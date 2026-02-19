@@ -91,11 +91,11 @@ def _build_response(data: dict) -> DailyAnalysis:
     analysis_raw = data.get("analysis", {})
 
     summary = AnalysisSummary(
-        productive_hours=summary_raw.get("productive_hours", 0.0),
-        wasted_hours=summary_raw.get("wasted_hours", 0.0),
-        youtube_hours=summary_raw.get("youtube_hours", 0.0),
-        task_completion_rate=summary_raw.get("task_completion_rate", 0.0),
-        overall_score=summary_raw.get("overall_score", 0),
+        productive_hours=summary_raw.get("productive_hours") or 0.0,
+        wasted_hours=summary_raw.get("wasted_hours") or 0.0,
+        youtube_hours=summary_raw.get("youtube_hours") or 0.0,
+        task_completion_rate=summary_raw.get("task_completion_rate") or 0.0,
+        overall_score=summary_raw.get("overall_score") or 0,
     )
 
     from models.schemas import ImprovementSuggestion, ComparisonWithPast
