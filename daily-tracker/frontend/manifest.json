@@ -1,0 +1,14 @@
+{
+  "name": "日次行動分析AI",
+  "short_name": "行動分析",
+  "description": "毎日の行動をAIが分析し改善提案するツール",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#1a1a2e",
+  "theme_color": "#16213e",
+  "orientation": "portrait",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
