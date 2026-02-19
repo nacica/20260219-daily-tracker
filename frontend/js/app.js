@@ -45,9 +45,23 @@ export function showToast(message, type = "info") {
   const toast = document.createElement("div");
   toast.className = `toast ${type}`;
   const icon = type === "error" ? "❌" : type === "success" ? "✅" : "ℹ️";
-  toast.innerHTML = `<span>${icon}</span><span>${message}</span>`;
-  container.appendChild(toast);
-  setTimeout(() => toast.remove(), 3000);
+
+  if (type === "error") {
+    toast.innerHTML = `<span>${icon}</span><span class="toast-msg">${message}</span><button class="toast-copy" title="コピー">📋</button>`;
+    const copyBtn = toast.querySelector(".toast-copy");
+    copyBtn.addEventListener("click", () => {
+      navigator.clipboard.writeText(message).then(() => {
+        copyBtn.textContent = "✅";
+        setTimeout(() => { copyBtn.textContent = "📋"; }, 1500);
+      });
+    });
+    container.appendChild(toast);
+    setTimeout(() => toast.remove(), 8000);
+  } else {
+    toast.innerHTML = `<span>${icon}</span><span>${message}</span>`;
+    container.appendChild(toast);
+    setTimeout(() => toast.remove(), 3000);
+  }
 }
 
 // ===== ホーム画面 =====

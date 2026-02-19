@@ -749,9 +749,30 @@ textarea {
   gap: 10px;
   animation: slideUp 0.3s ease, fadeOut 0.3s ease 2.7s forwards;
 }
+.toast.error {
+  animation: slideUp 0.3s ease, fadeOut 0.3s ease 7.7s forwards;
+}
 
 .toast.error   { border-color: rgba(255, 51, 102, 0.45); }
 .toast.success { border-color: rgba(0, 255, 148, 0.4); }
+
+.toast-msg { flex: 1; }
+
+.toast-copy {
+  background: none;
+  border: 1px solid rgba(255, 51, 102, 0.35);
+  border-radius: 4px;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.8rem;
+  padding: 2px 6px;
+  flex-shrink: 0;
+  transition: border-color 0.2s, color 0.2s;
+}
+.toast-copy:hover {
+  border-color: rgba(255, 51, 102, 0.7);
+  color: var(--text);
+}
 
 @keyframes slideUp {
   from { transform: translateY(16px); opacity: 0; }
