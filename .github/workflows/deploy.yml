@@ -69,28 +69,38 @@ jobs:
           workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
           service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
 
-      - name: Absolute Deploy
+      - name: Absolute Force Deploy
         env:
           FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
         run: |
           # 1. バックエンドURL取得
           BACKEND_URL=$(gcloud run services describe ${{ env.SERVICE_NAME }} --region ${{ env.REGION }} --project ${{ env.PROJECT_ID }} --format 'value(status.url)')
           
-          # 2. 混乱の元となる古い設定ファイルを削除
-          find . -name "firebase.json" -delete
+          # 2. 【超重要】リポジトリ内の全 firebase.json を物理的に削除
+          # これにより、古い設定が読み込まれる可能性を 0% にします
+          find . -name "firebase.json" -exec rm -f {} +
           
           # 3. フォルダを特定 (大文字小文字無視)
           RAW_DIR=$(ls -d [fF]rontend | head -n 1)
           
-          # 4. デプロイ専用のクリーンなフォルダ 'dist' を作成
+          # 4. デプロイ専用のフォルダ 'dist' を作成してコピー
           mkdir -p ./dist
           cp -r $RAW_DIR/* ./dist/
           
           # 5. URL置換
           sed -i "s|window.API_BASE_URL = \"http://localhost:8000/api/v1\"|window.API_BASE_URL = \"$BACKEND_URL/api/v1\"|" ./dist/index.html
           
-          # 6. その場で「最強のfirebase.json」を生成
-          echo "{\"hosting\": {\"public\": \"dist\", \"rewrites\": [{\"source\": \"**\", \"destination\": \"/index.html\"}]}}" > firebase.json
+          # 6. ルートディレクトリに、このジョブ専用の firebase.json を作り直す
+          # public を 'dist' に固定します
+          cat <<EOF > firebase.json
+          {
+            "hosting": {
+              "public": "dist",
+              "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+              "rewrites": [{"source": "**", "destination": "/index.html"}]
+            }
+          }
+          EOF
           
           # 7. デプロイ実行
           npm install -g firebase-tools
