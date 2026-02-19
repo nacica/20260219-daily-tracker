@@ -176,3 +176,4 @@ daily-tracker/
 - [ ] **Phase 2** - スクショ OCR + 履歴画面
 - [ ] **Phase 3** - 週次分析 + 改善追跡
 - [ ] **Phase 4** - Firebase Hosting + Cloud Run デプロイ
+
