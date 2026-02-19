@@ -24,6 +24,7 @@ export async function renderAnalysisView(date) {
     attachAnalysisEvents(date);
   } catch (err) {
     main.innerHTML = buildNoAnalysisHTML(date, err.message);
+    attachAnalysisEvents(date);
   }
 }
 
@@ -81,10 +82,10 @@ function buildAnalysisHTML(analysis) {
     ${buildListSection("🔍 根本原因の分析", detail.root_causes, "cause")}
 
     <!-- 思考の弱み -->
-    ${detail.thinking_weaknesses.length > 0 ? buildListSection("🧠 思考パターンの弱み", detail.thinking_weaknesses, "cause") : ""}
+    ${detail.thinking_weaknesses?.length > 0 ? buildListSection("🧠 思考パターンの弱み", detail.thinking_weaknesses, "cause") : ""}
 
     <!-- 行動の弱み -->
-    ${detail.behavior_weaknesses.length > 0 ? buildListSection("🔄 行動パターンの弱み", detail.behavior_weaknesses, "cause") : ""}
+    ${detail.behavior_weaknesses?.length > 0 ? buildListSection("🔄 行動パターンの弱み", detail.behavior_weaknesses, "cause") : ""}
 
     <!-- 改善提案 -->
     ${buildSuggestionsSection(detail.improvement_suggestions)}
