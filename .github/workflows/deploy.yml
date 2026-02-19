@@ -28,17 +28,12 @@ jobs:
           workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
           service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
 
-      - name: Set up Cloud SDK
-        uses: google-github-actions/setup-gcloud@v2
-        with:
-          project_id: ${{ env.PROJECT_ID }}
-
       - name: Build & Push Docker image
         run: |
-          # backend フォルダがあるか確認し、あれば移動してビルド
-          if [ -d "backend" ]; then cd backend; fi
           IMAGE="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/daily-tracker/${{ env.SERVICE_NAME }}:${{ github.sha }}"
           gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+          # backendフォルダに移動してビルド
+          cd $(ls -d [bB]ackend)
           docker build -t "$IMAGE" .
           docker push "$IMAGE"
           echo "IMAGE=$IMAGE" >> "$GITHUB_ENV"
@@ -75,37 +70,26 @@ jobs:
           workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
           service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
 
-      - name: Debug and Deploy
+      - name: Force Deploy to Firebase
         env:
           FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
         run: |
-          # 1. 現在の場所にあるファイル/フォルダを全表示 (ログで確認用)
-          echo "Checking directory structure..."
-          ls -R
-          
-          # 2. バックエンドURL取得
+          # 1. バックエンドURL取得
           BACKEND_URL=$(gcloud run services describe ${{ env.SERVICE_NAME }} --region ${{ env.REGION }} --project ${{ env.PROJECT_ID }} --format 'value(status.url)')
           
-          # 3. デプロイ対象のフォルダを自動判定
-          # frontend, Frontend, またはリポジトリのルートに index.html がある場合を想定
-          if [ -d "frontend" ]; then
-            PUB_DIR="frontend"
-          elif [ -d "Frontend" ]; then
-            PUB_DIR="Frontend"
-          elif [ -f "index.html" ]; then
-            PUB_DIR="."
-          else
-            echo "Error: Could not find frontend directory or index.html"
-            exit 1
-          fi
+          # 2. フォルダを特定 (大文字小文字無視)
+          RAW_DIR=$(ls -d [fF]rontend)
           
-          echo "Detected public directory: $PUB_DIR"
+          # 3. 作業用の一時フォルダ 'deploy_dist' を作成して中身をコピー
+          mkdir -p deploy_dist
+          cp -r $RAW_DIR/* deploy_dist/
           
-          # 4. URLを置換 (もしファイルがあれば)
-          if [ -f "$PUB_DIR/index.html" ]; then
-            sed -i "s|window.API_BASE_URL = \"http://localhost:8000/api/v1\"|window.API_BASE_URL = \"$BACKEND_URL/api/v1\"|" "$PUB_DIR/index.html"
-          fi
+          # 4. URLを置換
+          sed -i "s|window.API_BASE_URL = \"http://localhost:8000/api/v1\"|window.API_BASE_URL = \"$BACKEND_URL/api/v1\"|" deploy_dist/index.html
           
-          # 5. インストールとデプロイ
+          # 5. Firebase設定ファイルを「その場で生成」して矛盾をなくす
+          echo '{"hosting": {"public": "deploy_dist", "rewrites": [{"source": "**", "destination": "/index.html"}]}}' > firebase.json
+          
+          # 6. デプロイ実行
           npm install -g firebase-tools
-          firebase deploy --only hosting --project ${{ env.PROJECT_ID }} --non-interactive --token "$FIREBASE_TOKEN" --public "$PUB_DIR"
+          firebase deploy --only hosting --project ${{ env.PROJECT_ID }} --non-interactive --token "$FIREBASE_TOKEN"
