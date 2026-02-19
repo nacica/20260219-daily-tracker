@@ -10,7 +10,7 @@ env:
   REGION: asia-northeast1
   SERVICE_NAME: daily-tracker-api
 jobs:
-  deploy-all:
+  deploy:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -18,12 +18,11 @@ jobs:
         with:
           workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
           service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
-      
+
       - name: Build & Push Backend
         run: |
           IMAGE="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/daily-tracker/${{ env.SERVICE_NAME }}:${{ github.sha }}"
           gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
-          cd frontend/.. # ルートにいることを保証
           cd backend && docker build -t "$IMAGE" . && docker push "$IMAGE"
           echo "IMAGE=$IMAGE" >> "$GITHUB_ENV"
 
@@ -35,10 +34,15 @@ jobs:
         env:
           FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
         run: |
+          # バックエンドURLを取得して反映
           BACKEND_URL=$(gcloud run services describe ${{ env.SERVICE_NAME }} --region ${{ env.REGION }} --project ${{ env.PROJECT_ID }} --format 'value(status.url)')
+          
+          # frontendフォルダに移動
           cd frontend
-          # index.html の書き換え
+          
+          # index.html のAPI URLを書き換え
           sed -i "s|window.API_BASE_URL = \"http://localhost:8000/api/v1\"|window.API_BASE_URL = \"$BACKEND_URL/api/v1\"|" index.html
-          # デプロイ実行
+          
+          # デプロイ実行（ここで firebase.json の "public": "." が効く）
           npm install -g firebase-tools
           firebase deploy --only hosting --project ${{ env.PROJECT_ID }} --non-interactive --token "$FIREBASE_TOKEN"
