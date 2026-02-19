@@ -5,7 +5,7 @@
  *   - API リクエスト: Network First（オフライン時はキャッシュ）
  */
 
-const CACHE_NAME = "daily-tracker-v2";
+const CACHE_NAME = "daily-tracker-v3";
 const STATIC_ASSETS = [
   "/",
   "/index.html",
@@ -16,6 +16,9 @@ const STATIC_ASSETS = [
   "/js/components/input-form.js",
   "/js/components/analysis-view.js",
   "/manifest.json",
+  "/icons/icon-192.png",
+  "/icons/icon-512.png",
+  "/icons/apple-touch-icon.png",
 ];
 
 // インストール時に静的アセットをキャッシュ
