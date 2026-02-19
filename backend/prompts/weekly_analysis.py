@@ -91,7 +91,7 @@ def build_weekly_analysis_prompt(
             productive = s.get("productive_hours", 0)
             wasted = s.get("wasted_hours", 0)
             youtube = s.get("youtube_hours", 0)
-            task_rate = int(s.get("task_completion_rate", 0) * 100)
+            task_rate = int((s.get("task_completion_rate") or 0) * 100)
             lines.append(
                 f"- {date}: スコア={score}, 生産的={productive}h, "
                 f"無駄={wasted}h, YouTube={youtube}h, タスク完了={task_rate}%"
