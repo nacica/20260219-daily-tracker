@@ -13,8 +13,6 @@ env:
   PROJECT_ID: daily-tracker-487904
   REGION: asia-northeast1
   SERVICE_NAME: daily-tracker-api
-  BACKEND_DIR: backend
-  FRONTEND_DIR: frontend
 
 jobs:
   deploy-backend:
@@ -39,9 +37,9 @@ jobs:
         run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
 
       - name: Build & Push Docker image
-        working-directory: ${{ env.BACKEND_DIR }}
         run: |
           IMAGE="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/daily-tracker/${{ env.SERVICE_NAME }}:${{ github.sha }}"
+          cd backend
           docker build -t "$IMAGE" .
           docker push "$IMAGE"
           echo "IMAGE=$IMAGE" >> "$GITHUB_ENV"
@@ -78,20 +76,22 @@ jobs:
           workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
           service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
 
-      - name: Inject backend URL into index.html
-        run: |
-          BACKEND_URL=$(gcloud run services describe ${{ env.SERVICE_NAME }} --region ${{ env.REGION }} --project ${{ env.PROJECT_ID }} --format 'value(status.url)')
-          if [ -n "$BACKEND_URL" ]; then
-            sed -i "s|window.API_BASE_URL = \"http://localhost:8000/api/v1\"|window.API_BASE_URL = \"$BACKEND_URL/api/v1\"|" ${{ env.FRONTEND_DIR }}/index.html
-          fi
-
       - name: Install Firebase CLI
         run: npm install -g firebase-tools
 
       - name: Deploy to Firebase Hosting
-        # ポイント: frontend フォルダに移動して、その場で 「. (カレントディレクトリ)」をデプロイ
-        working-directory: ${{ env.FRONTEND_DIR }}
         env:
           FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
         run: |
-          firebase deploy --only hosting --project ${{ env.PROJECT_ID }} --non-interactive --token "$FIREBASE_TOKEN" --public .
+          # 1. バックエンドのURLを動的に取得
+          BACKEND_URL=$(gcloud run services describe ${{ env.SERVICE_NAME }} --region ${{ env.REGION }} --project ${{ env.PROJECT_ID }} --format 'value(status.url)')
+          
+          # 2. フォルダを問答無用で特定する (frontend または Frontend)
+          TARGET_DIR=$(ls -d [fF]rontend | head -n 1)
+          echo "Detected directory: $TARGET_DIR"
+          
+          # 3. index.html 内の URL を書き換える
+          sed -i "s|window.API_BASE_URL = \"http://localhost:8000/api/v1\"|window.API_BASE_URL = \"$BACKEND_URL/api/v1\"|" $TARGET_DIR/index.html
+          
+          # 4. そのフォルダを指定して、設定ファイル(firebase.json)を無視して強制デプロイ
+          firebase deploy --only hosting --project ${{ env.PROJECT_ID }} --non-interactive --token "$FIREBASE_TOKEN" --public $TARGET_DIR
