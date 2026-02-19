@@ -94,8 +94,9 @@ jobs:
         run: npm install -g firebase-tools
 
       - name: Deploy to Firebase Hosting
-        working-directory: ${{ env.FRONTEND_DIR }}
+        # working-directory を削除し、ルートから実行するように変更
         env:
           FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
         run: |
-          firebase deploy --only hosting --project ${{ env.PROJECT_ID }} --non-interactive --token "$FIREBASE_TOKEN"
+          # フォルダを明示的に指定してデプロイ
+          firebase deploy --only hosting --project ${{ env.PROJECT_ID }} --non-interactive --token "$FIREBASE_TOKEN" --public ${{ env.FRONTEND_DIR }}
