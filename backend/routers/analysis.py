@@ -21,40 +21,46 @@ async def generate_analysis(date: str):
     指定日の行動記録をもとに Claude API で日次分析を生成し保存する。
     過去7日間のデータも参照して比較分析を行う。
     """
-    # 行動記録の存在確認
-    record = firestore_service.get_record(date)
-    if not record:
-        raise HTTPException(
-            status_code=404,
-            detail=f"{date} の行動記録が見つかりません。先に POST /records で記録を作成してください。",
-        )
-
-    # 過去データの取得（比較分析用）
-    past_records = firestore_service.get_past_records(date, days=7)
-    past_analyses = firestore_service.get_past_analyses(date, days=7)
-
-    # Claude API で分析を生成
     try:
-        analysis_data = claude_service.generate_daily_analysis(
-            record=record,
-            past_records=past_records,
-            past_analyses=past_analyses,
-        )
+        # 行動記録の存在確認
+        record = firestore_service.get_record(date)
+        if not record:
+            raise HTTPException(
+                status_code=404,
+                detail=f"{date} の行動記録が見つかりません。先に POST /records で記録を作成してください。",
+            )
+
+        # 過去データの取得（比較分析用）
+        past_records = firestore_service.get_past_records(date, days=7)
+        past_analyses = firestore_service.get_past_analyses(date, days=7)
+
+        # Claude API で分析を生成
+        try:
+            analysis_data = claude_service.generate_daily_analysis(
+                record=record,
+                past_records=past_records,
+                past_analyses=past_analyses,
+            )
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Claude API エラー: {str(e)}")
+
+        # 分析結果を Firestore に保存
+        now = now_jst()
+        doc = {
+            "id": date,
+            "date": date,
+            "summary": analysis_data.get("summary", {}),
+            "analysis": analysis_data.get("analysis", {}),
+            "created_at": now,
+        }
+        saved = firestore_service.save_analysis(date, doc)
+
+        return _build_response(saved)
+
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Claude API エラー: {str(e)}")
-
-    # 分析結果を Firestore に保存
-    now = now_jst()
-    doc = {
-        "id": date,
-        "date": date,
-        "summary": analysis_data.get("summary", {}),
-        "analysis": analysis_data.get("analysis", {}),
-        "created_at": now,
-    }
-    saved = firestore_service.save_analysis(date, doc)
-
-    return _build_response(saved)
+        raise HTTPException(status_code=500, detail=f"サーバーエラー: {type(e).__name__}: {str(e)}")
 
 
 @router.get("/analysis/{date}", response_model=DailyAnalysis)
