@@ -3,8 +3,8 @@
  * 新規作成・既存レコードの編集に対応
  */
 
-import { recordsApi, analysisApi } from "../api.js";
-import { showToast } from "../app.js";
+import { recordsApi, analysisApi } from "../api.js?v=20260225d";
+import { showToast } from "../app.js?v=20260225d";
 
 /**
  * 入力フォームをメインエリアにレンダリングする
@@ -56,7 +56,7 @@ function buildFormHTML(date, record, tasks, isEdit) {
     </div>
 
     <div class="card">
-      <div class="card-title">タスク管理</div>
+      <div class="card-title">タスク管理 <span style="font-size:0.65rem;color:var(--text-muted);font-weight:400">build-d</span></div>
 
       <label>予定タスク</label>
       <ul class="task-list" id="planned-list">
