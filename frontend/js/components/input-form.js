@@ -6,9 +6,6 @@
 import { recordsApi, analysisApi } from "../api.js";
 import { showToast } from "../app.js";
 
-/* ---- DOM 参照（attachFormEvents で初期化） ---- */
-let _plannedList, _completedList;
-
 /**
  * 入力フォームをメインエリアにレンダリングする
  * @param {string} date - 対象日 (YYYY-MM-DD)
@@ -38,6 +35,10 @@ function buildFormHTML(date, record, tasks, isEdit) {
   const rawInput = record?.raw_input || "";
   const plannedTasks = tasks.planned || [];
   const completedTasks = tasks.completed || [];
+  const hasCompleted = completedTasks.length > 0;
+
+  // 未完了タスク → 仕切り → 完了タスク の順で 1 つの <ul> に入れる
+  const incompleteTasks = plannedTasks.filter((t) => !completedTasks.includes(t));
 
   return `
     <h2 style="margin-bottom: 4px; font-size: 1.2rem;">${isEdit ? "記録を編集" : "行動を記録"}</h2>
@@ -54,23 +55,18 @@ function buildFormHTML(date, record, tasks, isEdit) {
       </div>
     </div>
 
-    <div class="card" id="task-card">
+    <div class="card">
       <div class="card-title">タスク管理</div>
 
       <label>予定タスク</label>
       <ul class="task-list" id="planned-list">
-        ${plannedTasks.filter((t) => !completedTasks.includes(t)).map((t) => buildTaskItem(t, false)).join("")}
+        ${incompleteTasks.map((t) => buildTaskItem(t, false)).join("")}
+        <li class="completed-divider" id="completed-divider" style="${hasCompleted ? "" : "display:none"}">完了タスク <span class="completed-count" id="completed-count">${completedTasks.length}</span></li>
+        ${completedTasks.map((t) => buildTaskItem(t, true)).join("")}
       </ul>
       <div class="task-input-row">
         <input type="text" id="planned-input" placeholder="タスクを追加..." />
         <button class="btn btn-outline btn-sm" id="btn-add-task">追加</button>
-      </div>
-
-      <div class="completed-section" id="completed-section" style="${completedTasks.length ? "" : "display:none"}">
-        <label class="completed-section-label">完了タスク<span class="completed-count" id="completed-count">${completedTasks.length}</span></label>
-        <ul class="task-list" id="completed-list">
-          ${completedTasks.map((t) => buildTaskItem(t, true)).join("")}
-        </ul>
       </div>
     </div>
 
@@ -101,71 +97,25 @@ function buildTaskItem(taskText, isCompleted) {
     </li>`;
 }
 
-/* ---- 完了セクション表示更新 ---- */
-function syncCompletedSection() {
-  const section = document.getElementById("completed-section");
-  const list = document.getElementById("completed-list");
-  if (!section || !list) return;
-  const count = list.children.length;
+function syncDivider() {
+  const divider = document.getElementById("completed-divider");
+  if (!divider) return;
+  const count = document.querySelectorAll("#planned-list .task-item.completed").length;
+  divider.style.display = count > 0 ? "" : "none";
   document.getElementById("completed-count").textContent = count;
-  section.style.display = count > 0 ? "block" : "none";
-}
-
-/* ---- チェックボックスに直接リスナーを付与 ---- */
-function bindCheckbox(checkbox) {
-  checkbox.addEventListener("click", function (e) {
-    // ブラウザのデフォルト動作（checked 切り替え）を先に完了させるため
-    // DOM 移動を次フレームに遅延
-    const cb = this;
-    const checked = cb.checked;
-    e.stopPropagation();          // 親への伝搬を止め干渉を防ぐ
-    requestAnimationFrame(() => {
-      const li = cb.closest("li");
-      if (!li) return;
-      if (checked) {
-        li.classList.add("completed");
-        _completedList.appendChild(li);
-      } else {
-        li.classList.remove("completed");
-        _plannedList.appendChild(li);
-      }
-      syncCompletedSection();
-    });
-  });
-}
-
-/* ---- 削除ボタン（イベント委任 — click） ---- */
-function bindRemoveButtons(container) {
-  container.addEventListener("click", (e) => {
-    const btn = e.target.closest(".task-remove");
-    if (!btn) return;
-    const li = btn.closest("li");
-    if (!li) return;
-    li.remove();
-    syncCompletedSection();
-  });
 }
 
 function attachFormEvents(date, isEdit) {
-  _plannedList = document.getElementById("planned-list");
-  _completedList = document.getElementById("completed-list");
+  const plannedList = document.getElementById("planned-list");
   const plannedInput = document.getElementById("planned-input");
-
-  // 既存チェックボックスにリスナーを付与
-  document.querySelectorAll("#task-card input[type='checkbox']").forEach(bindCheckbox);
-
-  // 削除ボタン（イベント委任）
-  bindRemoveButtons(_plannedList);
-  bindRemoveButtons(_completedList);
 
   // タスク追加
   function addTask() {
     const text = plannedInput.value.trim();
     if (!text) return;
-    _plannedList.insertAdjacentHTML("beforeend", buildTaskItem(text, false));
-    // 新しく追加されたチェックボックスにもリスナーを付与
-    const newCb = _plannedList.lastElementChild.querySelector("input[type='checkbox']");
-    if (newCb) bindCheckbox(newCb);
+    // 仕切りの直前に未完了タスクとして挿入
+    const divider = document.getElementById("completed-divider");
+    divider.insertAdjacentHTML("beforebegin", buildTaskItem(text, false));
     plannedInput.value = "";
     plannedInput.focus();
   }
@@ -173,6 +123,21 @@ function attachFormEvents(date, isEdit) {
   document.getElementById("btn-add-task").addEventListener("click", addTask);
   plannedInput.addEventListener("keydown", (e) => {
     if (e.key === "Enter") { e.preventDefault(); addTask(); }
+  });
+
+  // タスク削除 & チェックボックス切り替え（イベント委任）
+  plannedList.addEventListener("click", (e) => {
+    // 削除ボタン
+    if (e.target.dataset.remove !== undefined) {
+      e.target.closest("li").remove();
+      syncDivider();
+      return;
+    }
+    // チェックボックス — クラスを切り替えるだけ（CSS order が移動を担当）
+    if (e.target.type === "checkbox") {
+      e.target.closest("li").classList.toggle("completed", e.target.checked);
+      syncDivider();
+    }
   });
 
   // フォーム送信
@@ -206,16 +171,14 @@ async function submitForm(date, isEdit, btn) {
     return;
   }
 
-  // タスクリストを収集（予定リスト + 完了リスト両方から）
-  const pendingTasks = [...document.querySelectorAll("#planned-list .task-item span")]
+  // 1 つのリストからタスクを収集
+  const plannedTasks = [...document.querySelectorAll("#planned-list .task-item span")]
     .map((el) => el.textContent.trim())
     .filter(Boolean);
 
-  const completedTasks = [...document.querySelectorAll("#completed-list .task-item span")]
+  const completedTasks = [...document.querySelectorAll("#planned-list .task-item.completed span")]
     .map((el) => el.textContent.trim())
     .filter(Boolean);
-
-  const plannedTasks = [...pendingTasks, ...completedTasks];
 
   btn.disabled = true;
   const originalText = btn.textContent;

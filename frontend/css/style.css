@@ -514,20 +514,20 @@ textarea {
 
 .task-remove:hover { color: var(--neon-red); }
 
-/* 完了タスクセクション */
-.completed-section {
-  margin-top: 16px;
-  padding-top: 14px;
-  border-top: 1px solid var(--border);
-}
+/* 完了タスク — CSS order で下に移動 */
+.task-item.completed { order: 2; }
 
-.completed-section-label {
+.completed-divider {
+  order: 1;
   display: flex;
   align-items: center;
   gap: 8px;
+  padding: 10px 0 4px;
+  margin-top: 6px;
+  border-top: 1px solid var(--border);
   color: var(--text-muted);
   font-size: 0.85rem;
-  margin-bottom: 8px;
+  list-style: none;
 }
 
 .completed-count {
