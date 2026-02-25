@@ -36,14 +36,25 @@ const CACHE_NAME = "daily-tracker-v5";
 const CACHE_NAME = "daily-tracker-v6";
 ```
 
-### 2. CSS/JS リンクのキャッシュバスティング
+### 2. CSS/JS リンク + ES Module import のキャッシュバスティング
 
-`frontend/index.html` の CSS・JS リンクのクエリパラメータを更新する。
-CDN やブラウザキャッシュが古いファイルを返すのを防ぐ。
+以下 **3 箇所すべて** の `?v=` を同じ値に更新すること。
+iOS PWA では ES Module のメモリキャッシュが残り続け、
+index.html の CSS/JS だけバンプしても古い JS モジュールが配信される。
+
+1. `frontend/index.html` — CSS `<link>` と `<script>` タグ
+2. `frontend/js/app.js` — すべての `import ... from "...?v=..."` 行
+3. `frontend/js/components/input-form.js` — `import` 行
 
 ```html
-<!-- v=YYYYMMDD 形式で当日の日付に更新 -->
-<link rel="stylesheet" href="/css/style.css?v=20260225" />
+<!-- index.html: v=YYYYMMDDx 形式で更新 -->
+<link rel="stylesheet" href="/css/style.css?v=20260225e" />
+<script type="module" src="/js/app.js?v=20260225e"></script>
+```
+
+```js
+// app.js / input-form.js: import パスも同じバージョンに更新
+import { renderInputForm } from "./components/input-form.js?v=20260225e";
 ```
 
 ### 3. Firebase Hosting キャッシュヘッダー
