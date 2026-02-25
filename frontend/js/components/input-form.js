@@ -6,6 +6,9 @@
 import { recordsApi, analysisApi } from "../api.js";
 import { showToast } from "../app.js";
 
+/* ---- DOM 参照（attachFormEvents で初期化） ---- */
+let _plannedList, _completedList;
+
 /**
  * 入力フォームをメインエリアにレンダリングする
  * @param {string} date - 対象日 (YYYY-MM-DD)
@@ -98,24 +101,71 @@ function buildTaskItem(taskText, isCompleted) {
     </li>`;
 }
 
-function updateCompletedSection() {
+/* ---- 完了セクション表示更新 ---- */
+function syncCompletedSection() {
   const section = document.getElementById("completed-section");
-  const completedList = document.getElementById("completed-list");
-  const count = completedList.querySelectorAll(".task-item").length;
+  const list = document.getElementById("completed-list");
+  if (!section || !list) return;
+  const count = list.children.length;
   document.getElementById("completed-count").textContent = count;
-  section.style.display = count ? "" : "none";
+  section.style.display = count > 0 ? "block" : "none";
+}
+
+/* ---- チェックボックスに直接リスナーを付与 ---- */
+function bindCheckbox(checkbox) {
+  checkbox.addEventListener("click", function (e) {
+    // ブラウザのデフォルト動作（checked 切り替え）を先に完了させるため
+    // DOM 移動を次フレームに遅延
+    const cb = this;
+    const checked = cb.checked;
+    e.stopPropagation();          // 親への伝搬を止め干渉を防ぐ
+    requestAnimationFrame(() => {
+      const li = cb.closest("li");
+      if (!li) return;
+      if (checked) {
+        li.classList.add("completed");
+        _completedList.appendChild(li);
+      } else {
+        li.classList.remove("completed");
+        _plannedList.appendChild(li);
+      }
+      syncCompletedSection();
+    });
+  });
+}
+
+/* ---- 削除ボタン（イベント委任 — click） ---- */
+function bindRemoveButtons(container) {
+  container.addEventListener("click", (e) => {
+    const btn = e.target.closest(".task-remove");
+    if (!btn) return;
+    const li = btn.closest("li");
+    if (!li) return;
+    li.remove();
+    syncCompletedSection();
+  });
 }
 
 function attachFormEvents(date, isEdit) {
-  const plannedList = document.getElementById("planned-list");
-  const completedList = document.getElementById("completed-list");
+  _plannedList = document.getElementById("planned-list");
+  _completedList = document.getElementById("completed-list");
   const plannedInput = document.getElementById("planned-input");
+
+  // 既存チェックボックスにリスナーを付与
+  document.querySelectorAll("#task-card input[type='checkbox']").forEach(bindCheckbox);
+
+  // 削除ボタン（イベント委任）
+  bindRemoveButtons(_plannedList);
+  bindRemoveButtons(_completedList);
 
   // タスク追加
   function addTask() {
     const text = plannedInput.value.trim();
     if (!text) return;
-    plannedList.insertAdjacentHTML("beforeend", buildTaskItem(text, false));
+    _plannedList.insertAdjacentHTML("beforeend", buildTaskItem(text, false));
+    // 新しく追加されたチェックボックスにもリスナーを付与
+    const newCb = _plannedList.lastElementChild.querySelector("input[type='checkbox']");
+    if (newCb) bindCheckbox(newCb);
     plannedInput.value = "";
     plannedInput.focus();
   }
@@ -123,31 +173,6 @@ function attachFormEvents(date, isEdit) {
   document.getElementById("btn-add-task").addEventListener("click", addTask);
   plannedInput.addEventListener("keydown", (e) => {
     if (e.key === "Enter") { e.preventDefault(); addTask(); }
-  });
-
-  const taskCard = document.getElementById("task-card");
-
-  // タスク削除（イベント委任 — click）
-  taskCard.addEventListener("click", (e) => {
-    if (e.target.dataset.remove === undefined) return;
-    const li = e.target.closest("li");
-    const wasCompleted = li.classList.contains("completed");
-    li.remove();
-    if (wasCompleted) updateCompletedSection();
-  });
-
-  // チェックボックス切り替え（change イベントで確実に状態取得）
-  taskCard.addEventListener("change", (e) => {
-    if (e.target.type !== "checkbox") return;
-    const li = e.target.closest("li");
-    if (e.target.checked) {
-      li.classList.add("completed");
-      completedList.appendChild(li);
-    } else {
-      li.classList.remove("completed");
-      plannedList.appendChild(li);
-    }
-    updateCompletedSection();
   });
 
   // フォーム送信
