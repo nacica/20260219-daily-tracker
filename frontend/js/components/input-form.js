@@ -3,8 +3,8 @@
  * 新規作成・既存レコードの編集に対応
  */
 
-import { recordsApi, analysisApi } from "../api.js?v=20260225g";
-import { showToast } from "../app.js?v=20260225g";
+import { recordsApi, analysisApi } from "../api.js?v=20260225h";
+import { showToast } from "../app.js?v=20260225h";
 
 /**
  * 入力フォームをメインエリアにレンダリングする
@@ -169,6 +169,7 @@ function attachFormEvents(date, isEdit) {
     if (e.target.dataset.remove !== undefined) {
       e.target.closest("li").remove();
       syncCompletedCard();
+      saveDataQuietly();
       return;
     }
     // チェックボックス — リスト間で移動
@@ -182,6 +183,7 @@ function attachFormEvents(date, isEdit) {
         plannedList.appendChild(li);
       }
       syncCompletedCard();
+      saveDataQuietly();
     }
   }
 
