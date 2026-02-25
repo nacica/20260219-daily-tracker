@@ -22,28 +22,36 @@ def get_client() -> anthropic.Anthropic:
     return anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 
 
+RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 529}
+
+
 def _call_claude_with_retry(client, **kwargs):
     """
     Claude API をリトライ付きで呼び出す。
-    overloaded / rate_limit / 500 エラー時に指数バックオフでリトライ。
+    overloaded(529) / rate_limit(429) / 5xx エラー時に指数バックオフでリトライ。
     """
-    retryable = (
-        anthropic.OverloadedError,
-        anthropic.RateLimitError,
-        anthropic.InternalServerError,
-        anthropic.APIConnectionError,
-    )
     for attempt in range(MAX_RETRIES):
         try:
             with client.messages.stream(**kwargs) as stream:
                 return stream.get_final_message()
-        except retryable as e:
+        except anthropic.APIConnectionError as e:
             if attempt == MAX_RETRIES - 1:
                 raise
             wait = INITIAL_BACKOFF * (2 ** attempt)
             logger.warning(
-                "Claude API 一時エラー (attempt %d/%d): %s. %d秒後にリトライ...",
+                "Claude API 接続エラー (attempt %d/%d): %s. %d秒後にリトライ...",
                 attempt + 1, MAX_RETRIES, e, wait,
+            )
+            time.sleep(wait)
+        except anthropic.APIStatusError as e:
+            if e.status_code not in RETRYABLE_STATUS_CODES:
+                raise
+            if attempt == MAX_RETRIES - 1:
+                raise
+            wait = INITIAL_BACKOFF * (2 ** attempt)
+            logger.warning(
+                "Claude API HTTP %d エラー (attempt %d/%d): %s. %d秒後にリトライ...",
+                e.status_code, attempt + 1, MAX_RETRIES, e, wait,
             )
             time.sleep(wait)
 
