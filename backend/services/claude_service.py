@@ -5,14 +5,47 @@ Claude API サービス
 
 import os
 import json
+import time
+import logging
 import anthropic
 from prompts.daily_analysis import DAILY_ANALYSIS_SYSTEM_PROMPT, build_daily_analysis_prompt
 from prompts.weekly_analysis import WEEKLY_ANALYSIS_SYSTEM_PROMPT, build_weekly_analysis_prompt
+
+logger = logging.getLogger(__name__)
+
+MAX_RETRIES = 3
+INITIAL_BACKOFF = 2  # seconds
 
 
 def get_client() -> anthropic.Anthropic:
     """Anthropic クライアントを返す"""
     return anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+
+
+def _call_claude_with_retry(client, **kwargs):
+    """
+    Claude API をリトライ付きで呼び出す。
+    overloaded / rate_limit / 500 エラー時に指数バックオフでリトライ。
+    """
+    retryable = (
+        anthropic.OverloadedError,
+        anthropic.RateLimitError,
+        anthropic.InternalServerError,
+        anthropic.APIConnectionError,
+    )
+    for attempt in range(MAX_RETRIES):
+        try:
+            with client.messages.stream(**kwargs) as stream:
+                return stream.get_final_message()
+        except retryable as e:
+            if attempt == MAX_RETRIES - 1:
+                raise
+            wait = INITIAL_BACKOFF * (2 ** attempt)
+            logger.warning(
+                "Claude API 一時エラー (attempt %d/%d): %s. %d秒後にリトライ...",
+                attempt + 1, MAX_RETRIES, e, wait,
+            )
+            time.sleep(wait)
 
 
 def generate_daily_analysis(
@@ -43,14 +76,14 @@ def generate_daily_analysis(
         past_analyses=past_analyses or [],
     )
 
-    # ストリーミングで呼び出し（タイムアウト対策）
-    with client.messages.stream(
+    # リトライ付きで呼び出し（overloaded / rate_limit 対策）
+    response = _call_claude_with_retry(
+        client,
         model=model,
         max_tokens=4096,
         system=DAILY_ANALYSIS_SYSTEM_PROMPT,
         messages=[{"role": "user", "content": user_prompt}],
-    ) as stream:
-        response = stream.get_final_message()
+    )
 
     raw_text = response.content[0].text
 
@@ -99,7 +132,8 @@ is_productive:
 - 娯楽（1時間以内）→ true
 - 娯楽（1時間超）・無駄時間 → false"""
 
-    with client.messages.stream(
+    response = _call_claude_with_retry(
+        client,
         model=model,
         max_tokens=2048,
         system=system_prompt,
@@ -109,8 +143,7 @@ is_productive:
                 "content": f"以下の{date}の行動記録を構造化してください:\n\n{raw_input}",
             }
         ],
-    ) as stream:
-        response = stream.get_final_message()
+    )
 
     raw_text = response.content[0].text
     activities = _extract_json(raw_text)
@@ -149,13 +182,13 @@ def generate_weekly_analysis(
         last_week_analysis=last_week_analysis,
     )
 
-    with client.messages.stream(
+    response = _call_claude_with_retry(
+        client,
         model=model,
         max_tokens=6144,
         system=WEEKLY_ANALYSIS_SYSTEM_PROMPT,
         messages=[{"role": "user", "content": user_prompt}],
-    ) as stream:
-        response = stream.get_final_message()
+    )
 
     raw_text = response.content[0].text
     return _extract_json(raw_text)
