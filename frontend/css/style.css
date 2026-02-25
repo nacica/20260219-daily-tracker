@@ -100,7 +100,9 @@ body {
   backdrop-filter: blur(24px) saturate(180%);
   -webkit-backdrop-filter: blur(24px) saturate(180%);
   border-bottom: 1px solid var(--border);
-  padding: 44px var(--gap) 0;
+  padding: 48px var(--gap) 0;
+  padding: constant(safe-area-inset-top) var(--gap) 0;
+  padding: env(safe-area-inset-top, 48px) var(--gap) 0;
 }
 
 /* Cyan accent line at the very top */
