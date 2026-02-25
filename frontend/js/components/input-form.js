@@ -56,11 +56,18 @@ function buildFormHTML(date, record, tasks, isEdit) {
 
       <label>予定タスク</label>
       <ul class="task-list" id="planned-list">
-        ${plannedTasks.map((t) => buildTaskItem(t, completedTasks.includes(t))).join("")}
+        ${plannedTasks.filter((t) => !completedTasks.includes(t)).map((t) => buildTaskItem(t, false)).join("")}
       </ul>
       <div class="task-input-row">
         <input type="text" id="planned-input" placeholder="タスクを追加..." />
         <button class="btn btn-outline btn-sm" id="btn-add-task">追加</button>
+      </div>
+
+      <div class="completed-section" id="completed-section" style="${completedTasks.length ? "" : "display:none"}">
+        <label class="completed-section-label">完了タスク<span class="completed-count" id="completed-count">${completedTasks.length}</span></label>
+        <ul class="task-list" id="completed-list">
+          ${completedTasks.map((t) => buildTaskItem(t, true)).join("")}
+        </ul>
       </div>
     </div>
 
@@ -91,8 +98,17 @@ function buildTaskItem(taskText, isCompleted) {
     </li>`;
 }
 
+function updateCompletedSection() {
+  const section = document.getElementById("completed-section");
+  const completedList = document.getElementById("completed-list");
+  const count = completedList.querySelectorAll(".task-item").length;
+  document.getElementById("completed-count").textContent = count;
+  section.style.display = count ? "" : "none";
+}
+
 function attachFormEvents(date, isEdit) {
   const plannedList = document.getElementById("planned-list");
+  const completedList = document.getElementById("completed-list");
   const plannedInput = document.getElementById("planned-input");
 
   // タスク追加
@@ -109,13 +125,30 @@ function attachFormEvents(date, isEdit) {
     if (e.key === "Enter") { e.preventDefault(); addTask(); }
   });
 
-  // タスク削除 & チェックボックス（イベント委任）
+  // タスク削除 & チェック → 完了リストへ移動（イベント委任）
   plannedList.addEventListener("click", (e) => {
     if (e.target.dataset.remove !== undefined) {
       e.target.closest("li").remove();
     }
-    if (e.target.type === "checkbox") {
-      e.target.closest("li").classList.toggle("completed", e.target.checked);
+    if (e.target.type === "checkbox" && e.target.checked) {
+      const li = e.target.closest("li");
+      li.classList.add("completed");
+      completedList.appendChild(li);
+      updateCompletedSection();
+    }
+  });
+
+  // 完了リスト: 削除 & チェック解除 → 予定リストへ戻す
+  completedList.addEventListener("click", (e) => {
+    if (e.target.dataset.remove !== undefined) {
+      e.target.closest("li").remove();
+      updateCompletedSection();
+    }
+    if (e.target.type === "checkbox" && !e.target.checked) {
+      const li = e.target.closest("li");
+      li.classList.remove("completed");
+      plannedList.appendChild(li);
+      updateCompletedSection();
     }
   });
 
@@ -150,14 +183,16 @@ async function submitForm(date, isEdit, btn) {
     return;
   }
 
-  // タスクリストを収集
-  const plannedTasks = [...document.querySelectorAll("#planned-list .task-item span")]
+  // タスクリストを収集（予定リスト + 完了リスト両方から）
+  const pendingTasks = [...document.querySelectorAll("#planned-list .task-item span")]
     .map((el) => el.textContent.trim())
     .filter(Boolean);
 
-  const completedTasks = [...document.querySelectorAll("#planned-list .task-item.completed span")]
+  const completedTasks = [...document.querySelectorAll("#completed-list .task-item span")]
     .map((el) => el.textContent.trim())
     .filter(Boolean);
+
+  const plannedTasks = [...pendingTasks, ...completedTasks];
 
   btn.disabled = true;
   const originalText = btn.textContent;
