@@ -77,33 +77,33 @@ async def get_record(date: str):
 @router.put("/records/{date}", response_model=DailyRecord)
 async def update_record(date: str, body: RecordUpdate):
     """行動記録を更新する"""
+    existing = firestore_service.get_record(date)
+    if not existing:
+        raise HTTPException(status_code=404, detail=f"{date} の記録が見つかりません")
+
     update_data: dict = {"updated_at": now_jst()}
 
     if body.raw_input is not None:
         update_data["raw_input"] = body.raw_input
-        # テキストが更新された場合は再構造化
-        try:
-            parsed = claude_service.parse_activities(body.raw_input, date)
-            update_data["parsed_activities"] = parsed
-        except Exception:
-            pass
+        # raw_input が実際に変更された場合のみ再構造化（Claude API 呼び出しは重いため）
+        if body.raw_input != existing.get("raw_input", ""):
+            try:
+                parsed = claude_service.parse_activities(body.raw_input, date)
+                update_data["parsed_activities"] = parsed
+            except Exception:
+                pass
 
     if body.tasks_planned is not None or body.tasks_completed is not None:
-        # タスク情報を更新し、完了率を再計算
-        existing = firestore_service.get_record(date)
-        if existing:
-            planned = body.tasks_planned if body.tasks_planned is not None else existing.get("tasks", {}).get("planned", [])
-            completed = body.tasks_completed if body.tasks_completed is not None else existing.get("tasks", {}).get("completed", [])
-            completion_rate = len(completed) / len(planned) if planned else 0.0
-            update_data["tasks"] = {
-                "planned": planned,
-                "completed": completed,
-                "completion_rate": completion_rate,
-            }
+        planned = body.tasks_planned if body.tasks_planned is not None else existing.get("tasks", {}).get("planned", [])
+        completed = body.tasks_completed if body.tasks_completed is not None else existing.get("tasks", {}).get("completed", [])
+        completion_rate = len(completed) / len(planned) if planned else 0.0
+        update_data["tasks"] = {
+            "planned": planned,
+            "completed": completed,
+            "completion_rate": completion_rate,
+        }
 
     updated = firestore_service.update_record(date, update_data)
-    if not updated:
-        raise HTTPException(status_code=404, detail=f"{date} の記録が見つかりません")
     return DailyRecord(**updated)
 
 
