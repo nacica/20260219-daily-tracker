@@ -167,6 +167,7 @@ async function submitForm(date, isEdit, btn) {
     if (isEdit) {
       await recordsApi.update(date, {
         raw_input: rawInput,
+        tasks_planned: plannedTasks,
         tasks_completed: completedTasks,
       });
       showToast("記録を更新しました！", "success");

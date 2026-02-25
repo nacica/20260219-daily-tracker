@@ -51,6 +51,7 @@ class RecordCreate(BaseModel):
 class RecordUpdate(BaseModel):
     """行動記録更新リクエスト"""
     raw_input: Optional[str] = None
+    tasks_planned: Optional[list[str]] = None
     tasks_completed: Optional[list[str]] = None
 
 

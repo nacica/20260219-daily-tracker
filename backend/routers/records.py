@@ -88,15 +88,16 @@ async def update_record(date: str, body: RecordUpdate):
         except Exception:
             pass
 
-    if body.tasks_completed is not None:
-        # 完了タスクを更新し、完了率を再計算
+    if body.tasks_planned is not None or body.tasks_completed is not None:
+        # タスク情報を更新し、完了率を再計算
         existing = firestore_service.get_record(date)
         if existing:
-            planned = existing.get("tasks", {}).get("planned", [])
-            completion_rate = len(body.tasks_completed) / len(planned) if planned else 0.0
+            planned = body.tasks_planned if body.tasks_planned is not None else existing.get("tasks", {}).get("planned", [])
+            completed = body.tasks_completed if body.tasks_completed is not None else existing.get("tasks", {}).get("completed", [])
+            completion_rate = len(completed) / len(planned) if planned else 0.0
             update_data["tasks"] = {
                 "planned": planned,
-                "completed": body.tasks_completed,
+                "completed": completed,
                 "completion_rate": completion_rate,
             }
 
