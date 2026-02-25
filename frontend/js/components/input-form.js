@@ -3,8 +3,8 @@
  * 新規作成・既存レコードの編集に対応
  */
 
-import { recordsApi, analysisApi } from "../api.js?v=20260225i";
-import { showToast } from "../app.js?v=20260225i";
+import { recordsApi, analysisApi } from "../api.js?v=20260225j";
+import { showToast } from "../app.js?v=20260225j";
 
 /**
  * 入力フォームをメインエリアにレンダリングする
@@ -116,8 +116,16 @@ function attachFormEvents(date, isEdit) {
 
   const completedList = document.getElementById("completed-list");
 
-  // バックグラウンド自動保存
+  // バックグラウンド自動保存（排他制御付き）
+  let isSaving = false;
+  let pendingSave = false;
+
   async function saveDataQuietly() {
+    if (isSaving) {
+      pendingSave = true;
+      return;
+    }
+
     const rawInput = document.getElementById("raw-input").value.trim();
     if (!isEdit && !rawInput) return; // 新規作成時は行動ログが必要
 
@@ -129,6 +137,7 @@ function attachFormEvents(date, isEdit) {
       .filter(Boolean);
     const plannedTasks = [...incompleteTasks, ...completedTasks];
 
+    isSaving = true;
     try {
       if (isEdit) {
         await recordsApi.update(date, {
@@ -143,8 +152,14 @@ function attachFormEvents(date, isEdit) {
         if (btnSubmit) btnSubmit.textContent = "✏️ 記録を更新する";
       }
       showToast("自動保存しました", "success");
-    } catch {
-      // メイン保存ボタンで再試行可能
+    } catch (err) {
+      showToast("自動保存に失敗しました: " + err.message, "error");
+    } finally {
+      isSaving = false;
+      if (pendingSave) {
+        pendingSave = false;
+        saveDataQuietly();
+      }
     }
   }
 
