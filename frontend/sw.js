@@ -5,7 +5,7 @@
  *   - API リクエスト: Network First（オフライン時はキャッシュ）
  */
 
-const CACHE_NAME = "daily-tracker-v3";
+const CACHE_NAME = "daily-tracker-v4";
 const STATIC_ASSETS = [
   "/",
   "/index.html",
@@ -15,6 +15,10 @@ const STATIC_ASSETS = [
   "/js/router.js",
   "/js/components/input-form.js",
   "/js/components/analysis-view.js",
+  "/js/components/history-list.js",
+  "/js/components/weekly-report.js",
+  "/js/components/screenshot-upload.js",
+  "/js/components/suggestions.js",
   "/manifest.json",
   "/icons/icon-192.png",
   "/icons/icon-512.png",
@@ -52,7 +56,13 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // 静的アセットは Cache First
+  // JS/CSS は Network First（デプロイ後すぐ反映させるため）
+  if (url.pathname.endsWith(".js") || url.pathname.endsWith(".css")) {
+    event.respondWith(networkFirst(request));
+    return;
+  }
+
+  // その他の静的アセット（HTML, 画像, manifest等）は Cache First
   event.respondWith(cacheFirst(request));
 });
 
