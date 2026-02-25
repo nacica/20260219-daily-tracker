@@ -51,7 +51,7 @@ function buildFormHTML(date, record, tasks, isEdit) {
       </div>
     </div>
 
-    <div class="card">
+    <div class="card" id="task-card">
       <div class="card-title">タスク管理</div>
 
       <label>予定タスク</label>
@@ -125,31 +125,29 @@ function attachFormEvents(date, isEdit) {
     if (e.key === "Enter") { e.preventDefault(); addTask(); }
   });
 
-  // タスク削除 & チェック → 完了リストへ移動（イベント委任）
-  plannedList.addEventListener("click", (e) => {
-    if (e.target.dataset.remove !== undefined) {
-      e.target.closest("li").remove();
-    }
-    if (e.target.type === "checkbox" && e.target.checked) {
-      const li = e.target.closest("li");
-      li.classList.add("completed");
-      completedList.appendChild(li);
-      updateCompletedSection();
-    }
+  const taskCard = document.getElementById("task-card");
+
+  // タスク削除（イベント委任 — click）
+  taskCard.addEventListener("click", (e) => {
+    if (e.target.dataset.remove === undefined) return;
+    const li = e.target.closest("li");
+    const wasCompleted = li.classList.contains("completed");
+    li.remove();
+    if (wasCompleted) updateCompletedSection();
   });
 
-  // 完了リスト: 削除 & チェック解除 → 予定リストへ戻す
-  completedList.addEventListener("click", (e) => {
-    if (e.target.dataset.remove !== undefined) {
-      e.target.closest("li").remove();
-      updateCompletedSection();
-    }
-    if (e.target.type === "checkbox" && !e.target.checked) {
-      const li = e.target.closest("li");
+  // チェックボックス切り替え（change イベントで確実に状態取得）
+  taskCard.addEventListener("change", (e) => {
+    if (e.target.type !== "checkbox") return;
+    const li = e.target.closest("li");
+    if (e.target.checked) {
+      li.classList.add("completed");
+      completedList.appendChild(li);
+    } else {
       li.classList.remove("completed");
       plannedList.appendChild(li);
-      updateCompletedSection();
     }
+    updateCompletedSection();
   });
 
   // フォーム送信
