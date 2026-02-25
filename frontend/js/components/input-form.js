@@ -3,8 +3,8 @@
  * 新規作成・既存レコードの編集に対応
  */
 
-import { recordsApi, analysisApi } from "../api.js?v=20260225h";
-import { showToast } from "../app.js?v=20260225h";
+import { recordsApi, analysisApi } from "../api.js?v=20260225i";
+import { showToast } from "../app.js?v=20260225i";
 
 /**
  * 入力フォームをメインエリアにレンダリングする
@@ -147,6 +147,13 @@ function attachFormEvents(date, isEdit) {
       // メイン保存ボタンで再試行可能
     }
   }
+
+  // 行動ログの入力が止まったら自動保存（デバウンス 1.5 秒）
+  let rawInputTimer = null;
+  document.getElementById("raw-input").addEventListener("input", () => {
+    clearTimeout(rawInputTimer);
+    rawInputTimer = setTimeout(saveDataQuietly, 1500);
+  });
 
   // タスク追加
   function addTask() {
