@@ -100,8 +100,7 @@ body {
   backdrop-filter: blur(24px) saturate(180%);
   -webkit-backdrop-filter: blur(24px) saturate(180%);
   border-bottom: 1px solid var(--border);
-  padding: 0 var(--gap);
-  padding: max(env(safe-area-inset-top, 0px), 28px) var(--gap) 0;
+  padding: 44px var(--gap) 0;
 }
 
 /* Cyan accent line at the very top */
@@ -1132,6 +1131,8 @@ textarea {
 /* ===== デスクトップ対応 ===== */
 
 @media (min-width: 640px) {
+  .nav { padding-top: 0; }
+
   .stats-grid {
     grid-template-columns: repeat(4, 1fr);
   }
