@@ -18,3 +18,35 @@ git push origin main
 
 **push 後は `gh run watch` でデプロイ完了を確認してからユーザーに報告すること。**
 デプロイが失敗した場合はログを確認し、原因を報告する。
+
+## フロントエンド変更時の必須チェックリスト
+
+フロントエンド (HTML/CSS/JS) を変更した場合、**以下を毎回必ず実施する**こと。
+過去にこれを怠り、変更がユーザーに届かない障害が発生した。
+
+### 1. SW キャッシュバージョンのバンプ
+
+`frontend/sw.js` の `CACHE_NAME` を必ずインクリメントする。
+バンプしないと古いキャッシュが残り続け、変更がユーザーに届かない。
+
+```js
+// 変更前
+const CACHE_NAME = "daily-tracker-v5";
+// 変更後（数字を +1）
+const CACHE_NAME = "daily-tracker-v6";
+```
+
+### 2. CSS/JS リンクのキャッシュバスティング
+
+`frontend/index.html` の CSS・JS リンクのクエリパラメータを更新する。
+CDN やブラウザキャッシュが古いファイルを返すのを防ぐ。
+
+```html
+<!-- v=YYYYMMDD 形式で当日の日付に更新 -->
+<link rel="stylesheet" href="/css/style.css?v=20260225" />
+```
+
+### 3. Firebase Hosting キャッシュヘッダー
+
+`firebase.json` で HTML/CSS/JS に `Cache-Control: no-cache` が設定済み。
+**この設定を削除しないこと。** 削除すると CDN が古いファイルを配信し続ける。
