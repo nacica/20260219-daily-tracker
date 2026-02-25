@@ -3,8 +3,8 @@
  * 新規作成・既存レコードの編集に対応
  */
 
-import { recordsApi, analysisApi } from "../api.js?v=20260225f";
-import { showToast } from "../app.js?v=20260225f";
+import { recordsApi, analysisApi } from "../api.js?v=20260225g";
+import { showToast } from "../app.js?v=20260225g";
 
 /**
  * 入力フォームをメインエリアにレンダリングする
@@ -116,6 +116,38 @@ function attachFormEvents(date, isEdit) {
 
   const completedList = document.getElementById("completed-list");
 
+  // バックグラウンド自動保存
+  async function saveDataQuietly() {
+    const rawInput = document.getElementById("raw-input").value.trim();
+    if (!isEdit && !rawInput) return; // 新規作成時は行動ログが必要
+
+    const incompleteTasks = [...document.querySelectorAll("#planned-list .task-item span")]
+      .map((el) => el.textContent.trim())
+      .filter(Boolean);
+    const completedTasks = [...document.querySelectorAll("#completed-list .task-item span")]
+      .map((el) => el.textContent.trim())
+      .filter(Boolean);
+    const plannedTasks = [...incompleteTasks, ...completedTasks];
+
+    try {
+      if (isEdit) {
+        await recordsApi.update(date, {
+          raw_input: rawInput,
+          tasks_planned: plannedTasks,
+          tasks_completed: completedTasks,
+        });
+      } else {
+        await recordsApi.create(date, rawInput, plannedTasks);
+        isEdit = true;
+        const btnSubmit = document.getElementById("btn-submit");
+        if (btnSubmit) btnSubmit.textContent = "✏️ 記録を更新する";
+      }
+      showToast("自動保存しました", "success");
+    } catch {
+      // メイン保存ボタンで再試行可能
+    }
+  }
+
   // タスク追加
   function addTask() {
     const text = plannedInput.value.trim();
@@ -123,6 +155,7 @@ function attachFormEvents(date, isEdit) {
     plannedList.insertAdjacentHTML("beforeend", buildTaskItem(text, false));
     plannedInput.value = "";
     plannedInput.focus();
+    saveDataQuietly();
   }
 
   document.getElementById("btn-add-task").addEventListener("click", addTask);
