@@ -3,8 +3,8 @@
  * 新規作成・既存レコードの編集に対応
  */
 
-import { recordsApi, analysisApi } from "../api.js?v=20260225j";
-import { showToast } from "../app.js?v=20260225j";
+import { recordsApi, analysisApi } from "../api.js?v=20260226a";
+import { showToast } from "../app.js?v=20260226a";
 
 /**
  * 入力フォームをメインエリアにレンダリングする
@@ -59,6 +59,9 @@ function buildFormHTML(date, record, tasks, isEdit) {
       <div class="card-title">タスク管理</div>
 
       <label>予定タスク</label>
+      <button class="btn btn-outline btn-sm" id="btn-carry-over" style="margin-bottom: 8px; width: 100%;">
+        📋 昨日の未完了タスクを引き継ぐ
+      </button>
       <ul class="task-list" id="planned-list">
         ${incompleteTasks.map((t) => buildTaskItem(t, false)).join("")}
       </ul>
@@ -168,6 +171,49 @@ function attachFormEvents(date, isEdit) {
   document.getElementById("raw-input").addEventListener("input", () => {
     clearTimeout(rawInputTimer);
     rawInputTimer = setTimeout(saveDataQuietly, 1500);
+  });
+
+  // 昨日の未完了タスク引き継ぎ
+  document.getElementById("btn-carry-over").addEventListener("click", async (e) => {
+    const btn = e.target;
+    btn.disabled = true;
+    btn.textContent = "読み込み中...";
+    try {
+      const d = new Date(date + "T00:00:00");
+      d.setDate(d.getDate() - 1);
+      const yesterdayDate = d.toISOString().slice(0, 10);
+      const record = await recordsApi.get(yesterdayDate);
+      const planned = record?.tasks?.planned || [];
+      const completed = record?.tasks?.completed || [];
+      const incomplete = planned.filter((t) => !completed.includes(t));
+      if (incomplete.length === 0) {
+        showToast("昨日の未完了タスクはありません", "info");
+        return;
+      }
+      // 今日の既存タスクを取得して重複排除
+      const existing = new Set(
+        [...document.querySelectorAll("#planned-list .task-item span, #completed-list .task-item span")]
+          .map((el) => el.textContent.trim())
+      );
+      let added = 0;
+      for (const task of incomplete) {
+        if (!existing.has(task)) {
+          plannedList.insertAdjacentHTML("beforeend", buildTaskItem(task, false));
+          added++;
+        }
+      }
+      if (added > 0) {
+        showToast(`${added}件のタスクを引き継ぎました`, "success");
+        saveDataQuietly();
+      } else {
+        showToast("すべて既に追加済みです", "info");
+      }
+    } catch {
+      showToast("昨日の記録が見つかりません", "error");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "📋 昨日の未完了タスクを引き継ぐ";
+    }
   });
 
   // タスク追加

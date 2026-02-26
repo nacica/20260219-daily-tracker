@@ -3,13 +3,13 @@
  * ルーティングの設定とホーム画面の表示を担当する
  */
 
-import { addRoute, navigate, updateNavActive } from "./router.js?v=20260225j";
-import { renderInputForm } from "./components/input-form.js?v=20260225j";
-import { renderAnalysisView } from "./components/analysis-view.js?v=20260225j";
-import { renderHistoryList } from "./components/history-list.js?v=20260225j";
-import { renderWeeklyReport } from "./components/weekly-report.js?v=20260225j";
-import { renderSuggestions } from "./components/suggestions.js?v=20260225j";
-import { recordsApi, analysisApi } from "./api.js?v=20260225j";
+import { addRoute, navigate, updateNavActive } from "./router.js?v=20260226a";
+import { renderInputForm } from "./components/input-form.js?v=20260226a";
+import { renderAnalysisView } from "./components/analysis-view.js?v=20260226a";
+import { renderHistoryList } from "./components/history-list.js?v=20260226a";
+import { renderWeeklyReport } from "./components/weekly-report.js?v=20260226a";
+import { renderSuggestions } from "./components/suggestions.js?v=20260226a";
+import { recordsApi, analysisApi } from "./api.js?v=20260226a";
 
 // ===== ユーティリティ =====
 
