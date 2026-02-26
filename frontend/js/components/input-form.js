@@ -3,8 +3,8 @@
  * 新規作成・既存レコードの編集に対応
  */
 
-import { recordsApi, analysisApi } from "../api.js?v=20260226a";
-import { showToast } from "../app.js?v=20260226a";
+import { recordsApi, analysisApi } from "../api.js?v=20260226b";
+import { showToast } from "../app.js?v=20260226b";
 
 /**
  * 入力フォームをメインエリアにレンダリングする
@@ -181,7 +181,7 @@ function attachFormEvents(date, isEdit) {
     try {
       const d = new Date(date + "T00:00:00");
       d.setDate(d.getDate() - 1);
-      const yesterdayDate = d.toISOString().slice(0, 10);
+      const yesterdayDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
       const record = await recordsApi.get(yesterdayDate);
       const planned = record?.tasks?.planned || [];
       const completed = record?.tasks?.completed || [];
