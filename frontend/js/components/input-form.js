@@ -3,8 +3,8 @@
  * 新規作成・既存レコードの編集に対応
  */
 
-import { recordsApi, analysisApi } from "../api.js?v=20260226b";
-import { showToast } from "../app.js?v=20260226b";
+import { recordsApi, analysisApi } from "../api.js?v=20260226c";
+import { showToast } from "../app.js?v=20260226c";
 
 /**
  * 入力フォームをメインエリアにレンダリングする
@@ -178,18 +178,35 @@ function attachFormEvents(date, isEdit) {
     const btn = e.target;
     btn.disabled = true;
     btn.textContent = "読み込み中...";
+
+    // 直近 7 日間を遡って未完了タスクを持つ日を探す
+    const base = new Date(date + "T00:00:00");
+    let found = null;
+    let searchedDate = null;
+    for (let i = 1; i <= 7; i++) {
+      const d = new Date(base);
+      d.setDate(d.getDate() - i);
+      searchedDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      try {
+        found = await recordsApi.get(searchedDate);
+        const planned = found?.tasks?.planned || [];
+        const completed = found?.tasks?.completed || [];
+        if (planned.filter((t) => !completed.includes(t)).length > 0) break;
+        found = null; // 未完了タスクがないので次の日へ
+      } catch {
+        found = null;
+      }
+    }
+
     try {
-      const d = new Date(date + "T00:00:00");
-      d.setDate(d.getDate() - 1);
-      const yesterdayDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-      const record = await recordsApi.get(yesterdayDate);
-      const planned = record?.tasks?.planned || [];
-      const completed = record?.tasks?.completed || [];
-      const incomplete = planned.filter((t) => !completed.includes(t));
-      if (incomplete.length === 0) {
-        showToast("昨日の未完了タスクはありません", "info");
+      if (!found) {
+        showToast("直近7日間に未完了タスクが見つかりません", "info");
         return;
       }
+      const planned = found.tasks?.planned || [];
+      const completed = found.tasks?.completed || [];
+      const incomplete = planned.filter((t) => !completed.includes(t));
+
       // 今日の既存タスクを取得して重複排除
       const existing = new Set(
         [...document.querySelectorAll("#planned-list .task-item span, #completed-list .task-item span")]
@@ -203,13 +220,13 @@ function attachFormEvents(date, isEdit) {
         }
       }
       if (added > 0) {
-        showToast(`${added}件のタスクを引き継ぎました`, "success");
+        showToast(`${found.date} から ${added}件のタスクを引き継ぎました`, "success");
         saveDataQuietly();
       } else {
         showToast("すべて既に追加済みです", "info");
       }
-    } catch {
-      showToast("昨日の記録が見つかりません", "error");
+    } catch (err) {
+      showToast("タスク引き継ぎに失敗: " + err.message, "error");
     } finally {
       btn.disabled = false;
       btn.textContent = "📋 昨日の未完了タスクを引き継ぐ";
