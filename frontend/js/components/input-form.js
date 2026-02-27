@@ -3,8 +3,8 @@
  * 新規作成・既存レコードの編集に対応
  */
 
-import { recordsApi, analysisApi } from "../api.js?v=20260226c";
-import { showToast } from "../app.js?v=20260226c";
+import { recordsApi, analysisApi } from "../api.js?v=20260227a";
+import { showToast } from "../app.js?v=20260227a";
 
 /**
  * 入力フォームをメインエリアにレンダリングする

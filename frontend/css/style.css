@@ -1149,7 +1149,7 @@ textarea {
   color: var(--text-primary);
 }
 
-/* ===== デスクトップ対応 ===== */
+/* ===== タブレット対応 ===== */
 
 @media (min-width: 640px) {
   .nav { padding-top: 0; }
@@ -1161,4 +1161,614 @@ textarea {
   textarea { min-height: 220px; }
 
   .history-date { min-width: 90px; }
+}
+
+/* ===== デスクトップヘッダー (モバイルでは非表示) ===== */
+
+.desktop-header {
+  display: none;
+}
+
+/* =============================================================
+   デスクトップ版 — Velzon Minimal Inspired
+   1024px 以上でのみ適用。モバイルは一切変更しない。
+   ============================================================= */
+
+@media (min-width: 1024px) {
+  :root {
+    --sidebar-w: 260px;
+    --header-h: 70px;
+    --content-max: 1140px;
+    --dt-bg: #0b1120;
+    --dt-sidebar-bg: linear-gradient(180deg, #070d1c 0%, #0a1228 100%);
+    --dt-header-bg: rgba(8, 14, 30, 0.92);
+    --dt-card-bg: rgba(12, 20, 42, 0.95);
+    --dt-card-border: rgba(0, 212, 255, 0.06);
+    --dt-card-shadow: 0 1px 3px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.3);
+    --dt-card-hover-shadow: 0 8px 25px rgba(0, 0, 0, 0.45), 0 0 1px rgba(0, 212, 255, 0.1);
+  }
+
+  /* ── Body ── */
+  body {
+    background: var(--dt-bg);
+    background-image:
+      radial-gradient(ellipse 60% 40% at 15% 0%, rgba(0, 212, 255, 0.03) 0%, transparent 60%),
+      radial-gradient(ellipse 40% 30% at 85% 100%, rgba(168, 85, 247, 0.02) 0%, transparent 60%);
+    background-size: 100% 100%;
+  }
+
+  /* ── Sidebar Navigation ── */
+  .nav {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: var(--sidebar-w);
+    height: 100vh;
+    padding: 0 !important;
+    border-bottom: none;
+    border-right: 1px solid var(--border);
+    background: var(--dt-sidebar-bg);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    z-index: 200;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+
+  /* Accent line on right edge */
+  .nav::before {
+    top: 0;
+    left: auto;
+    right: -1px;
+    bottom: 0;
+    width: 1px;
+    height: 100%;
+    background: linear-gradient(180deg,
+      var(--cyan) 0%,
+      rgba(0, 212, 255, 0.3) 30%,
+      rgba(168, 85, 247, 0.2) 70%,
+      transparent 100%);
+    opacity: 0.5;
+  }
+
+  .nav-inner {
+    flex-direction: column;
+    align-items: stretch;
+    height: auto;
+    min-height: 100%;
+  }
+
+  /* Logo area */
+  .nav-logo {
+    padding: 22px 24px;
+    font-size: 1.05rem;
+    letter-spacing: 0.08em;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 8px;
+    text-shadow: 0 0 24px rgba(0, 212, 255, 0.4);
+  }
+
+  .nav-logo::before {
+    width: 8px;
+    height: 8px;
+  }
+
+  /* Nav links — vertical list */
+  .nav-links {
+    flex-direction: column;
+    gap: 2px;
+    padding: 8px 12px;
+  }
+
+  .nav-link {
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 14px;
+    padding: 11px 16px;
+    font-size: 0.88rem;
+    font-weight: 500;
+    text-transform: none;
+    letter-spacing: 0.01em;
+    border-radius: var(--radius-xs);
+    color: var(--text-secondary);
+    transition: all 0.15s ease;
+    position: relative;
+  }
+
+  .nav-link .icon {
+    width: 20px;
+    height: 20px;
+    margin-bottom: 0;
+    flex-shrink: 0;
+    opacity: 0.7;
+    transition: opacity 0.15s;
+  }
+
+  .nav-link span {
+    font-size: 0.88rem;
+  }
+
+  .nav-link:hover {
+    color: var(--text-primary);
+    background: rgba(0, 212, 255, 0.06);
+  }
+
+  .nav-link:hover .icon {
+    opacity: 1;
+  }
+
+  .nav-link.active {
+    color: var(--cyan);
+    background: rgba(0, 212, 255, 0.1);
+    text-shadow: 0 0 12px rgba(0, 212, 255, 0.3);
+  }
+
+  .nav-link.active::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 6px;
+    bottom: 6px;
+    width: 3px;
+    border-radius: 0 3px 3px 0;
+    background: var(--cyan);
+    box-shadow: 0 0 8px rgba(0, 212, 255, 0.6);
+  }
+
+  .nav-link.active .icon {
+    opacity: 1;
+    filter: drop-shadow(0 0 5px rgba(0, 212, 255, 0.7));
+  }
+
+  /* Sidebar bottom info */
+  .nav-links::after {
+    content: 'NEXUS AI v2.0';
+    display: block;
+    margin-top: auto;
+    padding: 20px 16px 24px;
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    opacity: 0.4;
+  }
+
+  /* ── Desktop Header ── */
+  .desktop-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: fixed;
+    top: 0;
+    left: var(--sidebar-w);
+    right: 0;
+    height: var(--header-h);
+    background: var(--dt-header-bg);
+    backdrop-filter: blur(20px) saturate(150%);
+    -webkit-backdrop-filter: blur(20px) saturate(150%);
+    border-bottom: 1px solid var(--border);
+    padding: 0 32px;
+    z-index: 150;
+  }
+
+  .desktop-header::after {
+    content: '';
+    position: absolute;
+    bottom: -1px;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg,
+      rgba(0, 212, 255, 0.15) 0%,
+      rgba(0, 212, 255, 0.05) 50%,
+      transparent 100%);
+  }
+
+  .desktop-header-left {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .desktop-header-title {
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    letter-spacing: 0.01em;
+  }
+
+  .desktop-header-breadcrumb {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    padding: 4px 12px;
+    background: rgba(0, 212, 255, 0.06);
+    border-radius: 4px;
+    border: 1px solid rgba(0, 212, 255, 0.08);
+    letter-spacing: 0.02em;
+  }
+
+  .desktop-header-right {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .desktop-header-date {
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+    font-feature-settings: "tnum";
+    padding: 6px 14px;
+    background: rgba(0, 212, 255, 0.04);
+    border-radius: var(--radius-xs);
+    border: 1px solid var(--border);
+  }
+
+  /* ── Main Content Layout ── */
+  #app {
+    max-width: none;
+    margin-left: var(--sidebar-w);
+    padding: 0 32px 0;
+  }
+
+  main {
+    max-width: var(--content-max);
+    margin: 0 auto;
+    padding: calc(var(--header-h) + 24px) 0 48px;
+  }
+
+  /* ── Cards — Velzon Clean Style ── */
+  .card {
+    background: var(--dt-card-bg);
+    border: 1px solid var(--dt-card-border);
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 20px;
+    box-shadow: var(--dt-card-shadow);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    transition: box-shadow 0.25s ease, border-color 0.25s ease, transform 0.2s ease;
+  }
+
+  .card:hover {
+    box-shadow: var(--dt-card-hover-shadow);
+    border-color: rgba(0, 212, 255, 0.12);
+  }
+
+  /* Softer corner glow on desktop */
+  .card::before {
+    width: 120px;
+    height: 120px;
+    background: radial-gradient(circle at top left, rgba(0, 212, 255, 0.04) 0%, transparent 70%);
+  }
+
+  .card-title {
+    font-size: 0.72rem;
+    margin-bottom: 18px;
+    letter-spacing: 0.16em;
+  }
+
+  /* ── Score Circle — slightly larger ── */
+  .score-circle {
+    width: 150px;
+    height: 150px;
+  }
+
+  .score-value {
+    font-size: 3rem;
+  }
+
+  /* ── Stats Grid — always 4 col with better spacing ── */
+  .stats-grid {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+  }
+
+  .stat-item {
+    padding: 20px 12px;
+    border-radius: 10px;
+    background: rgba(0, 212, 255, 0.02);
+    border: 1px solid rgba(0, 212, 255, 0.06);
+    transition: all 0.2s ease;
+  }
+
+  .stat-item:hover {
+    background: rgba(0, 212, 255, 0.06);
+    border-color: rgba(0, 212, 255, 0.15);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  }
+
+  .stat-value {
+    font-size: 1.6rem;
+  }
+
+  .stat-label {
+    font-size: 0.65rem;
+    margin-top: 4px;
+  }
+
+  /* ── Buttons — not full-width on desktop ── */
+  .btn {
+    padding: 12px 28px;
+  }
+
+  .btn-primary {
+    width: auto;
+    min-width: 220px;
+    display: inline-flex;
+  }
+
+  .btn-outline {
+    width: auto;
+  }
+
+  /* Center action buttons */
+  .card > .btn-primary,
+  .card > .btn-outline:only-child {
+    display: flex;
+    margin: 0 auto;
+  }
+
+  /* ── Forms — wider and better spaced ── */
+  textarea {
+    min-height: 300px;
+    padding: 16px 20px;
+    border-radius: 10px;
+    font-size: 0.95rem;
+  }
+
+  input[type="text"],
+  input[type="date"] {
+    padding: 12px 18px;
+    border-radius: 8px;
+  }
+
+  .form-group {
+    margin-bottom: 24px;
+  }
+
+  label {
+    font-size: 0.72rem;
+    margin-bottom: 10px;
+    letter-spacing: 0.12em;
+  }
+
+  /* Task items — better padding */
+  .task-item {
+    padding: 13px 16px;
+    border-radius: 8px;
+  }
+
+  .task-input-row {
+    gap: 12px;
+  }
+
+  /* ── Analysis Sections — improved ── */
+  .analysis-section {
+    margin-bottom: 24px;
+  }
+
+  .analysis-section h3 {
+    font-size: 0.72rem;
+    margin-bottom: 14px;
+    letter-spacing: 0.14em;
+  }
+
+  .analysis-list li {
+    padding: 14px 20px;
+    border-radius: 8px;
+    font-size: 0.92rem;
+    transition: transform 0.15s ease, background 0.15s ease;
+  }
+
+  .analysis-list li:hover {
+    transform: translateX(4px);
+  }
+
+  /* ── Suggestion Cards — 2 column grid ── */
+  .analysis-section:has(.suggestion-card) {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .analysis-section:has(.suggestion-card) h3 {
+    grid-column: 1 / -1;
+  }
+
+  .suggestion-card {
+    padding: 18px 20px;
+    border-radius: 10px;
+    transition: transform 0.15s ease, background 0.15s ease;
+  }
+
+  .suggestion-card:hover {
+    transform: translateY(-2px);
+    background: rgba(0, 212, 255, 0.04);
+  }
+
+  /* ── Badges — slightly larger ── */
+  .badge {
+    padding: 4px 12px;
+    font-size: 0.65rem;
+    border-radius: 5px;
+  }
+
+  /* ── History List ── */
+  .history-item {
+    padding: 14px 16px;
+    border-radius: 8px;
+    transition: all 0.15s ease;
+  }
+
+  .history-item:hover {
+    background: rgba(0, 212, 255, 0.05);
+    transform: translateX(4px);
+  }
+
+  .history-date {
+    min-width: 100px;
+    font-size: 0.78rem;
+  }
+
+  .history-preview {
+    font-size: 0.9rem;
+  }
+
+  .history-score {
+    width: 40px;
+    height: 40px;
+    font-size: 0.78rem;
+  }
+
+  /* ── Calendar — larger cells ── */
+  .calendar-grid {
+    gap: 5px;
+  }
+
+  .cal-cell {
+    border-radius: 8px;
+    transition: all 0.15s ease;
+  }
+
+  .cal-cell:not(.empty):hover {
+    transform: scale(1.05);
+    box-shadow: 0 0 16px rgba(0, 212, 255, 0.2);
+  }
+
+  .cal-day {
+    font-size: 0.85rem;
+  }
+
+  .cal-score {
+    font-size: 0.62rem;
+  }
+
+  .cal-header {
+    font-size: 0.65rem;
+    padding: 8px 0;
+  }
+
+  .cal-legend {
+    margin-top: 16px;
+    gap: 10px;
+    font-size: 0.7rem;
+  }
+
+  /* ── Upload Area ── */
+  .upload-area {
+    padding: 48px 32px;
+    border-radius: 14px;
+  }
+
+  .ocr-bar-label {
+    width: 140px;
+    font-size: 0.82rem;
+  }
+
+  /* ── Filter Buttons — wider ── */
+  .filter-btn {
+    padding: 6px 18px;
+    font-size: 0.72rem;
+  }
+
+  .filter-btn-group {
+    gap: 8px;
+  }
+
+  /* ── Summary Items ── */
+  .suggest-summary-item {
+    padding: 12px 18px;
+    border-radius: 10px;
+  }
+
+  /* ── Toast — repositioned for sidebar ── */
+  #toast-container {
+    bottom: 32px;
+    left: calc(var(--sidebar-w) + 50vw - var(--sidebar-w) / 2);
+    transform: translateX(-50%);
+    max-width: 520px;
+  }
+
+  .toast {
+    border-radius: 10px;
+    padding: 14px 20px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  }
+
+  /* ── Empty State ── */
+  .empty-state {
+    padding: 72px 24px;
+  }
+
+  .empty-state .icon {
+    width: 56px;
+    height: 56px;
+    margin-bottom: 20px;
+  }
+
+  /* ── Loading ── */
+  .loading {
+    padding: 72px 0;
+  }
+
+  .spinner {
+    width: 42px;
+    height: 42px;
+  }
+
+  /* ── Scrollbar — wider for desktop ── */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.2);
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: rgba(0, 212, 255, 0.15);
+    border-radius: 3px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 212, 255, 0.3);
+  }
+
+  /* ── Home page title adjustments ── */
+  .home-date {
+    font-size: 0.72rem;
+  }
+
+  .home-title {
+    font-size: 1.4rem;
+    margin-bottom: 20px;
+  }
+}
+
+/* =============================================================
+   Extra-wide desktop (1440px+) — wider content, 2-col layouts
+   ============================================================= */
+
+@media (min-width: 1440px) {
+  :root {
+    --content-max: 1280px;
+  }
+
+  /* Suggestions list — 2 column grid */
+  #suggestions-list {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+  }
+
+  #suggestions-list .card {
+    margin-bottom: 0;
+  }
+
+  #suggestions-list .empty-state {
+    grid-column: 1 / -1;
+  }
 }

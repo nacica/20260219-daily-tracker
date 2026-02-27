@@ -17,7 +17,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="manifest" href="/manifest.json" />
-  <link rel="stylesheet" href="/css/style.css?v=20260226c" />
+  <link rel="stylesheet" href="/css/style.css?v=20260227a" />
 
   <!-- バックエンド URL の設定（本番環境では Cloud Run の URL に変更） -->
   <script>
@@ -76,6 +76,17 @@
     </div>
   </nav>
 
+  <!-- デスクトップ用ヘッダー（モバイルでは非表示） -->
+  <header class="desktop-header">
+    <div class="desktop-header-left">
+      <h1 class="desktop-header-title" id="desktop-page-title">ダッシュボード</h1>
+      <span class="desktop-header-breadcrumb" id="desktop-breadcrumb">ホーム</span>
+    </div>
+    <div class="desktop-header-right">
+      <span class="desktop-header-date" id="desktop-date"></span>
+    </div>
+  </header>
+
   <!-- メインコンテンツ（SPA でここに各画面が挿入される） -->
   <div id="app">
     <main>
@@ -87,6 +98,6 @@
   <div id="toast-container"></div>
 
   <!-- アプリのメインスクリプト（ES Modules） -->
-  <script type="module" src="/js/app.js?v=20260226c"></script>
+  <script type="module" src="/js/app.js?v=20260227a"></script>
 </body>
 </html>

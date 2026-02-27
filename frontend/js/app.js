@@ -3,13 +3,13 @@
  * ルーティングの設定とホーム画面の表示を担当する
  */
 
-import { addRoute, navigate, updateNavActive } from "./router.js?v=20260226c";
-import { renderInputForm } from "./components/input-form.js?v=20260226c";
-import { renderAnalysisView } from "./components/analysis-view.js?v=20260226c";
-import { renderHistoryList } from "./components/history-list.js?v=20260226c";
-import { renderWeeklyReport } from "./components/weekly-report.js?v=20260226c";
-import { renderSuggestions } from "./components/suggestions.js?v=20260226c";
-import { recordsApi, analysisApi } from "./api.js?v=20260226c";
+import { addRoute, navigate, updateNavActive } from "./router.js?v=20260227a";
+import { renderInputForm } from "./components/input-form.js?v=20260227a";
+import { renderAnalysisView } from "./components/analysis-view.js?v=20260227a";
+import { renderHistoryList } from "./components/history-list.js?v=20260227a";
+import { renderWeeklyReport } from "./components/weekly-report.js?v=20260227a";
+import { renderSuggestions } from "./components/suggestions.js?v=20260227a";
+import { recordsApi, analysisApi } from "./api.js?v=20260227a";
 
 // ===== ユーティリティ =====
 
@@ -28,6 +28,38 @@ function formatDateJP(dateStr) {
 /** メインコンテンツエリアを返す */
 function getMain() {
   return document.querySelector("main");
+}
+
+// ===== デスクトップヘッダー更新 =====
+
+/** ルート名マッピング */
+const ROUTE_TITLES = {
+  "/": { title: "ダッシュボード", breadcrumb: "ホーム" },
+  "/input": { title: "行動記録", breadcrumb: "記録入力" },
+  "/history": { title: "履歴一覧", breadcrumb: "履歴" },
+  "/weekly": { title: "週次レポート", breadcrumb: "週次分析" },
+  "/suggestions": { title: "改善提案", breadcrumb: "提案アーカイブ" },
+};
+
+/** デスクトップヘッダーのタイトルと日付を更新 */
+function updateDesktopHeader() {
+  const titleEl = document.getElementById("desktop-page-title");
+  const breadcrumbEl = document.getElementById("desktop-breadcrumb");
+  const dateEl = document.getElementById("desktop-date");
+  if (!titleEl) return;
+
+  const hash = window.location.hash.slice(1) || "/";
+  // ルートの先頭部分でマッチ（/input/:date → /input）
+  const baseRoute = "/" + (hash.split("/")[1] || "");
+  const route = ROUTE_TITLES[baseRoute] || ROUTE_TITLES["/"];
+
+  titleEl.textContent = route.title;
+  breadcrumbEl.textContent = route.breadcrumb;
+
+  // 日付表示
+  const now = new Date();
+  const weekdays = ["日", "月", "火", "水", "木", "金", "土"];
+  dateEl.textContent = `${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日（${weekdays[now.getDay()]}）`;
 }
 
 /** ローディング表示 */
@@ -207,4 +239,8 @@ document.addEventListener("DOMContentLoaded", () => {
   // 初回ナビゲーション
   navigate();
   updateNavActive();
+  updateDesktopHeader();
 });
+
+// ハッシュ変更時にデスクトップヘッダーも更新
+window.addEventListener("hashchange", updateDesktopHeader);
