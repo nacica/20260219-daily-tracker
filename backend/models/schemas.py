@@ -111,3 +111,29 @@ class DailyAnalysis(BaseModel):
     summary: AnalysisSummary
     analysis: AnalysisDetail
     created_at: Optional[str] = None
+
+
+# ---- ソクラテス式対話 ----
+
+class DialogueMessage(BaseModel):
+    """対話の1メッセージ"""
+    role: str              # "ai" | "user"
+    content: str
+    timestamp: Optional[str] = None
+
+
+class AnalysisDialogue(BaseModel):
+    """ソクラテス式対話セッション"""
+    id: str
+    date: str
+    status: str            # "in_progress" | "completed"
+    messages: list[DialogueMessage] = []
+    turn_count: int = 0    # ユーザーの発言回数
+    max_turns: int = 5
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+
+
+class DialogueReplyRequest(BaseModel):
+    """対話返信リクエスト"""
+    message: str = Field(..., min_length=1, max_length=2000)

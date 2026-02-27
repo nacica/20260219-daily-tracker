@@ -82,3 +82,28 @@ export const analysisApi = {
     return apiFetch(`/analysis?${params}`);
   },
 };
+
+// ---- ソクラテス式対話 ----
+
+export const dialogueApi = {
+  /** 対話を開始（または再開） */
+  start: (date) =>
+    apiFetch(`/dialogue/${date}/start`, { method: "POST" }),
+
+  /** ユーザーの返答を送信しAI応答を取得 */
+  reply: (date, message) =>
+    apiFetch(`/dialogue/${date}/reply`, {
+      method: "POST",
+      body: { message },
+    }),
+
+  /** 対話から分析を生成 */
+  synthesize: (date) =>
+    apiFetch(`/dialogue/${date}/synthesize`, { method: "POST" }),
+
+  /** 保存済み対話を取得 */
+  get: (date) => apiFetch(`/dialogue/${date}`),
+
+  /** 対話を削除 */
+  delete: (date) => apiFetch(`/dialogue/${date}`, { method: "DELETE" }),
+};

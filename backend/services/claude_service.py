@@ -10,6 +10,11 @@ import logging
 import anthropic
 from prompts.daily_analysis import DAILY_ANALYSIS_SYSTEM_PROMPT, build_daily_analysis_prompt
 from prompts.weekly_analysis import WEEKLY_ANALYSIS_SYSTEM_PROMPT, build_weekly_analysis_prompt
+from prompts.socratic_dialogue import (
+    SOCRATIC_QUESTION_SYSTEM_PROMPT, build_socratic_question_prompt,
+    SOCRATIC_FOLLOWUP_SYSTEM_PROMPT, build_socratic_followup_prompt,
+    SOCRATIC_SYNTHESIS_SYSTEM_PROMPT, build_socratic_synthesis_prompt,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -195,6 +200,93 @@ def generate_weekly_analysis(
         model=model,
         max_tokens=6144,
         system=WEEKLY_ANALYSIS_SYSTEM_PROMPT,
+        messages=[{"role": "user", "content": user_prompt}],
+    )
+
+    raw_text = response.content[0].text
+    return _extract_json(raw_text)
+
+
+def generate_socratic_questions(
+    record: dict,
+    past_records: list[dict] = None,
+    past_analyses: list[dict] = None,
+) -> str:
+    """ソクラテス式の振り返り質問を生成する（テキスト返却）"""
+    client = get_client()
+    model = os.getenv("DAILY_ANALYSIS_MODEL", "claude-sonnet-4-6")
+
+    screen_time = record.get("screen_time")
+    user_prompt = build_socratic_question_prompt(
+        record=record,
+        screen_time=screen_time,
+        past_records=past_records or [],
+        past_analyses=past_analyses or [],
+    )
+
+    response = _call_claude_with_retry(
+        client,
+        model=model,
+        max_tokens=1024,
+        system=SOCRATIC_QUESTION_SYSTEM_PROMPT,
+        messages=[{"role": "user", "content": user_prompt}],
+    )
+
+    return response.content[0].text
+
+
+def generate_socratic_followup(
+    record: dict,
+    messages: list[dict],
+    turn_count: int,
+    max_turns: int,
+) -> str:
+    """ソクラテス式対話のフォローアップ応答を生成する（テキスト返却）"""
+    client = get_client()
+    model = os.getenv("DAILY_ANALYSIS_MODEL", "claude-sonnet-4-6")
+
+    user_prompt = build_socratic_followup_prompt(
+        record=record,
+        messages=messages,
+        turn_count=turn_count,
+        max_turns=max_turns,
+    )
+
+    response = _call_claude_with_retry(
+        client,
+        model=model,
+        max_tokens=1024,
+        system=SOCRATIC_FOLLOWUP_SYSTEM_PROMPT,
+        messages=[{"role": "user", "content": user_prompt}],
+    )
+
+    return response.content[0].text
+
+
+def generate_dialogue_synthesis(
+    record: dict,
+    messages: list[dict],
+    past_records: list[dict] = None,
+    past_analyses: list[dict] = None,
+) -> dict:
+    """対話＋データから共創された分析を生成する（JSON返却）"""
+    client = get_client()
+    model = os.getenv("DAILY_ANALYSIS_MODEL", "claude-sonnet-4-6")
+
+    screen_time = record.get("screen_time")
+    user_prompt = build_socratic_synthesis_prompt(
+        record=record,
+        messages=messages,
+        screen_time=screen_time,
+        past_records=past_records or [],
+        past_analyses=past_analyses or [],
+    )
+
+    response = _call_claude_with_retry(
+        client,
+        model=model,
+        max_tokens=4096,
+        system=SOCRATIC_SYNTHESIS_SYSTEM_PROMPT,
         messages=[{"role": "user", "content": user_prompt}],
     )
 

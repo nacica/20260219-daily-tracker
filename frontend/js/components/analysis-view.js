@@ -1,13 +1,22 @@
 /**
  * 分析結果表示コンポーネント
  * 日次分析データを視覚的に表示する
+ * ソクラテス式対話UIにも対応
  */
 
-import { analysisApi } from "../api.js";
-import { showToast } from "../app.js";
+import { analysisApi, dialogueApi, recordsApi } from "../api.js?v=20260227d";
+import { showToast } from "../app.js?v=20260227d";
+
+/** 日付を日本語表記にフォーマット */
+function formatDateJP(dateStr) {
+  const d = new Date(dateStr + "T00:00:00");
+  const weekdays = ["日", "月", "火", "水", "木", "金", "土"];
+  return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日（${weekdays[d.getDay()]}）`;
+}
 
 /**
  * 分析結果をメインエリアにレンダリングする
+ * 4状態: 分析済み / 対話中 / 記録あり未分析 / 記録なし
  * @param {string} date - 対象日 (YYYY-MM-DD)
  */
 export async function renderAnalysisView(date) {
@@ -15,20 +24,237 @@ export async function renderAnalysisView(date) {
   main.innerHTML = `
     <div class="loading">
       <div class="spinner"></div>
-      <p>分析結果を読み込み中...</p>
+      <p>読み込み中...</p>
     </div>`;
 
-  try {
-    const analysis = await analysisApi.get(date);
-    main.innerHTML = buildAnalysisHTML(analysis);
+  // 並列で分析・対話・記録を取得
+  const [analysisResult, dialogueResult, recordResult] = await Promise.allSettled([
+    analysisApi.get(date),
+    dialogueApi.get(date),
+    recordsApi.get(date),
+  ]);
+
+  const hasAnalysis = analysisResult.status === "fulfilled";
+  const hasDialogue = dialogueResult.status === "fulfilled";
+  const hasRecord = recordResult.status === "fulfilled";
+
+  if (hasAnalysis) {
+    // 状態1: 分析済み → 既存表示 + 対話履歴トグル
+    const dialogueData = hasDialogue ? dialogueResult.value : null;
+    main.innerHTML = buildAnalysisHTML(analysisResult.value, dialogueData);
     attachAnalysisEvents(date);
-  } catch (err) {
-    main.innerHTML = buildNoAnalysisHTML(date, err.message);
+    attachDialogueHistoryEvents();
+  } else if (hasDialogue && dialogueResult.value.status === "in_progress") {
+    // 状態2: 対話中 → 対話UI
+    main.innerHTML = buildDialogueUI(date, dialogueResult.value);
+    attachDialogueEvents(date);
+  } else if (hasRecord) {
+    // 状態3: 記録あり・未分析 → 選択画面
+    main.innerHTML = buildChoiceHTML(date);
+    attachChoiceEvents(date);
+  } else {
+    // 状態4: 記録なし
+    main.innerHTML = buildNoAnalysisHTML(date, "404");
     attachAnalysisEvents(date);
   }
 }
 
-function buildAnalysisHTML(analysis) {
+// ===== 状態3: 選択画面 =====
+
+function buildChoiceHTML(date) {
+  const dateLabel = formatDateJP(date);
+  return `
+    <h2 style="font-size: 1.1rem; margin-bottom: 4px;">分析方法を選択</h2>
+    <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: var(--gap);">${dateLabel}</p>
+
+    <div class="card">
+      <div class="card-title">振り返り対話</div>
+      <p class="dialogue-choice-desc">
+        AIと対話しながら、今日の行動を振り返ります。<br>
+        あなたの視点を反映した、より深い分析が生成されます。
+      </p>
+      <button class="btn btn-primary" id="btn-start-dialogue" style="width: 100%;">
+        振り返り対話を始める
+      </button>
+    </div>
+
+    <div class="card" style="text-align: center;">
+      <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 12px;">
+        対話なしで一括分析することもできます
+      </p>
+      <button class="btn btn-outline btn-sm" id="btn-quick-analysis">
+        通常の分析を生成
+      </button>
+    </div>`;
+}
+
+function attachChoiceEvents(date) {
+  document.getElementById("btn-start-dialogue")?.addEventListener("click", async (e) => {
+    e.target.disabled = true;
+    e.target.textContent = "対話を準備中...";
+    try {
+      const dialogue = await dialogueApi.start(date);
+      const main = document.querySelector("main");
+      main.innerHTML = buildDialogueUI(date, dialogue);
+      attachDialogueEvents(date);
+    } catch (err) {
+      showToast(`対話の開始に失敗しました: ${err.message}`, "error");
+      e.target.disabled = false;
+      e.target.textContent = "振り返り対話を始める";
+    }
+  });
+
+  document.getElementById("btn-quick-analysis")?.addEventListener("click", async (e) => {
+    e.target.disabled = true;
+    e.target.textContent = "分析中...";
+    try {
+      await analysisApi.generate(date);
+      showToast("分析が完了しました！", "success");
+      await renderAnalysisView(date);
+    } catch (err) {
+      showToast(`分析に失敗しました: ${err.message}`, "error");
+      e.target.disabled = false;
+      e.target.textContent = "通常の分析を生成";
+    }
+  });
+}
+
+// ===== 状態2: 対話UI =====
+
+function buildDialogueUI(date, dialogue) {
+  const dateLabel = formatDateJP(date);
+  const canSynthesize = dialogue.turn_count >= 1;
+  const isMaxed = dialogue.turn_count >= dialogue.max_turns;
+  const progress = (dialogue.turn_count / dialogue.max_turns) * 100;
+
+  return `
+    <div class="dialogue-header">
+      <h2 style="font-size: 1.1rem; margin-bottom: 4px;">振り返り対話</h2>
+      <p style="color: var(--text-muted); font-size: 0.85rem;">${dateLabel}</p>
+      <div class="dialogue-progress">
+        <span class="dialogue-turn-count">${dialogue.turn_count} / ${dialogue.max_turns} ターン</span>
+        <div class="dialogue-progress-bar">
+          <div class="dialogue-progress-fill" style="width: ${progress}%"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="dialogue-messages" id="dialogue-messages">
+      ${dialogue.messages.map((m) => buildMessageBubble(m)).join("")}
+    </div>
+
+    ${isMaxed ? `
+      <div class="dialogue-maxed-notice">
+        <p>対話の上限に達しました。分析をまとめましょう。</p>
+      </div>
+    ` : `
+      <div class="dialogue-input-area">
+        <textarea id="dialogue-input"
+          placeholder="あなたの考えや気づきを入力してください..."
+          rows="3"></textarea>
+        <button class="btn btn-primary" id="btn-send-reply" style="width: 100%;">
+          送信
+        </button>
+      </div>
+    `}
+
+    <div class="dialogue-actions">
+      ${canSynthesize ? `
+        <button class="btn btn-primary" id="btn-synthesize">
+          分析をまとめる
+        </button>
+      ` : ""}
+      <button class="btn btn-outline btn-sm" id="btn-abandon-dialogue">
+        対話を中止
+      </button>
+    </div>`;
+}
+
+function buildMessageBubble(message) {
+  const isAI = message.role === "ai";
+  const bubbleClass = isAI ? "dialogue-bubble-ai" : "dialogue-bubble-user";
+  const label = isAI ? "AI" : "あなた";
+
+  return `
+    <div class="dialogue-bubble ${bubbleClass}">
+      <div class="dialogue-bubble-label">${label}</div>
+      <div class="dialogue-bubble-content">${escapeHTML(message.content)}</div>
+    </div>`;
+}
+
+function attachDialogueEvents(date) {
+  const sendBtn = document.getElementById("btn-send-reply");
+  const input = document.getElementById("dialogue-input");
+
+  if (sendBtn && input) {
+    const sendReply = async () => {
+      const text = input.value.trim();
+      if (!text) return;
+
+      sendBtn.disabled = true;
+      sendBtn.textContent = "送信中...";
+      input.disabled = true;
+
+      try {
+        const updated = await dialogueApi.reply(date, text);
+        const main = document.querySelector("main");
+        main.innerHTML = buildDialogueUI(date, updated);
+        attachDialogueEvents(date);
+        // スクロールを最下部へ
+        const msgArea = document.getElementById("dialogue-messages");
+        if (msgArea) msgArea.scrollTop = msgArea.scrollHeight;
+      } catch (err) {
+        showToast(`送信に失敗しました: ${err.message}`, "error");
+        sendBtn.disabled = false;
+        sendBtn.textContent = "送信";
+        input.disabled = false;
+      }
+    };
+
+    sendBtn.addEventListener("click", sendReply);
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        sendReply();
+      }
+    });
+  }
+
+  document.getElementById("btn-synthesize")?.addEventListener("click", async (e) => {
+    e.target.disabled = true;
+    e.target.textContent = "分析を生成中...";
+    try {
+      await dialogueApi.synthesize(date);
+      showToast("対話から分析を生成しました！", "success");
+      await renderAnalysisView(date);
+    } catch (err) {
+      showToast(`分析生成に失敗しました: ${err.message}`, "error");
+      e.target.disabled = false;
+      e.target.textContent = "分析をまとめる";
+    }
+  });
+
+  document.getElementById("btn-abandon-dialogue")?.addEventListener("click", async () => {
+    if (!confirm("対話を中止しますか？入力した内容は失われます。")) return;
+    try {
+      await dialogueApi.delete(date);
+      showToast("対話を中止しました", "info");
+      await renderAnalysisView(date);
+    } catch (err) {
+      showToast(`中止に失敗しました: ${err.message}`, "error");
+    }
+  });
+
+  // 初期表示時にスクロールを最下部へ
+  requestAnimationFrame(() => {
+    const msgArea = document.getElementById("dialogue-messages");
+    if (msgArea) msgArea.scrollTop = msgArea.scrollHeight;
+  });
+}
+
+// ===== 状態1: 分析結果表示（既存） =====
+
+function buildAnalysisHTML(analysis, dialogueData) {
   const { date, summary, analysis: detail } = analysis;
   const score = summary.overall_score;
   const scoreClass = score >= 70 ? "good" : score >= 40 ? "mid" : "bad";
@@ -92,6 +318,9 @@ function buildAnalysisHTML(analysis) {
 
     <!-- 過去との比較 -->
     ${buildComparisonSection(detail.comparison_with_past)}
+
+    <!-- 対話履歴 -->
+    ${buildDialogueHistorySection(dialogueData)}
 
     <!-- 再分析ボタン -->
     <div class="card">
@@ -164,6 +393,41 @@ function buildComparisonSection(comparison) {
     </div>`;
 }
 
+// ===== 対話履歴（分析結果ページ内） =====
+
+function buildDialogueHistorySection(dialogue) {
+  if (!dialogue || !dialogue.messages || dialogue.messages.length === 0) return "";
+  return `
+    <div class="card">
+      <div class="dialogue-history-toggle" id="dialogue-history-toggle">
+        <span class="card-title" style="margin-bottom: 0; cursor: pointer;">
+          💬 対話履歴を見る
+        </span>
+        <span class="dialogue-toggle-icon">▼</span>
+      </div>
+      <div class="dialogue-history-content" id="dialogue-history-content" style="display: none; margin-top: 14px;">
+        ${dialogue.messages.map((m) => buildMessageBubble(m)).join("")}
+      </div>
+    </div>`;
+}
+
+function attachDialogueHistoryEvents() {
+  document.getElementById("dialogue-history-toggle")?.addEventListener("click", () => {
+    const content = document.getElementById("dialogue-history-content");
+    const icon = document.querySelector(".dialogue-toggle-icon");
+    if (!content || !icon) return;
+    if (content.style.display === "none") {
+      content.style.display = "block";
+      icon.textContent = "▲";
+    } else {
+      content.style.display = "none";
+      icon.textContent = "▼";
+    }
+  });
+}
+
+// ===== 状態4: 記録なし / エラー =====
+
 function buildNoAnalysisHTML(date, errorMsg) {
   const is404 = errorMsg.includes("404") || errorMsg.includes("見つかりません");
   return `
@@ -181,6 +445,8 @@ function buildNoAnalysisHTML(date, errorMsg) {
         <button class="btn btn-outline" onclick="window.location.hash='/'">ホームへ戻る</button>`}
     </div>`;
 }
+
+// ===== 共通イベント =====
 
 function attachAnalysisEvents(date) {
   const btnRegenerate = document.getElementById("btn-regenerate");

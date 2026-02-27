@@ -132,3 +132,31 @@ def get_past_analyses(date: str, days: int = 7) -> list[dict]:
     start = (dt - timedelta(days=days)).strftime("%Y-%m-%d")
     end = (dt - timedelta(days=1)).strftime("%Y-%m-%d")
     return list_analyses(start_date=start, end_date=end)
+
+
+# ---- analysis_dialogues ----
+
+def get_dialogue(date: str) -> Optional[dict]:
+    """指定日のソクラテス式対話を取得"""
+    db = get_db()
+    doc = db.collection("analysis_dialogues").document(date).get()
+    if doc.exists:
+        return doc.to_dict()
+    return None
+
+
+def save_dialogue(date: str, data: dict) -> dict:
+    """対話を保存（上書き）"""
+    db = get_db()
+    db.collection("analysis_dialogues").document(date).set(data)
+    return data
+
+
+def delete_dialogue(date: str) -> bool:
+    """対話を削除"""
+    db = get_db()
+    ref = db.collection("analysis_dialogues").document(date)
+    if not ref.get().exists:
+        return False
+    ref.delete()
+    return True
