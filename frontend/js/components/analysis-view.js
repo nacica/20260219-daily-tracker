@@ -4,8 +4,8 @@
  * ソクラテス式対話UIにも対応
  */
 
-import { analysisApi, dialogueApi, recordsApi } from "../api.js?v=20260227d";
-import { showToast } from "../app.js?v=20260227d";
+import { analysisApi, dialogueApi, recordsApi } from "../api.js?v=20260227e";
+import { showToast } from "../app.js?v=20260227e";
 
 /** 日付を日本語表記にフォーマット */
 function formatDateJP(dateStr) {
@@ -322,8 +322,11 @@ function buildAnalysisHTML(analysis, dialogueData) {
     <!-- 対話履歴 -->
     ${buildDialogueHistorySection(dialogueData)}
 
-    <!-- 再分析ボタン -->
+    <!-- アクションボタン -->
     <div class="card">
+      <button class="btn btn-primary" id="btn-start-dialogue-from-analysis" style="width: 100%; margin-bottom: 10px;">
+        振り返り対話を始める
+      </button>
       <button class="btn btn-outline btn-sm" id="btn-regenerate" style="width: 100%;">
         🔄 分析を再実行する
       </button>
@@ -462,6 +465,25 @@ function attachAnalysisEvents(date) {
         showToast(`分析に失敗しました: ${err.message}`, "error");
         e.target.disabled = false;
         e.target.textContent = "🔄 分析を再実行する";
+      }
+    });
+  }
+
+  // 分析結果ページから対話を開始
+  const btnStartDialogueFromAnalysis = document.getElementById("btn-start-dialogue-from-analysis");
+  if (btnStartDialogueFromAnalysis) {
+    btnStartDialogueFromAnalysis.addEventListener("click", async (e) => {
+      e.target.disabled = true;
+      e.target.textContent = "対話を準備中...";
+      try {
+        const dialogue = await dialogueApi.start(date);
+        const main = document.querySelector("main");
+        main.innerHTML = buildDialogueUI(date, dialogue);
+        attachDialogueEvents(date);
+      } catch (err) {
+        showToast(`対話の開始に失敗しました: ${err.message}`, "error");
+        e.target.disabled = false;
+        e.target.textContent = "振り返り対話を始める";
       }
     });
   }
