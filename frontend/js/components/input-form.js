@@ -1,10 +1,43 @@
 /**
  * 行動記録入力フォームコンポーネント
  * 新規作成・既存レコードの編集に対応
+ * デスクトップ: 2列ドラッグ&ドロップレイアウト
  */
 
-import { recordsApi, analysisApi } from "../api.js?v=20260227b";
-import { showToast } from "../app.js?v=20260227b";
+import { recordsApi, analysisApi } from "../api.js?v=20260227c";
+import { showToast } from "../app.js?v=20260227c";
+
+/* ── レイアウト永続化 ── */
+
+const DEFAULT_LAYOUT = {
+  "card-activity-log": { column: 0, order: 0 },
+  "card-task-mgmt":    { column: 1, order: 0 },
+  "card-actions":      { column: 1, order: 1 },
+  "card-completed":    { column: 1, order: 2 },
+};
+
+const CARD_IDS = Object.keys(DEFAULT_LAYOUT);
+
+function getLayoutPreference() {
+  try {
+    const saved = localStorage.getItem("input-form-layout");
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      // すべてのカードIDが存在するか検証
+      for (const id of CARD_IDS) {
+        if (!parsed[id] || typeof parsed[id].column !== "number") return DEFAULT_LAYOUT;
+      }
+      return parsed;
+    }
+  } catch {}
+  return DEFAULT_LAYOUT;
+}
+
+function saveLayoutPreference(layout) {
+  localStorage.setItem("input-form-layout", JSON.stringify(layout));
+}
+
+/* ── メインレンダリング ── */
 
 /**
  * 入力フォームをメインエリアにレンダリングする
@@ -27,6 +60,8 @@ export async function renderInputForm(date) {
   attachFormEvents(date, isEdit);
 }
 
+/* ── HTML 生成 ── */
+
 function buildFormHTML(date, record, tasks, isEdit) {
   const dateLabel = new Date(date + "T00:00:00").toLocaleDateString("ja-JP", {
     year: "numeric", month: "long", day: "numeric", weekday: "long",
@@ -36,62 +71,92 @@ function buildFormHTML(date, record, tasks, isEdit) {
   const plannedTasks = tasks.planned || [];
   const completedTasks = tasks.completed || [];
   const hasCompleted = completedTasks.length > 0;
-
-  // 未完了タスク → 仕切り → 完了タスク の順で 1 つの <ul> に入れる
   const incompleteTasks = plannedTasks.filter((t) => !completedTasks.includes(t));
+
+  // 各カードの HTML をマップで管理
+  const cards = {
+    "card-activity-log": `
+      <div class="card draggable-card" id="card-activity-log" draggable="false">
+        <div class="card-drag-handle" title="ドラッグで移動">⠿</div>
+        <div class="card-title">行動ログ</div>
+        <div class="form-group">
+          <label for="raw-input">今日の行動を自由に入力してください</label>
+          <textarea
+            id="raw-input"
+            placeholder="8:00 起床&#10;8:30 朝食&#10;9:00-12:00 仕事（企画書作成）&#10;12:00 昼食&#10;13:00-14:30 YouTube視聴&#10;15:00-18:00 コードレビュー&#10;19:00 夕食&#10;20:00-22:00 読書&#10;23:00 就寝"
+          >${rawInput}</textarea>
+        </div>
+      </div>`,
+
+    "card-task-mgmt": `
+      <div class="card draggable-card" id="card-task-mgmt" draggable="false">
+        <div class="card-drag-handle" title="ドラッグで移動">⠿</div>
+        <div class="card-title">タスク管理</div>
+        <label>予定タスク</label>
+        <button class="btn btn-outline btn-sm" id="btn-carry-over" style="margin-bottom: 8px; width: 100%;">
+          📋 昨日の未完了タスクを引き継ぐ
+        </button>
+        <ul class="task-list" id="planned-list">
+          ${incompleteTasks.map((t) => buildTaskItem(t, false)).join("")}
+        </ul>
+        <div class="task-input-row">
+          <input type="text" id="planned-input" placeholder="タスクを追加..." />
+          <button class="btn btn-outline btn-sm" id="btn-add-task">追加</button>
+        </div>
+      </div>`,
+
+    "card-actions": `
+      <div class="card draggable-card" id="card-actions" draggable="false">
+        <div class="card-drag-handle" title="ドラッグで移動">⠿</div>
+        <button class="btn btn-primary" id="btn-submit">
+          ${isEdit ? "✏️ 記録を更新する" : "💾 記録を保存する"}
+        </button>
+        ${isEdit ? `
+        <div style="margin-top: 10px; display: flex; gap: 10px;">
+          <button class="btn btn-outline btn-sm" id="btn-analyze" style="flex: 1;">
+            🤖 AI で分析する
+          </button>
+          <button class="btn btn-outline btn-sm" id="btn-view-analysis" style="flex: 1;"
+            onclick="window.location.hash='/analysis/${record?.date || ''}'">
+            📊 分析を見る
+          </button>
+        </div>` : ""}
+      </div>`,
+
+    "card-completed": `
+      <div class="card draggable-card completed-tasks-card" id="card-completed" draggable="false"
+           style="${hasCompleted ? "" : "display:none"}">
+        <div class="card-drag-handle" title="ドラッグで移動">⠿</div>
+        <div class="card-title">完了タスク <span class="completed-count" id="completed-count">${completedTasks.length}</span></div>
+        <ul class="task-list" id="completed-list">
+          ${completedTasks.map((t) => buildTaskItem(t, true)).join("")}
+        </ul>
+      </div>`,
+  };
+
+  // localStorage のレイアウトに従ってカードを列に振り分け
+  const layout = getLayoutPreference();
+  const columns = [[], []];
+
+  for (const [cardId, cardHTML] of Object.entries(cards)) {
+    const col = layout[cardId]?.column ?? DEFAULT_LAYOUT[cardId].column;
+    const order = layout[cardId]?.order ?? DEFAULT_LAYOUT[cardId].order;
+    columns[col].push({ cardId, cardHTML, order });
+  }
+
+  columns.forEach((col) => col.sort((a, b) => a.order - b.order));
 
   return `
     <h2 style="margin-bottom: 4px; font-size: 1.2rem;">${isEdit ? "記録を編集" : "行動を記録"}</h2>
     <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: var(--gap);">${dateLabel}</p>
 
-    <div class="card">
-      <div class="card-title">行動ログ</div>
-      <div class="form-group">
-        <label for="raw-input">今日の行動を自由に入力してください</label>
-        <textarea
-          id="raw-input"
-          placeholder="8:00 起床&#10;8:30 朝食&#10;9:00-12:00 仕事（企画書作成）&#10;12:00 昼食&#10;13:00-14:30 YouTube視聴&#10;15:00-18:00 コードレビュー&#10;19:00 夕食&#10;20:00-22:00 読書&#10;23:00 就寝"
-        >${rawInput}</textarea>
+    <div class="input-grid" id="input-grid">
+      <div class="input-column" id="input-column-0" data-column="0">
+        ${columns[0].map((c) => c.cardHTML).join("")}
       </div>
-    </div>
-
-    <div class="card">
-      <div class="card-title">タスク管理</div>
-
-      <label>予定タスク</label>
-      <button class="btn btn-outline btn-sm" id="btn-carry-over" style="margin-bottom: 8px; width: 100%;">
-        📋 昨日の未完了タスクを引き継ぐ
-      </button>
-      <ul class="task-list" id="planned-list">
-        ${incompleteTasks.map((t) => buildTaskItem(t, false)).join("")}
-      </ul>
-      <div class="task-input-row">
-        <input type="text" id="planned-input" placeholder="タスクを追加..." />
-        <button class="btn btn-outline btn-sm" id="btn-add-task">追加</button>
+      <div class="input-column" id="input-column-1" data-column="1">
+        ${columns[1].map((c) => c.cardHTML).join("")}
       </div>
-    </div>
-
-    <div class="card" style="margin-bottom: 0;">
-      <button class="btn btn-primary" id="btn-submit" ${!rawInput && !isEdit ? "" : ""}>
-        ${isEdit ? "✏️ 記録を更新する" : "💾 記録を保存する"}
-      </button>
-      ${isEdit ? `
-      <div style="margin-top: 10px; display: flex; gap: 10px;">
-        <button class="btn btn-outline btn-sm" id="btn-analyze" style="flex: 1;">
-          🤖 AI で分析する
-        </button>
-        <button class="btn btn-outline btn-sm" id="btn-view-analysis" style="flex: 1;"
-          onclick="window.location.hash='/analysis/${record?.date || ''}'">
-          📊 分析を見る
-        </button>
-      </div>` : ""}
-    </div>
-
-    <div class="card completed-tasks-card" id="completed-tasks-card" style="${hasCompleted ? "" : "display:none"}">
-      <div class="card-title">完了タスク <span class="completed-count" id="completed-count">${completedTasks.length}</span></div>
-      <ul class="task-list" id="completed-list">
-        ${completedTasks.map((t) => buildTaskItem(t, true)).join("")}
-      </ul>
     </div>
   `;
 }
@@ -106,17 +171,18 @@ function buildTaskItem(taskText, isCompleted) {
 }
 
 function syncCompletedCard() {
-  const card = document.getElementById("completed-tasks-card");
+  const card = document.getElementById("card-completed");
   if (!card) return;
   const count = document.querySelectorAll("#completed-list .task-item").length;
   card.style.display = count > 0 ? "" : "none";
   document.getElementById("completed-count").textContent = count;
 }
 
+/* ── イベント登録 ── */
+
 function attachFormEvents(date, isEdit) {
   const plannedList = document.getElementById("planned-list");
   const plannedInput = document.getElementById("planned-input");
-
   const completedList = document.getElementById("completed-list");
 
   // バックグラウンド自動保存（排他制御付き）
@@ -130,7 +196,7 @@ function attachFormEvents(date, isEdit) {
     }
 
     const rawInput = document.getElementById("raw-input").value.trim();
-    if (!isEdit && !rawInput) return; // 新規作成時は行動ログが必要
+    if (!isEdit && !rawInput) return;
 
     const incompleteTasks = [...document.querySelectorAll("#planned-list .task-item span")]
       .map((el) => el.textContent.trim())
@@ -179,7 +245,6 @@ function attachFormEvents(date, isEdit) {
     btn.disabled = true;
     btn.textContent = "読み込み中...";
 
-    // 直近 7 日間を遡って未完了タスクを持つ日を探す
     const base = new Date(date + "T00:00:00");
     let found = null;
     let searchedDate = null;
@@ -192,7 +257,7 @@ function attachFormEvents(date, isEdit) {
         const planned = found?.tasks?.planned || [];
         const completed = found?.tasks?.completed || [];
         if (planned.filter((t) => !completed.includes(t)).length > 0) break;
-        found = null; // 未完了タスクがないので次の日へ
+        found = null;
       } catch {
         found = null;
       }
@@ -207,7 +272,6 @@ function attachFormEvents(date, isEdit) {
       const completed = found.tasks?.completed || [];
       const incomplete = planned.filter((t) => !completed.includes(t));
 
-      // 今日の既存タスクを取得して重複排除
       const existing = new Set(
         [...document.querySelectorAll("#planned-list .task-item span, #completed-list .task-item span")]
           .map((el) => el.textContent.trim())
@@ -250,14 +314,12 @@ function attachFormEvents(date, isEdit) {
 
   // タスク削除 & チェックボックス切り替え（イベント委任）
   function handleTaskClick(e) {
-    // 削除ボタン
     if (e.target.dataset.remove !== undefined) {
       e.target.closest("li").remove();
       syncCompletedCard();
       saveDataQuietly();
       return;
     }
-    // チェックボックス — リスト間で移動
     if (e.target.type === "checkbox") {
       const li = e.target.closest("li");
       if (e.target.checked) {
@@ -297,7 +359,148 @@ function attachFormEvents(date, isEdit) {
       }
     });
   }
+
+  // ドラッグ&ドロップ（デスクトップのみ）
+  attachDragDropEvents();
 }
+
+/* ── ドラッグ&ドロップ ── */
+
+function attachDragDropEvents() {
+  const mql = window.matchMedia("(min-width: 1024px)");
+  if (!mql.matches) return;
+
+  const grid = document.getElementById("input-grid");
+  if (!grid) return;
+
+  const columns = grid.querySelectorAll(".input-column");
+  let draggedCard = null;
+
+  // ハンドルの mousedown で一時的に draggable を有効化（textarea の選択と干渉しない）
+  grid.querySelectorAll(".card-drag-handle").forEach((handle) => {
+    handle.addEventListener("mousedown", () => {
+      const card = handle.closest(".draggable-card");
+      if (card) card.setAttribute("draggable", "true");
+    });
+  });
+
+  document.addEventListener("mouseup", () => {
+    grid.querySelectorAll(".draggable-card").forEach((card) => {
+      card.setAttribute("draggable", "false");
+    });
+  });
+
+  // dragstart
+  grid.addEventListener("dragstart", (e) => {
+    const card = e.target.closest(".draggable-card");
+    if (!card) { e.preventDefault(); return; }
+
+    draggedCard = card;
+    card.classList.add("dragging");
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", card.id);
+
+    requestAnimationFrame(() => {
+      card.style.opacity = "0.35";
+    });
+  });
+
+  // dragend
+  grid.addEventListener("dragend", (e) => {
+    const card = e.target.closest(".draggable-card");
+    if (card) {
+      card.classList.remove("dragging");
+      card.style.opacity = "";
+      card.setAttribute("draggable", "false");
+    }
+    draggedCard = null;
+    columns.forEach((col) => col.classList.remove("drag-over"));
+    grid.querySelectorAll(".drop-indicator").forEach((el) => el.remove());
+  });
+
+  // 各カラムにドロップゾーンを設定
+  columns.forEach((column) => {
+    column.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      if (!draggedCard) return;
+
+      column.classList.add("drag-over");
+
+      const visibleCards = [...column.querySelectorAll(".draggable-card:not(.dragging)")].filter(
+        (c) => c.style.display !== "none"
+      );
+      const afterCard = getInsertAfterCard(column, e.clientY, visibleCards);
+
+      grid.querySelectorAll(".drop-indicator").forEach((el) => el.remove());
+      const indicator = document.createElement("div");
+      indicator.className = "drop-indicator";
+
+      if (afterCard) {
+        column.insertBefore(indicator, afterCard);
+      } else {
+        column.appendChild(indicator);
+      }
+    });
+
+    column.addEventListener("dragleave", (e) => {
+      if (!column.contains(e.relatedTarget)) {
+        column.classList.remove("drag-over");
+        column.querySelectorAll(".drop-indicator").forEach((el) => el.remove());
+      }
+    });
+
+    column.addEventListener("drop", (e) => {
+      e.preventDefault();
+      column.classList.remove("drag-over");
+      grid.querySelectorAll(".drop-indicator").forEach((el) => el.remove());
+
+      if (!draggedCard) return;
+
+      const visibleCards = [...column.querySelectorAll(".draggable-card:not(.dragging)")].filter(
+        (c) => c.style.display !== "none"
+      );
+      const afterCard = getInsertAfterCard(column, e.clientY, visibleCards);
+
+      if (afterCard) {
+        column.insertBefore(draggedCard, afterCard);
+      } else {
+        column.appendChild(draggedCard);
+      }
+
+      persistCurrentLayout(columns);
+    });
+  });
+
+  // ビューポート変更への対応
+  mql.addEventListener("change", (e) => {
+    grid.querySelectorAll(".draggable-card").forEach((card) => {
+      card.setAttribute("draggable", "false");
+    });
+  });
+}
+
+function getInsertAfterCard(column, mouseY, cards) {
+  for (const card of cards) {
+    const rect = card.getBoundingClientRect();
+    const midY = rect.top + rect.height / 2;
+    if (mouseY < midY) return card;
+  }
+  return null;
+}
+
+function persistCurrentLayout(columns) {
+  const layout = {};
+  columns.forEach((column, colIndex) => {
+    const cards = column.querySelectorAll(".draggable-card");
+    cards.forEach((card, orderIndex) => {
+      layout[card.id] = { column: colIndex, order: orderIndex };
+    });
+  });
+  saveLayoutPreference(layout);
+}
+
+/* ── フォーム送信 ── */
 
 async function submitForm(date, isEdit, btn) {
   const rawInput = document.getElementById("raw-input").value.trim();
@@ -306,7 +509,6 @@ async function submitForm(date, isEdit, btn) {
     return;
   }
 
-  // 2 つのリストからタスクを収集
   const incompleteTasks = [...document.querySelectorAll("#planned-list .task-item span")]
     .map((el) => el.textContent.trim())
     .filter(Boolean);
@@ -333,7 +535,6 @@ async function submitForm(date, isEdit, btn) {
       await recordsApi.create(date, rawInput, plannedTasks);
       showToast("記録を保存しました！", "success");
     }
-    // ホームへ戻る
     window.location.hash = "/";
   } catch (err) {
     showToast(`保存に失敗しました: ${err.message}`, "error");
@@ -341,6 +542,8 @@ async function submitForm(date, isEdit, btn) {
     btn.textContent = originalText;
   }
 }
+
+/* ── ユーティリティ ── */
 
 function escapeHTML(str) {
   return str.replace(/[&<>"']/g, (c) => ({
