@@ -1236,16 +1236,15 @@ textarea {
     flex-direction: column;
     align-items: stretch;
     height: auto;
-    min-height: 100%;
   }
 
   /* Logo area */
   .nav-logo {
-    padding: 22px 24px;
+    padding: 14px 20px;
     font-size: 1.05rem;
     letter-spacing: 0.08em;
     border-bottom: 1px solid var(--border);
-    margin-bottom: 8px;
+    margin-bottom: 0;
     text-shadow: 0 0 24px rgba(0, 212, 255, 0.4);
   }
 
@@ -1254,11 +1253,11 @@ textarea {
     height: 8px;
   }
 
-  /* Nav links — vertical list */
+  /* Nav links — vertical list, packed top */
   .nav-links {
     flex-direction: column;
-    gap: 2px;
-    padding: 8px 12px;
+    gap: 0;
+    padding: 0;
   }
 
   .nav-link {
@@ -1266,15 +1265,16 @@ textarea {
     align-items: center;
     justify-content: flex-start;
     gap: 14px;
-    padding: 11px 16px;
+    padding: 14px 20px;
     font-size: 0.88rem;
     font-weight: 500;
     text-transform: none;
     letter-spacing: 0.01em;
-    border-radius: var(--radius-xs);
+    border-radius: 0;
     color: var(--text-secondary);
     transition: all 0.15s ease;
     position: relative;
+    border-bottom: 1px solid rgba(0, 212, 255, 0.04);
   }
 
   .nav-link .icon {
@@ -1309,10 +1309,10 @@ textarea {
     content: '';
     position: absolute;
     left: 0;
-    top: 6px;
-    bottom: 6px;
+    top: 0;
+    bottom: 0;
     width: 3px;
-    border-radius: 0 3px 3px 0;
+    border-radius: 0;
     background: var(--cyan);
     box-shadow: 0 0 8px rgba(0, 212, 255, 0.6);
   }
@@ -1322,17 +1322,9 @@ textarea {
     filter: drop-shadow(0 0 5px rgba(0, 212, 255, 0.7));
   }
 
-  /* Sidebar bottom info */
+  /* Sidebar bottom info — removed to keep nav packed top */
   .nav-links::after {
-    content: 'NEXUS AI v2.0';
-    display: block;
-    margin-top: auto;
-    padding: 20px 16px 24px;
-    font-size: 0.65rem;
-    color: var(--text-muted);
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    opacity: 0.4;
+    content: none;
   }
 
   /* ── Desktop Header ── */
