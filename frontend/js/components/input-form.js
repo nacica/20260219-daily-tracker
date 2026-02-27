@@ -4,8 +4,8 @@
  * デスクトップ: 2列ドラッグ&ドロップレイアウト
  */
 
-import { recordsApi, analysisApi } from "../api.js?v=20260227e";
-import { showToast } from "../app.js?v=20260227e";
+import { recordsApi, analysisApi } from "../api.js?v=20260228a";
+import { showToast } from "../app.js?v=20260228a";
 
 /* ── レイアウト永続化 ── */
 

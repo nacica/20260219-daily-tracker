@@ -137,3 +137,97 @@ class AnalysisDialogue(BaseModel):
 class DialogueReplyRequest(BaseModel):
     """対話返信リクエスト"""
     message: str = Field(..., min_length=1, max_length=2000)
+
+
+# ---- ナレッジグラフ（コーチング機能） ----
+
+class EntityObservation(BaseModel):
+    """エンティティの観測記録"""
+    content: str
+    source_date: str
+    confidence: float = 0.8
+
+
+class UserEntity(BaseModel):
+    """ナレッジグラフのエンティティ"""
+    id: str = ""
+    name: str
+    entityType: str  # goal|behavior_pattern|trigger|strength|weakness|habit|value|emotion_pattern|life_context
+    observations: list[EntityObservation] = []
+    first_observed: str = ""
+    last_observed: str = ""
+    observation_count: int = 0
+    status: str = "active"  # active|resolved|monitoring
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+
+
+class EntityRelation(BaseModel):
+    """エンティティ間の関係性"""
+    id: str = ""
+    from_entity: str
+    from_entity_id: str = ""
+    to_entity: str
+    to_entity_id: str = ""
+    relation_type: str  # triggers|prevents|supports|conflicts_with|correlates_with|part_of|leads_to
+    strength: float = 0.5
+    evidence_count: int = 1
+    evidence_dates: list[str] = []
+    description: str = ""
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+
+
+class PatternSummary(BaseModel):
+    """月次パターンサマリー"""
+    pattern: str
+    frequency: int = 0
+    trend: str = "stable"  # improving|stable|worsening
+
+
+class GoalProgress(BaseModel):
+    """月次目標進捗"""
+    goal: str
+    progress_percentage: int = 0
+    blockers: list[str] = []
+    achievements: list[str] = []
+
+
+class EmotionalSummary(BaseModel):
+    """月次感情サマリー"""
+    average_score: float = 0.0
+    best_day_pattern: str = ""
+    worst_day_pattern: str = ""
+
+
+class CoachingEffectiveness(BaseModel):
+    """コーチング効果"""
+    advice_followed_rate: float = 0.0
+    most_effective_advice: str = ""
+    least_effective_advice: str = ""
+
+
+class CoachingSummary(BaseModel):
+    """月次コーチングサマリー"""
+    period: str  # YYYY-MM
+    top_patterns: list[PatternSummary] = []
+    goals_progress: list[GoalProgress] = []
+    emotional_summary: EmotionalSummary = EmotionalSummary()
+    key_insights: list[str] = []
+    coaching_effectiveness: CoachingEffectiveness = CoachingEffectiveness()
+    created_at: Optional[str] = None
+
+
+# ---- コーチング API リクエスト ----
+
+class CoachChatRequest(BaseModel):
+    """コーチングチャットリクエスト"""
+    message: str = Field(..., min_length=1, max_length=2000)
+    conversation_history: list[dict] = Field(default=[], description="直近の対話履歴（最大10ターン）")
+
+
+class CoachChatResponse(BaseModel):
+    """コーチングチャットレスポンス"""
+    reply: str
+    referenced_patterns: list[str] = []
+    suggested_action: str = ""

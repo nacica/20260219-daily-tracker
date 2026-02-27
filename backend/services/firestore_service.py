@@ -160,3 +160,161 @@ def delete_dialogue(date: str) -> bool:
         return False
     ref.delete()
     return True
+
+
+# ---- ナレッジグラフ: user_entities ----
+
+DEFAULT_USER_ID = "default"
+
+
+def _user_ref(user_id: str = DEFAULT_USER_ID):
+    """ユーザードキュメントの参照を返す"""
+    db = get_db()
+    return db.collection("users").document(user_id)
+
+
+def get_entity(entity_id: str, user_id: str = DEFAULT_USER_ID) -> Optional[dict]:
+    """エンティティを取得"""
+    doc = _user_ref(user_id).collection("user_entities").document(entity_id).get()
+    if doc.exists:
+        return doc.to_dict()
+    return None
+
+
+def list_entities(
+    user_id: str = DEFAULT_USER_ID,
+    entity_type: Optional[str] = None,
+    status: Optional[str] = None,
+    limit: int = 100,
+) -> list[dict]:
+    """エンティティ一覧を取得"""
+    query = _user_ref(user_id).collection("user_entities")
+    if entity_type:
+        query = query.where(filter=FieldFilter("entityType", "==", entity_type))
+    if status:
+        query = query.where(filter=FieldFilter("status", "==", status))
+    query = query.limit(limit)
+    return [doc.to_dict() for doc in query.stream()]
+
+
+def find_entity_by_name(name: str, user_id: str = DEFAULT_USER_ID) -> Optional[dict]:
+    """名前でエンティティを検索"""
+    query = _user_ref(user_id).collection("user_entities").where(
+        filter=FieldFilter("name", "==", name)
+    ).limit(1)
+    docs = list(query.stream())
+    if docs:
+        return docs[0].to_dict()
+    return None
+
+
+def save_entity(entity_id: str, data: dict, user_id: str = DEFAULT_USER_ID) -> dict:
+    """エンティティを保存"""
+    _user_ref(user_id).collection("user_entities").document(entity_id).set(data)
+    return data
+
+
+def update_entity(entity_id: str, data: dict, user_id: str = DEFAULT_USER_ID) -> dict:
+    """エンティティを部分更新"""
+    _user_ref(user_id).collection("user_entities").document(entity_id).update(data)
+    return data
+
+
+def delete_entity(entity_id: str, user_id: str = DEFAULT_USER_ID) -> bool:
+    """エンティティを削除"""
+    ref = _user_ref(user_id).collection("user_entities").document(entity_id)
+    if not ref.get().exists:
+        return False
+    ref.delete()
+    return True
+
+
+# ---- ナレッジグラフ: entity_relations ----
+
+def get_relation(relation_id: str, user_id: str = DEFAULT_USER_ID) -> Optional[dict]:
+    """リレーションを取得"""
+    doc = _user_ref(user_id).collection("entity_relations").document(relation_id).get()
+    if doc.exists:
+        return doc.to_dict()
+    return None
+
+
+def list_relations(
+    user_id: str = DEFAULT_USER_ID,
+    min_strength: Optional[float] = None,
+    limit: int = 100,
+) -> list[dict]:
+    """リレーション一覧を取得"""
+    query = _user_ref(user_id).collection("entity_relations")
+    if min_strength is not None:
+        query = query.where(filter=FieldFilter("strength", ">=", min_strength))
+    query = query.limit(limit)
+    return [doc.to_dict() for doc in query.stream()]
+
+
+def find_relation(
+    from_name: str, to_name: str, relation_type: str,
+    user_id: str = DEFAULT_USER_ID,
+) -> Optional[dict]:
+    """from/to/typeでリレーションを検索"""
+    query = (
+        _user_ref(user_id).collection("entity_relations")
+        .where(filter=FieldFilter("from_entity", "==", from_name))
+        .where(filter=FieldFilter("to_entity", "==", to_name))
+        .where(filter=FieldFilter("relation_type", "==", relation_type))
+        .limit(1)
+    )
+    docs = list(query.stream())
+    if docs:
+        return docs[0].to_dict()
+    return None
+
+
+def save_relation(relation_id: str, data: dict, user_id: str = DEFAULT_USER_ID) -> dict:
+    """リレーションを保存"""
+    _user_ref(user_id).collection("entity_relations").document(relation_id).set(data)
+    return data
+
+
+def update_relation(relation_id: str, data: dict, user_id: str = DEFAULT_USER_ID) -> dict:
+    """リレーションを部分更新"""
+    _user_ref(user_id).collection("entity_relations").document(relation_id).update(data)
+    return data
+
+
+def delete_relation(relation_id: str, user_id: str = DEFAULT_USER_ID) -> bool:
+    """リレーションを削除"""
+    ref = _user_ref(user_id).collection("entity_relations").document(relation_id)
+    if not ref.get().exists:
+        return False
+    ref.delete()
+    return True
+
+
+# ---- コーチングサマリー ----
+
+def get_coaching_summary(year_month: str, user_id: str = DEFAULT_USER_ID) -> Optional[dict]:
+    """月次コーチングサマリーを取得"""
+    doc = _user_ref(user_id).collection("coaching_summaries").document(year_month).get()
+    if doc.exists:
+        return doc.to_dict()
+    return None
+
+
+def get_latest_coaching_summary(user_id: str = DEFAULT_USER_ID) -> Optional[dict]:
+    """最新の月次コーチングサマリーを取得"""
+    query = (
+        _user_ref(user_id).collection("coaching_summaries")
+        .order_by("period", direction=firestore.Query.DESCENDING)
+        .limit(1)
+    )
+    docs = list(query.stream())
+    if docs:
+        return docs[0].to_dict()
+    return None
+
+
+def save_coaching_summary(year_month: str, data: dict, user_id: str = DEFAULT_USER_ID) -> dict:
+    """月次コーチングサマリーを保存"""
+    _user_ref(user_id).collection("coaching_summaries").document(year_month).set(data)
+    return data

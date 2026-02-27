@@ -107,3 +107,61 @@ export const dialogueApi = {
   /** 対話を削除 */
   delete: (date) => apiFetch(`/dialogue/${date}`, { method: "DELETE" }),
 };
+
+// ---- コーチングチャット ----
+
+export const coachApi = {
+  /** コーチとチャット */
+  chat: (message, conversationHistory = []) =>
+    apiFetch("/coach/chat", {
+      method: "POST",
+      body: { message, conversation_history: conversationHistory },
+    }),
+};
+
+// ---- ナレッジグラフ ----
+
+export const knowledgeApi = {
+  /** エンティティ一覧 */
+  listEntities: (entityType, status, limit = 50) => {
+    const params = new URLSearchParams();
+    if (entityType) params.set("entity_type", entityType);
+    if (status) params.set("status", status);
+    params.set("limit", limit);
+    return apiFetch(`/knowledge/entities?${params}`);
+  },
+
+  /** エンティティ詳細 */
+  getEntity: (id) => apiFetch(`/knowledge/entities/${id}`),
+
+  /** エンティティ削除 */
+  deleteEntity: (id) => apiFetch(`/knowledge/entities/${id}`, { method: "DELETE" }),
+
+  /** リレーション一覧 */
+  listRelations: (minStrength, limit = 50) => {
+    const params = new URLSearchParams();
+    if (minStrength != null) params.set("min_strength", minStrength);
+    params.set("limit", limit);
+    return apiFetch(`/knowledge/relations?${params}`);
+  },
+
+  /** リレーション削除 */
+  deleteRelation: (id) => apiFetch(`/knowledge/relations/${id}`, { method: "DELETE" }),
+
+  /** サマリー統計 */
+  summary: () => apiFetch("/knowledge/summary"),
+};
+
+// ---- 月次サマリー ----
+
+export const summariesApi = {
+  /** 月次サマリー生成 */
+  generate: (yearMonth) =>
+    apiFetch(`/summaries/generate/${yearMonth}`, { method: "POST" }),
+
+  /** 月次サマリー取得 */
+  get: (yearMonth) => apiFetch(`/summaries/${yearMonth}`),
+
+  /** サマリー一覧 */
+  list: () => apiFetch("/summaries"),
+};

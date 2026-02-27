@@ -3,13 +3,16 @@
  * ルーティングの設定とホーム画面の表示を担当する
  */
 
-import { addRoute, navigate, updateNavActive } from "./router.js?v=20260227e";
-import { renderInputForm } from "./components/input-form.js?v=20260227e";
-import { renderAnalysisView } from "./components/analysis-view.js?v=20260227e";
-import { renderHistoryList } from "./components/history-list.js?v=20260227e";
-import { renderWeeklyReport } from "./components/weekly-report.js?v=20260227e";
-import { renderSuggestions } from "./components/suggestions.js?v=20260227e";
-import { recordsApi, analysisApi } from "./api.js?v=20260227e";
+import { addRoute, navigate, updateNavActive } from "./router.js?v=20260228a";
+import { renderInputForm } from "./components/input-form.js?v=20260228a";
+import { renderAnalysisView } from "./components/analysis-view.js?v=20260228a";
+import { renderHistoryList } from "./components/history-list.js?v=20260228a";
+import { renderWeeklyReport } from "./components/weekly-report.js?v=20260228a";
+import { renderSuggestions } from "./components/suggestions.js?v=20260228a";
+import { renderCoachingChat } from "./components/coaching-chat.js?v=20260228a";
+import { renderKnowledgeGraph } from "./components/knowledge-graph.js?v=20260228a";
+import { renderMonthlyReport } from "./components/monthly-report.js?v=20260228a";
+import { recordsApi, analysisApi } from "./api.js?v=20260228a";
 
 // ===== ユーティリティ =====
 
@@ -39,6 +42,9 @@ const ROUTE_TITLES = {
   "/history": { title: "履歴一覧", breadcrumb: "履歴" },
   "/weekly": { title: "週次レポート", breadcrumb: "週次分析" },
   "/suggestions": { title: "改善提案", breadcrumb: "提案アーカイブ" },
+  "/coach": { title: "コーチング", breadcrumb: "パーソナルコーチ" },
+  "/knowledge": { title: "ナレッジグラフ", breadcrumb: "行動パターン" },
+  "/monthly": { title: "月次レポート", breadcrumb: "月次サマリー" },
 };
 
 /** デスクトップヘッダーのタイトルと日付を更新 */
@@ -227,6 +233,10 @@ addRoute("/history", () => renderHistoryList());
 addRoute("/weekly", () => renderWeeklyReport(null));
 addRoute("/weekly/:weekId", ({ weekId }) => renderWeeklyReport(weekId));
 addRoute("/suggestions", () => renderSuggestions());
+addRoute("/coach", () => renderCoachingChat());
+addRoute("/knowledge", () => renderKnowledgeGraph());
+addRoute("/monthly", () => renderMonthlyReport(null));
+addRoute("/monthly/:yearMonth", ({ yearMonth }) => renderMonthlyReport(yearMonth));
 
 // ===== 初期化 =====
 
