@@ -118,18 +118,19 @@ body {
 .nav-inner {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  height: 56px;
+  justify-content: center;
+  height: 48px;
 }
 
+/* モバイルではロゴを非表示（アプリ名はPWAタイトルで確認可能） */
 .nav-logo {
+  display: none;
   font-size: 0.92rem;
   font-weight: 700;
   color: var(--cyan);
   text-decoration: none;
   letter-spacing: 0.06em;
   text-shadow: 0 0 18px rgba(0, 212, 255, 0.5);
-  display: flex;
   align-items: center;
   gap: 10px;
 }
@@ -154,14 +155,27 @@ body {
 
 .nav-links {
   display: flex;
-  gap: 2px;
+  gap: 4px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;        /* Firefox */
+  width: 100%;
+  justify-content: center;
+  padding: 0 4px;
+}
+
+.nav-links::-webkit-scrollbar {
+  display: none;                /* Chrome/Safari */
 }
 
 .nav-link {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 6px 10px;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 4px 8px;
   border-radius: var(--radius-xs);
   color: var(--text-muted);
   text-decoration: none;
@@ -173,13 +187,19 @@ body {
   cursor: pointer;
   border: none;
   background: none;
+  flex-shrink: 0;
+}
+
+/* モバイルではテキストラベルを非表示にしアイコンのみ表示 */
+.nav-link span {
+  display: none;
 }
 
 .nav-link .icon {
   display: block;
-  width: 18px;
-  height: 18px;
-  margin-bottom: 3px;
+  width: 24px;
+  height: 24px;
+  margin-bottom: 0;
   transition: filter 0.2s;
 }
 
@@ -1594,11 +1614,13 @@ textarea {
   .nav-inner {
     flex-direction: column;
     align-items: stretch;
+    justify-content: flex-start;
     height: auto;
   }
 
-  /* Logo area */
+  /* Logo area — デスクトップでは再表示 */
   .nav-logo {
+    display: flex;
     padding: 14px 20px;
     font-size: 1.05rem;
     letter-spacing: 0.08em;
@@ -1617,6 +1639,9 @@ textarea {
     flex-direction: column;
     gap: 0;
     padding: 0;
+    overflow-x: visible;
+    width: auto;
+    justify-content: flex-start;
   }
 
   .nav-link {
@@ -1625,6 +1650,8 @@ textarea {
     justify-content: flex-start;
     gap: 14px;
     padding: 14px 20px;
+    min-width: auto;
+    min-height: auto;
     font-size: 0.88rem;
     font-weight: 500;
     text-transform: none;
@@ -1645,7 +1672,9 @@ textarea {
     transition: opacity 0.15s;
   }
 
+  /* デスクトップではテキストラベルを再表示 */
   .nav-link span {
+    display: inline;
     font-size: 0.88rem;
   }
 
