@@ -5,7 +5,7 @@
  *   - API リクエスト: Network First（オフライン時はキャッシュ）
  */
 
-const CACHE_NAME = "daily-tracker-v34";
+const CACHE_NAME = "daily-tracker-v35";
 const STATIC_ASSETS = [
   "/",
   "/index.html",
@@ -13,6 +13,7 @@ const STATIC_ASSETS = [
   "/js/app.js",
   "/js/api.js",
   "/js/router.js",
+  "/js/swipe-nav.js",
   "/js/components/input-form.js",
   "/js/components/analysis-view.js",
   "/js/components/history-list.js",

@@ -2866,3 +2866,51 @@ textarea {
   flex-direction: column;
   gap: 8px;
 }
+
+/* ===================================================
+   スワイプナビゲーション — ページ遷移アニメーション
+   =================================================== */
+
+main {
+  will-change: transform, opacity;
+}
+
+/* 左スワイプ時（次のタブへ）: 現在のページが左にスライドアウト */
+main.swipe-exit-left {
+  animation: swipeOutLeft 120ms ease-in forwards;
+}
+
+/* 右スワイプ時（前のタブへ）: 現在のページが右にスライドアウト */
+main.swipe-exit-right {
+  animation: swipeOutRight 120ms ease-in forwards;
+}
+
+/* 左スワイプ後: 新しいページが右からスライドイン */
+main.swipe-enter-left {
+  animation: swipeInFromRight 200ms ease-out forwards;
+}
+
+/* 右スワイプ後: 新しいページが左からスライドイン */
+main.swipe-enter-right {
+  animation: swipeInFromLeft 200ms ease-out forwards;
+}
+
+@keyframes swipeOutLeft {
+  from { transform: translateX(0); opacity: 1; }
+  to   { transform: translateX(-30px); opacity: 0; }
+}
+
+@keyframes swipeOutRight {
+  from { transform: translateX(0); opacity: 1; }
+  to   { transform: translateX(30px); opacity: 0; }
+}
+
+@keyframes swipeInFromRight {
+  from { transform: translateX(30px); opacity: 0; }
+  to   { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes swipeInFromLeft {
+  from { transform: translateX(-30px); opacity: 0; }
+  to   { transform: translateX(0); opacity: 1; }
+}
