@@ -3,17 +3,50 @@
  * ルーティングの設定とホーム画面の表示を担当する
  */
 
-import { addRoute, navigate, updateNavActive } from "./router.js?v=20260228k";
-import { renderInputForm } from "./components/input-form.js?v=20260228k";
-import { renderAnalysisView } from "./components/analysis-view.js?v=20260228k";
-import { renderHistoryList } from "./components/history-list.js?v=20260228k";
-import { renderWeeklyReport } from "./components/weekly-report.js?v=20260228k";
-import { renderSuggestions } from "./components/suggestions.js?v=20260228k";
-import { renderCoachingChat } from "./components/coaching-chat.js?v=20260228k";
-import { renderKnowledgeGraph } from "./components/knowledge-graph.js?v=20260228k";
-import { renderMonthlyReport } from "./components/monthly-report.js?v=20260228k";
-import { recordsApi, analysisApi } from "./api.js?v=20260228k";
-import { initSwipeNav } from "./swipe-nav.js?v=20260228k";
+import { addRoute, navigate, updateNavActive } from "./router.js?v=20260228l";
+import { renderInputForm } from "./components/input-form.js?v=20260228l";
+import { renderAnalysisView } from "./components/analysis-view.js?v=20260228l";
+import { renderHistoryList } from "./components/history-list.js?v=20260228l";
+import { renderWeeklyReport } from "./components/weekly-report.js?v=20260228l";
+import { renderSuggestions } from "./components/suggestions.js?v=20260228l";
+import { renderCoachingChat } from "./components/coaching-chat.js?v=20260228l";
+import { renderKnowledgeGraph } from "./components/knowledge-graph.js?v=20260228l";
+import { renderMonthlyReport } from "./components/monthly-report.js?v=20260228l";
+import { recordsApi, analysisApi } from "./api.js?v=20260228l";
+import { initSwipeNav } from "./swipe-nav.js?v=20260228l";
+
+// ===== テーマ切替 =====
+
+/** テーマを適用する */
+function applyTheme(theme) {
+  document.documentElement.setAttribute("data-theme", theme);
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) {
+    meta.content = theme === "light" ? "#ffffff" : "#020408";
+  }
+}
+
+/** テーマ初期化: トグルボタンとOS設定リスナーを設定 */
+function initTheme() {
+  const toggle = document.getElementById("theme-toggle");
+  if (!toggle) return;
+
+  toggle.addEventListener("click", () => {
+    const current = document.documentElement.getAttribute("data-theme");
+    const next = current === "light" ? "dark" : "light";
+    applyTheme(next);
+    localStorage.setItem("theme", next);
+  });
+
+  // OS設定変更のリアルタイム追従（手動選択がない場合のみ）
+  window
+    .matchMedia("(prefers-color-scheme: light)")
+    .addEventListener("change", (e) => {
+      if (!localStorage.getItem("theme")) {
+        applyTheme(e.matches ? "light" : "dark");
+      }
+    });
+}
 
 // ===== ユーティリティ =====
 
@@ -242,6 +275,9 @@ addRoute("/monthly/:yearMonth", ({ yearMonth }) => renderMonthlyReport(yearMonth
 // ===== 初期化 =====
 
 document.addEventListener("DOMContentLoaded", () => {
+  // テーマ初期化
+  initTheme();
+
   // Service Worker 登録
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("/sw.js").catch(() => {});

@@ -61,6 +61,39 @@
   --gap: 16px;
 }
 
+/* === ライトテーマ === */
+[data-theme="light"] {
+  --bg-void:       #f0f2f5;
+  --bg-primary:    #ffffff;
+  --bg-secondary:  #f5f7fa;
+  --bg-card:       rgba(255, 255, 255, 0.92);
+  --bg-input:      rgba(245, 247, 250, 0.95);
+
+  --cyan:          #0099cc;
+  --cyan-dim:      rgba(0, 153, 204, 0.6);
+  --cyan-glow:     0 0 12px rgba(0, 153, 204, 0.2), 0 0 40px rgba(0, 153, 204, 0.05);
+  --violet:        #7c3aed;
+  --violet-dim:    rgba(124, 58, 237, 0.5);
+  --blue:          #2563eb;
+
+  --neon-green:    #059669;
+  --neon-amber:    #d97706;
+  --neon-red:      #dc2626;
+
+  --glow-green:    0 0 12px rgba(5, 150, 105, 0.2);
+  --glow-amber:    0 0 12px rgba(217, 119, 6, 0.2);
+  --glow-red:      0 0 12px rgba(220, 38, 38, 0.2);
+  --glow-cyan:     0 0 12px rgba(0, 153, 204, 0.2);
+
+  --text-primary:   #1a202c;
+  --text-secondary: #4a5568;
+  --text-muted:     #a0aec0;
+
+  --border:         rgba(0, 0, 0, 0.08);
+  --border-bright:  rgba(0, 0, 0, 0.15);
+  --border-card:    rgba(0, 0, 0, 0.06);
+}
+
 html {
   font-size: 16px;
   scroll-behavior: smooth;
@@ -81,6 +114,240 @@ body {
   min-height: 100vh;
   line-height: 1.6;
 }
+
+/* === ライトテーマ — ハードコード色の上書き === */
+
+[data-theme="light"] body {
+  background: var(--bg-primary);
+  background-image:
+    radial-gradient(ellipse 80% 50% at 20% -10%, rgba(0, 153, 204, 0.04) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 40% at 80% 110%, rgba(124, 58, 237, 0.03) 0%, transparent 60%),
+    linear-gradient(rgba(0, 0, 0, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 0, 0, 0.03) 1px, transparent 1px);
+  background-size: 100% 100%, 100% 100%, 48px 48px, 48px 48px;
+}
+
+[data-theme="light"] .nav {
+  background: rgba(255, 255, 255, 0.88);
+}
+
+[data-theme="light"] .nav::before {
+  opacity: 0.35;
+}
+
+[data-theme="light"] .nav-logo {
+  text-shadow: none;
+}
+
+[data-theme="light"] .nav-link:hover {
+  background: rgba(0, 153, 204, 0.07);
+}
+
+[data-theme="light"] .nav-link.active {
+  background: rgba(0, 153, 204, 0.09);
+  text-shadow: none;
+}
+
+[data-theme="light"] .nav-link.active .icon {
+  filter: drop-shadow(0 0 3px rgba(0, 153, 204, 0.5));
+}
+
+[data-theme="light"] .card::before {
+  background: radial-gradient(circle at top left, rgba(0, 153, 204, 0.04) 0%, transparent 70%);
+}
+
+[data-theme="light"] .card-title::before {
+  box-shadow: 0 0 6px rgba(0, 153, 204, 0.3);
+}
+
+[data-theme="light"] .score-circle {
+  background: rgba(255, 255, 255, 0.5);
+}
+
+[data-theme="light"] .score-circle::after {
+  background: conic-gradient(
+    from 0deg,
+    transparent 0%, transparent 25%,
+    rgba(0, 153, 204, 0.3) 45%,
+    rgba(124, 58, 237, 0.3) 55%,
+    transparent 75%, transparent 100%
+  );
+}
+
+[data-theme="light"] .score-circle.good {
+  box-shadow: 0 0 20px rgba(5, 150, 105, 0.15), inset 0 0 15px rgba(5, 150, 105, 0.04);
+  background: rgba(5, 150, 105, 0.04);
+}
+
+[data-theme="light"] .score-circle.mid {
+  box-shadow: 0 0 20px rgba(217, 119, 6, 0.15), inset 0 0 15px rgba(217, 119, 6, 0.04);
+  background: rgba(217, 119, 6, 0.04);
+}
+
+[data-theme="light"] .score-circle.bad {
+  box-shadow: 0 0 20px rgba(220, 38, 38, 0.15), inset 0 0 15px rgba(220, 38, 38, 0.04);
+  background: rgba(220, 38, 38, 0.04);
+}
+
+[data-theme="light"] .score-circle.good .score-value { text-shadow: none; }
+[data-theme="light"] .score-circle.mid .score-value  { text-shadow: none; }
+[data-theme="light"] .score-circle.bad .score-value   { text-shadow: none; }
+
+[data-theme="light"] .stat-item {
+  background: rgba(0, 153, 204, 0.03);
+}
+
+[data-theme="light"] .stat-item:hover {
+  background: rgba(0, 153, 204, 0.06);
+  border-color: rgba(0, 153, 204, 0.15);
+}
+
+[data-theme="light"] .analysis-list li {
+  background: rgba(0, 0, 0, 0.02);
+  backdrop-filter: none;
+}
+
+[data-theme="light"] .analysis-list.good li { background: rgba(5, 150, 105, 0.05); }
+[data-theme="light"] .analysis-list.bad li  { background: rgba(220, 38, 38, 0.05); }
+[data-theme="light"] .analysis-list.cause li { background: rgba(217, 119, 6, 0.05); }
+[data-theme="light"] .analysis-list.tip li   { background: rgba(0, 153, 204, 0.05); }
+
+[data-theme="light"] .suggestion-card {
+  background: rgba(0, 0, 0, 0.02);
+  backdrop-filter: none;
+}
+
+[data-theme="light"] .suggestion-card:hover {
+  background: rgba(0, 153, 204, 0.04);
+}
+
+[data-theme="light"] .toast {
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12);
+}
+
+[data-theme="light"] .spinner {
+  box-shadow: 0 0 12px rgba(0, 153, 204, 0.2);
+}
+
+[data-theme="light"] .history-item:hover {
+  background: rgba(0, 153, 204, 0.04);
+}
+
+[data-theme="light"] .history-score.good { background: rgba(5, 150, 105, 0.08); text-shadow: none; }
+[data-theme="light"] .history-score.mid  { background: rgba(217, 119, 6, 0.08); text-shadow: none; }
+[data-theme="light"] .history-score.bad  { background: rgba(220, 38, 38, 0.08); text-shadow: none; }
+
+[data-theme="light"] .cal-cell { background: rgba(0, 153, 204, 0.02); }
+[data-theme="light"] .cal-cell.score-good { background: rgba(5, 150, 105, 0.1); border-color: rgba(5, 150, 105, 0.2); }
+[data-theme="light"] .cal-cell.score-mid  { background: rgba(217, 119, 6, 0.1); border-color: rgba(217, 119, 6, 0.2); }
+[data-theme="light"] .cal-cell.score-bad  { background: rgba(220, 38, 38, 0.1); border-color: rgba(220, 38, 38, 0.2); }
+[data-theme="light"] .cal-cell.has-record { background: rgba(0, 153, 204, 0.06); }
+
+[data-theme="light"] .cal-cell.score-good .cal-score { text-shadow: none; }
+[data-theme="light"] .cal-cell.score-mid  .cal-score { text-shadow: none; }
+[data-theme="light"] .cal-cell.score-bad  .cal-score { text-shadow: none; }
+
+[data-theme="light"] .dialogue-bubble-ai {
+  background: rgba(0, 153, 204, 0.06);
+  border-color: rgba(0, 153, 204, 0.12);
+}
+
+[data-theme="light"] .dialogue-bubble-user {
+  background: rgba(124, 58, 237, 0.06);
+  border-color: rgba(124, 58, 237, 0.12);
+}
+
+[data-theme="light"] .chat-msg-user {
+  background: linear-gradient(135deg, rgba(0, 153, 204, 0.1), rgba(37, 99, 235, 0.1));
+  border-color: rgba(0, 153, 204, 0.15);
+}
+
+[data-theme="light"] .morning-context {
+  background: rgba(0, 0, 0, 0.02);
+}
+
+[data-theme="light"] .btn-primary {
+  box-shadow: 0 4px 16px rgba(0, 153, 204, 0.25);
+}
+
+[data-theme="light"] .btn-primary:disabled {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+[data-theme="light"] .chat-pattern-tag {
+  background: rgba(124, 58, 237, 0.1);
+  border-color: rgba(124, 58, 237, 0.2);
+}
+
+[data-theme="light"] .chat-action {
+  background: rgba(5, 150, 105, 0.08);
+}
+
+[data-theme="light"] ::selection {
+  background: rgba(0, 153, 204, 0.2);
+}
+
+[data-theme="light"] ::-webkit-scrollbar-track {
+  background: var(--bg-secondary);
+}
+
+[data-theme="light"] ::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.12);
+}
+
+[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+/* === テーマトグルボタン === */
+
+.theme-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+  color: var(--text-muted);
+  transition: color 0.2s, background 0.2s, border-color 0.2s;
+  flex-shrink: 0;
+  padding: 0;
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.theme-toggle:hover {
+  color: var(--cyan);
+  background: rgba(0, 212, 255, 0.07);
+  border-color: var(--cyan);
+}
+
+[data-theme="light"] .theme-toggle:hover {
+  background: rgba(0, 153, 204, 0.07);
+}
+
+.theme-toggle svg {
+  width: 18px;
+  height: 18px;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* ダーク時: 太陽アイコン表示、月アイコン非表示 */
+[data-theme="dark"] .theme-icon-moon,
+:root:not([data-theme="light"]) .theme-icon-moon { display: none; }
+[data-theme="dark"] .theme-icon-sun,
+:root:not([data-theme="light"]) .theme-icon-sun { display: block; }
+
+/* ライト時: 月アイコン表示、太陽アイコン非表示 */
+[data-theme="light"] .theme-icon-sun { display: none; }
+[data-theme="light"] .theme-icon-moon { display: block; }
 
 /* ===== レイアウト ===== */
 
@@ -121,6 +388,7 @@ body {
   justify-content: center;
   height: auto;
   padding: 6px 0;
+  position: relative;
 }
 
 /* モバイルではロゴを非表示（アプリ名はPWAタイトルで確認可能） */
@@ -1561,6 +1829,71 @@ textarea {
     --dt-card-border: rgba(0, 212, 255, 0.06);
     --dt-card-shadow: 0 1px 3px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.3);
     --dt-card-hover-shadow: 0 8px 25px rgba(0, 0, 0, 0.45), 0 0 1px rgba(0, 212, 255, 0.1);
+  }
+
+  /* ── ライトテーマ — デスクトップ変数 ── */
+  [data-theme="light"] {
+    --dt-bg: #f0f2f5;
+    --dt-sidebar-bg: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+    --dt-header-bg: rgba(255, 255, 255, 0.92);
+    --dt-card-bg: rgba(255, 255, 255, 0.98);
+    --dt-card-border: rgba(0, 0, 0, 0.06);
+    --dt-card-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
+    --dt-card-hover-shadow: 0 8px 25px rgba(0, 0, 0, 0.1), 0 0 1px rgba(0, 0, 0, 0.05);
+  }
+
+  [data-theme="light"] body {
+    background: var(--dt-bg);
+    background-image:
+      radial-gradient(ellipse 60% 40% at 15% 0%, rgba(0, 153, 204, 0.03) 0%, transparent 60%),
+      radial-gradient(ellipse 40% 30% at 85% 100%, rgba(124, 58, 237, 0.02) 0%, transparent 60%);
+    background-size: 100% 100%;
+  }
+
+  [data-theme="light"] .nav {
+    background: var(--dt-sidebar-bg);
+  }
+
+  [data-theme="light"] .nav::before {
+    opacity: 0.3;
+  }
+
+  [data-theme="light"] .card:hover {
+    border-color: rgba(0, 0, 0, 0.1);
+  }
+
+  [data-theme="light"] .card::before {
+    background: radial-gradient(circle at top left, rgba(0, 153, 204, 0.03) 0%, transparent 70%);
+  }
+
+  [data-theme="light"] .desktop-header-breadcrumb {
+    background: rgba(0, 153, 204, 0.06);
+    border-color: rgba(0, 153, 204, 0.08);
+  }
+
+  [data-theme="light"] .desktop-header-date {
+    background: rgba(0, 153, 204, 0.04);
+  }
+
+  [data-theme="light"] ::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.03);
+  }
+
+  [data-theme="light"] ::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.1);
+  }
+
+  [data-theme="light"] ::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.2);
+  }
+
+  /* テーマトグル — デスクトップ（サイドバー下部に配置） */
+  .theme-toggle {
+    position: static;
+    transform: none;
+    margin: auto 20px 20px;
+    width: 40px;
+    height: 40px;
   }
 
   /* ── Body ── */
