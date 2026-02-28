@@ -36,6 +36,7 @@ class Tasks(BaseModel):
     """その日のタスク"""
     planned: list[str] = []
     completed: list[str] = []
+    backlog: list[str] = []
     completion_rate: float = 0.0
 
 
@@ -46,6 +47,7 @@ class RecordCreate(BaseModel):
     date: str = Field(..., description="日付 (YYYY-MM-DD)")
     raw_input: str = Field(..., description="ユーザーが入力した生テキスト")
     tasks_planned: list[str] = Field(default=[], description="予定タスク")
+    tasks_backlog: list[str] = Field(default=[], description="近日中タスク")
 
 
 class RecordUpdate(BaseModel):
@@ -53,6 +55,7 @@ class RecordUpdate(BaseModel):
     raw_input: Optional[str] = None
     tasks_planned: Optional[list[str]] = None
     tasks_completed: Optional[list[str]] = None
+    tasks_backlog: Optional[list[str]] = None
 
 
 # ---- API レスポンス ----

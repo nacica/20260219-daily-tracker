@@ -40,6 +40,20 @@ def _collect_incomplete_tasks(date: str, days: int = 7) -> list[str]:
     return incomplete
 
 
+def _collect_backlog_tasks(date: str, days: int = 7) -> list[str]:
+    """直近N日間の近日中タスクを収集する（最新のレコードのbacklogを優先）"""
+    past_records = firestore_service.get_past_records(date, days=days)
+    backlog = []
+    seen = set()
+    for record in past_records:
+        tasks = record.get("tasks", {})
+        for task in tasks.get("backlog", []):
+            if task not in seen:
+                backlog.append(task)
+                seen.add(task)
+    return backlog
+
+
 def _build_dialogue_response(data: dict) -> AnalysisDialogue:
     """Firestore のデータから AnalysisDialogue レスポンスを構築"""
     messages = [
@@ -75,8 +89,9 @@ async def start_morning_dialogue(date: str):
         yesterday_record = firestore_service.get_record(yesterday)
         yesterday_analysis = firestore_service.get_analysis(yesterday)
 
-        # 直近の未完了タスクを収集
+        # 直近の未完了タスクと近日中タスクを収集
         incomplete_tasks = _collect_incomplete_tasks(date)
+        backlog_tasks = _collect_backlog_tasks(date)
 
         # アクティブな目標を取得
         active_goals = firestore_service.list_entities(
@@ -90,6 +105,7 @@ async def start_morning_dialogue(date: str):
                 yesterday_analysis=yesterday_analysis,
                 incomplete_tasks=incomplete_tasks,
                 active_goals=active_goals,
+                backlog_tasks=backlog_tasks,
             )
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Claude API エラー: {str(e)}")
@@ -109,6 +125,7 @@ async def start_morning_dialogue(date: str):
                 "yesterday_date": yesterday,
                 "has_yesterday_record": yesterday_record is not None,
                 "incomplete_tasks": incomplete_tasks,
+                "backlog_tasks": backlog_tasks,
             },
             "created_at": now,
             "updated_at": now,

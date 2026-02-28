@@ -39,6 +39,7 @@ def build_morning_question_prompt(
     yesterday_analysis: dict | None,
     incomplete_tasks: list[str],
     active_goals: list[dict],
+    backlog_tasks: list[str] | None = None,
 ) -> str:
     prompt = ""
 
@@ -80,6 +81,13 @@ def build_morning_question_prompt(
         prompt += f"""
 ## 直近の未完了タスク
 {chr(10).join('- ' + t for t in incomplete_tasks)}
+"""
+
+    if backlog_tasks:
+        prompt += f"""
+## 近日中タスク（バックログ）
+{chr(10).join('- ' + t for t in backlog_tasks)}
+（※ 今日すぐやる必要はないが、近日中に着手したいタスク。今日取り組めそうなものがあれば提案してもよい）
 """
 
     if active_goals:

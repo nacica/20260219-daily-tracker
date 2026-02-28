@@ -304,6 +304,7 @@ def generate_morning_questions(
     yesterday_analysis: dict | None,
     incomplete_tasks: list[str] = None,
     active_goals: list[dict] = None,
+    backlog_tasks: list[str] = None,
 ) -> str:
     """朝のプランニング問答の初期質問を生成する（テキスト返却）"""
     client = get_client()
@@ -314,6 +315,7 @@ def generate_morning_questions(
         yesterday_analysis=yesterday_analysis,
         incomplete_tasks=incomplete_tasks or [],
         active_goals=active_goals or [],
+        backlog_tasks=backlog_tasks or [],
     )
 
     response = _call_claude_with_retry(

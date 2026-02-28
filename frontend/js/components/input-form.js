@@ -5,16 +5,17 @@
  * 朝のタスク整理（ソクラテス式問答）統合
  */
 
-import { recordsApi, analysisApi, morningDialogueApi } from "../api.js?v=20260228b";
-import { showToast } from "../app.js?v=20260228b";
+import { recordsApi, analysisApi, morningDialogueApi } from "../api.js?v=20260228c";
+import { showToast } from "../app.js?v=20260228c";
 
 /* ── レイアウト永続化 ── */
 
 const DEFAULT_LAYOUT = {
   "card-activity-log": { column: 0, order: 0 },
   "card-task-mgmt":    { column: 1, order: 0 },
-  "card-actions":      { column: 1, order: 1 },
-  "card-completed":    { column: 1, order: 2 },
+  "card-backlog":      { column: 1, order: 1 },
+  "card-actions":      { column: 1, order: 2 },
+  "card-completed":    { column: 1, order: 3 },
 };
 
 const CARD_IDS = Object.keys(DEFAULT_LAYOUT);
@@ -61,7 +62,7 @@ export async function renderInputForm(date) {
   if (morningResult.status === "fulfilled") morningDialogue = morningResult.value;
 
   const isEdit = !!existingRecord;
-  const tasks = existingRecord?.tasks || { planned: [], completed: [] };
+  const tasks = existingRecord?.tasks || { planned: [], completed: [], backlog: [] };
 
   main.innerHTML = buildFormHTML(date, existingRecord, tasks, isEdit, morningDialogue);
   attachFormEvents(date, isEdit);
@@ -170,6 +171,7 @@ function buildFormHTML(date, record, tasks, isEdit, morningDialogue) {
   const rawInput = record?.raw_input || "";
   const plannedTasks = tasks.planned || [];
   const completedTasks = tasks.completed || [];
+  const backlogTasks = tasks.backlog || [];
   const hasCompleted = completedTasks.length > 0;
   const incompleteTasks = plannedTasks.filter((t) => !completedTasks.includes(t));
 
@@ -202,6 +204,20 @@ function buildFormHTML(date, record, tasks, isEdit, morningDialogue) {
         <div class="task-input-row">
           <input type="text" id="planned-input" placeholder="タスクを追加..." />
           <button class="btn btn-outline btn-sm" id="btn-add-task">追加</button>
+        </div>
+      </div>`,
+
+    "card-backlog": `
+      <div class="card draggable-card backlog-card" id="card-backlog" draggable="false">
+        <div class="card-drag-handle" title="ドラッグで移動">⠿</div>
+        <div class="card-title">近日中 <span class="backlog-count" id="backlog-count">${backlogTasks.length}</span></div>
+        <p class="backlog-description">今日やらなくてもいいけど、近いうちにやりたいタスク</p>
+        <ul class="task-list backlog-list" id="backlog-list">
+          ${backlogTasks.map((t) => buildBacklogItem(t)).join("")}
+        </ul>
+        <div class="task-input-row">
+          <input type="text" id="backlog-input" placeholder="近日中タスクを追加..." />
+          <button class="btn btn-outline btn-sm" id="btn-add-backlog">追加</button>
         </div>
       </div>`,
 
@@ -271,6 +287,16 @@ function buildTaskItem(taskText, isCompleted) {
     <li class="task-item${isCompleted ? " completed" : ""}">
       <input type="checkbox" ${isCompleted ? "checked" : ""} data-task="${escapeHTML(taskText)}" />
       <span>${escapeHTML(taskText)}</span>
+      ${!isCompleted ? `<button class="task-move-backlog" data-to-backlog="${escapeHTML(taskText)}" title="近日中へ移動">▼</button>` : ""}
+      <button class="task-remove" data-remove="${escapeHTML(taskText)}" title="削除">✕</button>
+    </li>`;
+}
+
+function buildBacklogItem(taskText) {
+  return `
+    <li class="task-item backlog-item">
+      <span>${escapeHTML(taskText)}</span>
+      <button class="task-move-today" data-to-today="${escapeHTML(taskText)}" title="今日やるへ昇格">▲</button>
       <button class="task-remove" data-remove="${escapeHTML(taskText)}" title="削除">✕</button>
     </li>`;
 }
@@ -281,6 +307,13 @@ function syncCompletedCard() {
   const count = document.querySelectorAll("#completed-list .task-item").length;
   card.style.display = count > 0 ? "" : "none";
   document.getElementById("completed-count").textContent = count;
+}
+
+function syncBacklogCount() {
+  const countEl = document.getElementById("backlog-count");
+  if (!countEl) return;
+  const count = document.querySelectorAll("#backlog-list .task-item").length;
+  countEl.textContent = count;
 }
 
 /* ── 朝問答イベント ── */
@@ -407,9 +440,9 @@ function applyMorningPlanToForm(plan) {
   const plannedList = document.getElementById("planned-list");
   if (!plannedList) return;
 
-  // 既存タスクのセット
+  // 既存タスクのセット（近日中タスクも含む）
   const existing = new Set(
-    [...document.querySelectorAll("#planned-list .task-item span, #completed-list .task-item span")]
+    [...document.querySelectorAll("#planned-list .task-item span, #completed-list .task-item span, #backlog-list .task-item span")]
       .map((el) => el.textContent.trim())
   );
 
@@ -439,6 +472,8 @@ function attachFormEvents(date, isEdit) {
   const plannedList = document.getElementById("planned-list");
   const plannedInput = document.getElementById("planned-input");
   const completedList = document.getElementById("completed-list");
+  const backlogList = document.getElementById("backlog-list");
+  const backlogInput = document.getElementById("backlog-input");
 
   // バックグラウンド自動保存（排他制御付き）
   let isSaving = false;
@@ -459,6 +494,9 @@ function attachFormEvents(date, isEdit) {
     const completedTasks = [...document.querySelectorAll("#completed-list .task-item span")]
       .map((el) => el.textContent.trim())
       .filter(Boolean);
+    const backlogTasks = [...document.querySelectorAll("#backlog-list .task-item span")]
+      .map((el) => el.textContent.trim())
+      .filter(Boolean);
     const plannedTasks = [...incompleteTasks, ...completedTasks];
 
     isSaving = true;
@@ -468,9 +506,10 @@ function attachFormEvents(date, isEdit) {
           raw_input: rawInput,
           tasks_planned: plannedTasks,
           tasks_completed: completedTasks,
+          tasks_backlog: backlogTasks,
         });
       } else {
-        await recordsApi.create(date, rawInput, plannedTasks);
+        await recordsApi.create(date, rawInput, plannedTasks, backlogTasks);
         isEdit = true;
         const btnSubmit = document.getElementById("btn-submit");
         if (btnSubmit) btnSubmit.textContent = "記録を更新する";
@@ -528,7 +567,7 @@ function attachFormEvents(date, isEdit) {
       const incomplete = planned.filter((t) => !completed.includes(t));
 
       const existing = new Set(
-        [...document.querySelectorAll("#planned-list .task-item span, #completed-list .task-item span")]
+        [...document.querySelectorAll("#planned-list .task-item span, #completed-list .task-item span, #backlog-list .task-item span")]
           .map((el) => el.textContent.trim())
       );
       let added = 0;
@@ -538,6 +577,16 @@ function attachFormEvents(date, isEdit) {
           added++;
         }
       }
+      // 近日中タスクも引き継ぐ
+      const prevBacklog = found.tasks?.backlog || [];
+      for (const task of prevBacklog) {
+        if (!existing.has(task)) {
+          backlogList.insertAdjacentHTML("beforeend", buildBacklogItem(task));
+          added++;
+          existing.add(task);
+        }
+      }
+      syncBacklogCount();
       if (added > 0) {
         showToast(`${found.date} から ${added}件のタスクを引き継ぎました`, "success");
         saveDataQuietly();
@@ -567,11 +616,48 @@ function attachFormEvents(date, isEdit) {
     if (e.key === "Enter") { e.preventDefault(); addTask(); }
   });
 
-  // タスク削除 & チェックボックス切り替え（イベント委任）
+  // 近日中タスク追加
+  function addBacklogTask() {
+    const text = backlogInput.value.trim();
+    if (!text) return;
+    backlogList.insertAdjacentHTML("beforeend", buildBacklogItem(text));
+    backlogInput.value = "";
+    backlogInput.focus();
+    syncBacklogCount();
+    saveDataQuietly();
+  }
+
+  document.getElementById("btn-add-backlog").addEventListener("click", addBacklogTask);
+  backlogInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); addBacklogTask(); }
+  });
+
+  // タスク削除 & チェックボックス切り替え & レーン移動（イベント委任）
   function handleTaskClick(e) {
     if (e.target.dataset.remove !== undefined) {
       e.target.closest("li").remove();
       syncCompletedCard();
+      syncBacklogCount();
+      saveDataQuietly();
+      return;
+    }
+    // 「近日中へ移動」ボタン
+    if (e.target.dataset.toBacklog !== undefined) {
+      const li = e.target.closest("li");
+      const taskText = li.querySelector("span").textContent.trim();
+      li.remove();
+      backlogList.insertAdjacentHTML("beforeend", buildBacklogItem(taskText));
+      syncBacklogCount();
+      saveDataQuietly();
+      return;
+    }
+    // 「今日やるへ昇格」ボタン
+    if (e.target.dataset.toToday !== undefined) {
+      const li = e.target.closest("li");
+      const taskText = li.querySelector("span").textContent.trim();
+      li.remove();
+      plannedList.insertAdjacentHTML("beforeend", buildTaskItem(taskText, false));
+      syncBacklogCount();
       saveDataQuietly();
       return;
     }
@@ -591,6 +677,7 @@ function attachFormEvents(date, isEdit) {
 
   plannedList.addEventListener("click", handleTaskClick);
   completedList.addEventListener("click", handleTaskClick);
+  backlogList.addEventListener("click", handleTaskClick);
 
   // フォーム送信
   document.getElementById("btn-submit").addEventListener("click", async (e) => {
@@ -772,6 +859,10 @@ async function submitForm(date, isEdit, btn) {
     .map((el) => el.textContent.trim())
     .filter(Boolean);
 
+  const backlogTasks = [...document.querySelectorAll("#backlog-list .task-item span")]
+    .map((el) => el.textContent.trim())
+    .filter(Boolean);
+
   const plannedTasks = [...incompleteTasks, ...completedTasks];
 
   btn.disabled = true;
@@ -784,10 +875,11 @@ async function submitForm(date, isEdit, btn) {
         raw_input: rawInput,
         tasks_planned: plannedTasks,
         tasks_completed: completedTasks,
+        tasks_backlog: backlogTasks,
       });
       showToast("記録を更新しました！", "success");
     } else {
-      await recordsApi.create(date, rawInput, plannedTasks);
+      await recordsApi.create(date, rawInput, plannedTasks, backlogTasks);
       showToast("記録を保存しました！", "success");
     }
     window.location.hash = "/";
