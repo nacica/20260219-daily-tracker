@@ -504,10 +504,10 @@ textarea {
 /* カテゴリバッジ */
 .task-category-badge {
   flex-shrink: 0;
-  font-size: 0.7rem;
+  font-size: 0.6rem;
   font-weight: 600;
-  padding: 2px 7px;
-  border-radius: 4px;
+  padding: 1px 4px;
+  border-radius: 3px;
   color: #000;
   white-space: nowrap;
   line-height: 1.3;

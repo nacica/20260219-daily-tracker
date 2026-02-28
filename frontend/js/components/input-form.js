@@ -5,8 +5,8 @@
  * 朝のタスク整理（ソクラテス式問答）統合
  */
 
-import { recordsApi, analysisApi, morningDialogueApi } from "../api.js?v=20260228e";
-import { showToast } from "../app.js?v=20260228e";
+import { recordsApi, analysisApi, morningDialogueApi } from "../api.js?v=20260228f";
+import { showToast } from "../app.js?v=20260228f";
 
 /* ── カテゴリ管理 ── */
 
