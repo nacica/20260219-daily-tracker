@@ -490,19 +490,19 @@ textarea {
   flex-shrink: 0;
 }
 
-.task-item > span {
+.task-item > span:not(.task-category-badge) {
   flex: 1;
   font-size: 0.9rem;
   min-width: 0;
 }
 
-.task-item.completed > span {
+.task-item.completed > span:not(.task-category-badge) {
   text-decoration: line-through;
   color: var(--text-muted);
 }
 
 /* カテゴリバッジ */
-.task-category-badge {
+.task-item > .task-category-badge {
   flex: 0 0 auto;
   font-size: 0.6rem;
   font-weight: 600;
