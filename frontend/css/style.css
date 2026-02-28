@@ -316,16 +316,7 @@ body {
   transition: color 0.2s, background 0.2s, border-color 0.2s;
   flex-shrink: 0;
   padding: 0;
-  position: absolute;
-  right: 8px;
-  top: 50%;
-  transform: translateY(-50%);
-  z-index: 10;
-}
-
-/* モバイル: nav-links に右余白を確保してトグルと重ならないようにする */
-.nav-links {
-  padding-right: 44px !important;
+  margin-left: 4px;
 }
 
 .theme-toggle:hover {
@@ -394,7 +385,6 @@ body {
   justify-content: center;
   height: auto;
   padding: 6px 0;
-  position: relative;
 }
 
 /* モバイルではロゴを非表示（アプリ名はPWAタイトルで確認可能） */
@@ -432,7 +422,8 @@ body {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 2px;
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   padding: 0 8px;
 }
 
@@ -1895,9 +1886,8 @@ textarea {
 
   /* テーマトグル — デスクトップ（サイドバー下部に配置） */
   .theme-toggle {
-    position: static;
-    transform: none;
-    margin: auto 20px 20px;
+    margin: auto 0 20px;
+    align-self: center;
     width: 40px;
     height: 40px;
   }
@@ -1976,8 +1966,10 @@ textarea {
     flex-direction: column;
     grid-template-columns: none;
     gap: 0;
-    padding: 0 !important;
+    padding: 0;
     width: auto;
+    flex: initial;
+    min-width: auto;
   }
 
   .nav-link {
