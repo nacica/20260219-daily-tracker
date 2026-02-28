@@ -320,6 +320,12 @@ body {
   right: 8px;
   top: 50%;
   transform: translateY(-50%);
+  z-index: 10;
+}
+
+/* モバイル: nav-links に右余白を確保してトグルと重ならないようにする */
+.nav-links {
+  padding-right: 44px !important;
 }
 
 .theme-toggle:hover {
@@ -1944,7 +1950,7 @@ textarea {
     flex-direction: column;
     align-items: stretch;
     justify-content: flex-start;
-    height: auto;
+    height: 100%;
     padding: 0;
   }
 
@@ -1970,7 +1976,7 @@ textarea {
     flex-direction: column;
     grid-template-columns: none;
     gap: 0;
-    padding: 0;
+    padding: 0 !important;
     width: auto;
   }
 
