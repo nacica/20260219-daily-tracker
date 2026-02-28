@@ -518,12 +518,12 @@ textarea {
 .task-move-backlog,
 .task-move-today {
   background: none;
-  border: none;
+  border: 1px solid var(--border);
   cursor: pointer;
-  font-size: 0.7rem;
-  padding: 2px 6px;
-  border-radius: 4px;
-  transition: color 0.2s, background 0.2s;
+  font-size: 0.82rem;
+  padding: 6px 12px;
+  border-radius: 6px;
+  transition: color 0.2s, background 0.2s, border-color 0.2s;
   line-height: 1;
   flex-shrink: 0;
 }
@@ -533,7 +533,8 @@ textarea {
 }
 .task-move-backlog:hover {
   color: var(--neon-amber);
-  background: rgba(255, 170, 0, 0.08);
+  background: rgba(255, 170, 0, 0.1);
+  border-color: rgba(255, 170, 0, 0.3);
 }
 
 .task-move-today {
@@ -541,7 +542,8 @@ textarea {
 }
 .task-move-today:hover {
   color: var(--cyan);
-  background: rgba(0, 212, 255, 0.08);
+  background: rgba(0, 212, 255, 0.1);
+  border-color: rgba(0, 212, 255, 0.3);
 }
 
 /* 近日中（バックログ）カード */
