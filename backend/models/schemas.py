@@ -139,6 +139,23 @@ class DialogueReplyRequest(BaseModel):
     message: str = Field(..., min_length=1, max_length=2000)
 
 
+# ---- 朝のタスク整理 ----
+
+class MorningPlanTask(BaseModel):
+    """朝プランの個別タスク"""
+    task: str
+    priority: str = "medium"  # high|medium|low
+    reason: str = ""
+
+
+class MorningPlan(BaseModel):
+    """朝問答から生成されたプラン"""
+    tasks_today: list[MorningPlanTask] = []
+    carried_over: list[str] = []
+    context_summary: str = ""
+    focus_message: str = ""
+
+
 # ---- ナレッジグラフ（コーチング機能） ----
 
 class EntityObservation(BaseModel):

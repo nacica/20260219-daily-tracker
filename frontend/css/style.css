@@ -1312,6 +1312,65 @@ textarea {
   max-width: 100%;
 }
 
+/* ===== 朝のタスク整理 ===== */
+
+.morning-dialogue-card {
+  margin-bottom: var(--gap);
+  border: 1px solid rgba(0, 212, 255, 0.15);
+}
+
+.morning-dialogue-card .card-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.morning-dialogue-card .card-title::before {
+  content: "\2600";
+  font-size: 1.1em;
+}
+
+.morning-description {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  line-height: 1.7;
+  margin-bottom: 14px;
+}
+
+.morning-focus-message {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--cyan);
+  padding: 12px 16px;
+  background: rgba(0, 212, 255, 0.06);
+  border-left: 3px solid var(--cyan);
+  border-radius: var(--radius-sm);
+  margin-bottom: 10px;
+}
+
+.morning-context {
+  color: var(--text-secondary);
+  font-size: 0.88rem;
+  line-height: 1.7;
+  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+}
+
+.morning-completed {
+  border-color: rgba(0, 212, 255, 0.08);
+}
+
+.morning-dialogue-history {
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+
+.morning-dialogue-history .dialogue-bubble {
+  max-width: 100%;
+}
+
 /* ===== タブレット対応 ===== */
 
 @media (min-width: 640px) {

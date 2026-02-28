@@ -2,10 +2,11 @@
  * 行動記録入力フォームコンポーネント
  * 新規作成・既存レコードの編集に対応
  * デスクトップ: 2列ドラッグ&ドロップレイアウト
+ * 朝のタスク整理（ソクラテス式問答）統合
  */
 
-import { recordsApi, analysisApi } from "../api.js?v=20260228a";
-import { showToast } from "../app.js?v=20260228a";
+import { recordsApi, analysisApi, morningDialogueApi } from "../api.js?v=20260228b";
+import { showToast } from "../app.js?v=20260228b";
 
 /* ── レイアウト永続化 ── */
 
@@ -47,22 +48,121 @@ export async function renderInputForm(date) {
   const main = document.querySelector("main");
   main.innerHTML = `<div class="loading"><div class="spinner"></div><p>読み込み中...</p></div>`;
 
-  // 既存レコードの取得（編集時）
+  // 既存レコードと朝問答を並行取得
   let existingRecord = null;
-  try {
-    existingRecord = await recordsApi.get(date);
-  } catch {}
+  let morningDialogue = null;
+
+  const [recordResult, morningResult] = await Promise.allSettled([
+    recordsApi.get(date),
+    morningDialogueApi.get(date),
+  ]);
+
+  if (recordResult.status === "fulfilled") existingRecord = recordResult.value;
+  if (morningResult.status === "fulfilled") morningDialogue = morningResult.value;
 
   const isEdit = !!existingRecord;
   const tasks = existingRecord?.tasks || { planned: [], completed: [] };
 
-  main.innerHTML = buildFormHTML(date, existingRecord, tasks, isEdit);
+  main.innerHTML = buildFormHTML(date, existingRecord, tasks, isEdit, morningDialogue);
   attachFormEvents(date, isEdit);
+  attachMorningDialogueEvents(date, morningDialogue);
+}
+
+/* ── 朝問答 HTML 生成 ── */
+
+function buildMorningDialogueHTML(morningDialogue) {
+  // 完了済み: 結果サマリーを表示
+  if (morningDialogue && morningDialogue.status === "completed") {
+    const plan = morningDialogue.plan || {};
+    const focusMessage = plan.focus_message || "";
+    const contextSummary = plan.context_summary || "";
+    const messages = morningDialogue.messages || [];
+
+    return `
+      <div class="card morning-dialogue-card morning-completed" id="card-morning-dialogue">
+        <div class="card-title">朝のタスク整理</div>
+        <div class="morning-result" id="morning-result">
+          ${focusMessage ? `<div class="morning-focus-message">${escapeHTML(focusMessage)}</div>` : ""}
+          ${contextSummary ? `<div class="morning-context">${escapeHTML(contextSummary)}</div>` : ""}
+          <button class="btn btn-outline btn-sm" id="btn-morning-toggle" style="margin-top: 8px;">
+            対話を見る
+          </button>
+          <div class="morning-dialogue-history" id="morning-dialogue-history" style="display:none; margin-top: 12px;">
+            ${messages.map((m) => `
+              <div class="dialogue-bubble ${m.role === "ai" ? "dialogue-bubble-ai" : "dialogue-bubble-user"}">
+                <div class="dialogue-bubble-label">${m.role === "ai" ? "AI" : "あなた"}</div>
+                <div class="dialogue-bubble-content">${escapeHTML(m.content)}</div>
+              </div>
+            `).join("")}
+          </div>
+        </div>
+      </div>`;
+  }
+
+  // 進行中: 対話UIを表示
+  if (morningDialogue && morningDialogue.status === "in_progress") {
+    const messages = morningDialogue.messages || [];
+    const turnCount = morningDialogue.turn_count || 0;
+    const maxTurns = morningDialogue.max_turns || 5;
+    const isMaxed = turnCount >= maxTurns;
+
+    return `
+      <div class="card morning-dialogue-card" id="card-morning-dialogue">
+        <div class="card-title">朝のタスク整理</div>
+        <div id="morning-dialogue">
+          <div class="dialogue-header">
+            <span>ターン ${turnCount}/${maxTurns}</span>
+            <div class="dialogue-progress">
+              <div class="dialogue-progress-bar" style="width: ${(turnCount / maxTurns) * 100}%"></div>
+            </div>
+          </div>
+          <div class="dialogue-messages" id="morning-messages">
+            ${messages.map((m) => `
+              <div class="dialogue-bubble ${m.role === "ai" ? "dialogue-bubble-ai" : "dialogue-bubble-user"}">
+                <div class="dialogue-bubble-label">${m.role === "ai" ? "AI" : "あなた"}</div>
+                <div class="dialogue-bubble-content">${escapeHTML(m.content)}</div>
+              </div>
+            `).join("")}
+          </div>
+          ${!isMaxed ? `
+          <div class="dialogue-input-area">
+            <textarea id="morning-input" rows="2" placeholder="回答を入力..."></textarea>
+            <button class="btn btn-primary btn-sm" id="btn-morning-send">送信</button>
+          </div>` : `
+          <div class="dialogue-maxed-notice">
+            <p>ターン上限に達しました。プランをまとめましょう。</p>
+          </div>`}
+          <div class="dialogue-actions" style="margin-top: 8px;">
+            ${turnCount >= 1 ? `
+            <button class="btn btn-primary btn-sm" id="btn-morning-synthesize">
+              プランをまとめる
+            </button>` : ""}
+            <button class="btn btn-outline btn-sm btn-danger" id="btn-morning-cancel">
+              キャンセル
+            </button>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  // 未開始: 開始ボタンを表示
+  return `
+    <div class="card morning-dialogue-card" id="card-morning-dialogue">
+      <div class="card-title">朝のタスク整理</div>
+      <div id="morning-start">
+        <p class="morning-description">
+          昨日の記録をもとに、ソクラテス式問答で今日やるべきことを整理しましょう。
+        </p>
+        <button class="btn btn-primary" id="btn-start-morning" style="width: 100%;">
+          昨日の続きから始める
+        </button>
+      </div>
+    </div>`;
 }
 
 /* ── HTML 生成 ── */
 
-function buildFormHTML(date, record, tasks, isEdit) {
+function buildFormHTML(date, record, tasks, isEdit, morningDialogue) {
   const dateLabel = new Date(date + "T00:00:00").toLocaleDateString("ja-JP", {
     year: "numeric", month: "long", day: "numeric", weekday: "long",
   });
@@ -94,7 +194,7 @@ function buildFormHTML(date, record, tasks, isEdit) {
         <div class="card-title">タスク管理</div>
         <label>予定タスク</label>
         <button class="btn btn-outline btn-sm" id="btn-carry-over" style="margin-bottom: 8px; width: 100%;">
-          📋 昨日の未完了タスクを引き継ぐ
+          昨日の未完了タスクを引き継ぐ
         </button>
         <ul class="task-list" id="planned-list">
           ${incompleteTasks.map((t) => buildTaskItem(t, false)).join("")}
@@ -109,16 +209,16 @@ function buildFormHTML(date, record, tasks, isEdit) {
       <div class="card draggable-card" id="card-actions" draggable="false">
         <div class="card-drag-handle" title="ドラッグで移動">⠿</div>
         <button class="btn btn-primary" id="btn-submit">
-          ${isEdit ? "✏️ 記録を更新する" : "💾 記録を保存する"}
+          ${isEdit ? "記録を更新する" : "記録を保存する"}
         </button>
         ${isEdit ? `
         <div style="margin-top: 10px; display: flex; gap: 10px;">
           <button class="btn btn-outline btn-sm" id="btn-analyze" style="flex: 1;">
-            🤖 AI で分析する
+            AI で分析する
           </button>
           <button class="btn btn-outline btn-sm" id="btn-view-analysis" style="flex: 1;"
             onclick="window.location.hash='/analysis/${record?.date || ''}'">
-            📊 分析を見る
+            分析を見る
           </button>
         </div>` : ""}
       </div>`,
@@ -146,9 +246,14 @@ function buildFormHTML(date, record, tasks, isEdit) {
 
   columns.forEach((col) => col.sort((a, b) => a.order - b.order));
 
+  // 朝問答カードを上部に全幅で配置
+  const morningHTML = buildMorningDialogueHTML(morningDialogue);
+
   return `
     <h2 style="margin-bottom: 4px; font-size: 1.2rem;">${isEdit ? "記録を編集" : "行動を記録"}</h2>
     <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: var(--gap);">${dateLabel}</p>
+
+    ${morningHTML}
 
     <div class="input-grid" id="input-grid">
       <div class="input-column" id="input-column-0" data-column="0">
@@ -176,6 +281,156 @@ function syncCompletedCard() {
   const count = document.querySelectorAll("#completed-list .task-item").length;
   card.style.display = count > 0 ? "" : "none";
   document.getElementById("completed-count").textContent = count;
+}
+
+/* ── 朝問答イベント ── */
+
+function attachMorningDialogueEvents(date, morningDialogue) {
+  // 開始ボタン
+  const btnStart = document.getElementById("btn-start-morning");
+  if (btnStart) {
+    btnStart.addEventListener("click", async () => {
+      btnStart.disabled = true;
+      btnStart.textContent = "準備中...";
+      try {
+        const dialogue = await morningDialogueApi.start(date);
+        // ページ再レンダリング
+        await renderInputForm(date);
+      } catch (err) {
+        showToast("朝問答の開始に失敗しました: " + err.message, "error");
+        btnStart.disabled = false;
+        btnStart.textContent = "昨日の続きから始める";
+      }
+    });
+  }
+
+  // 送信ボタン
+  const btnSend = document.getElementById("btn-morning-send");
+  if (btnSend) {
+    const input = document.getElementById("morning-input");
+
+    async function sendReply() {
+      const message = input.value.trim();
+      if (!message) return;
+
+      btnSend.disabled = true;
+      btnSend.textContent = "...";
+      input.disabled = true;
+
+      try {
+        await morningDialogueApi.reply(date, message);
+        await renderInputForm(date);
+      } catch (err) {
+        showToast("送信に失敗しました: " + err.message, "error");
+        btnSend.disabled = false;
+        btnSend.textContent = "送信";
+        input.disabled = false;
+      }
+    }
+
+    btnSend.addEventListener("click", sendReply);
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        sendReply();
+      }
+    });
+
+    // 対話メッセージを最下部にスクロール
+    const messagesEl = document.getElementById("morning-messages");
+    if (messagesEl) {
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+
+    // inputにフォーカス
+    input.focus();
+  }
+
+  // プランをまとめるボタン
+  const btnSynthesize = document.getElementById("btn-morning-synthesize");
+  if (btnSynthesize) {
+    btnSynthesize.addEventListener("click", async () => {
+      btnSynthesize.disabled = true;
+      btnSynthesize.textContent = "まとめ中...";
+      try {
+        const result = await morningDialogueApi.synthesize(date);
+        const plan = result.plan || {};
+
+        // タスクをフォームに反映
+        applyMorningPlanToForm(plan);
+
+        showToast("今日のプランができました！", "success");
+        // ページ再レンダリング
+        await renderInputForm(date);
+      } catch (err) {
+        showToast("プランの生成に失敗しました: " + err.message, "error");
+        btnSynthesize.disabled = false;
+        btnSynthesize.textContent = "プランをまとめる";
+      }
+    });
+  }
+
+  // キャンセルボタン
+  const btnCancel = document.getElementById("btn-morning-cancel");
+  if (btnCancel) {
+    btnCancel.addEventListener("click", async () => {
+      btnCancel.disabled = true;
+      try {
+        await morningDialogueApi.delete(date);
+        showToast("朝問答をキャンセルしました", "info");
+        await renderInputForm(date);
+      } catch (err) {
+        showToast("キャンセルに失敗しました: " + err.message, "error");
+        btnCancel.disabled = false;
+      }
+    });
+  }
+
+  // 対話履歴トグルボタン（完了済み）
+  const btnToggle = document.getElementById("btn-morning-toggle");
+  if (btnToggle) {
+    btnToggle.addEventListener("click", () => {
+      const history = document.getElementById("morning-dialogue-history");
+      if (history) {
+        const isHidden = history.style.display === "none";
+        history.style.display = isHidden ? "" : "none";
+        btnToggle.textContent = isHidden ? "対話を閉じる" : "対話を見る";
+      }
+    });
+  }
+}
+
+/**
+ * 朝問答のプラン結果を予定タスクリストに反映する
+ */
+function applyMorningPlanToForm(plan) {
+  const plannedList = document.getElementById("planned-list");
+  if (!plannedList) return;
+
+  // 既存タスクのセット
+  const existing = new Set(
+    [...document.querySelectorAll("#planned-list .task-item span, #completed-list .task-item span")]
+      .map((el) => el.textContent.trim())
+  );
+
+  // tasks_today を追加
+  const tasksToday = plan.tasks_today || [];
+  for (const item of tasksToday) {
+    const taskName = item.task || "";
+    if (taskName && !existing.has(taskName)) {
+      plannedList.insertAdjacentHTML("beforeend", buildTaskItem(taskName, false));
+      existing.add(taskName);
+    }
+  }
+
+  // carried_over を追加
+  const carriedOver = plan.carried_over || [];
+  for (const task of carriedOver) {
+    if (task && !existing.has(task)) {
+      plannedList.insertAdjacentHTML("beforeend", buildTaskItem(task, false));
+      existing.add(task);
+    }
+  }
 }
 
 /* ── イベント登録 ── */
@@ -218,7 +473,7 @@ function attachFormEvents(date, isEdit) {
         await recordsApi.create(date, rawInput, plannedTasks);
         isEdit = true;
         const btnSubmit = document.getElementById("btn-submit");
-        if (btnSubmit) btnSubmit.textContent = "✏️ 記録を更新する";
+        if (btnSubmit) btnSubmit.textContent = "記録を更新する";
       }
       showToast("自動保存しました", "success");
     } catch (err) {
@@ -293,7 +548,7 @@ function attachFormEvents(date, isEdit) {
       showToast("タスク引き継ぎに失敗: " + err.message, "error");
     } finally {
       btn.disabled = false;
-      btn.textContent = "📋 昨日の未完了タスクを引き継ぐ";
+      btn.textContent = "昨日の未完了タスクを引き継ぐ";
     }
   });
 
@@ -355,7 +610,7 @@ function attachFormEvents(date, isEdit) {
       } catch (err) {
         showToast(`分析に失敗しました: ${err.message}`, "error");
         e.target.disabled = false;
-        e.target.textContent = "🤖 AI で分析する";
+        e.target.textContent = "AI で分析する";
       }
     });
   }

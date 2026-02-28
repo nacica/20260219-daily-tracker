@@ -108,6 +108,31 @@ export const dialogueApi = {
   delete: (date) => apiFetch(`/dialogue/${date}`, { method: "DELETE" }),
 };
 
+// ---- 朝のタスク整理 ----
+
+export const morningDialogueApi = {
+  /** 朝問答を開始（または再開） */
+  start: (date) =>
+    apiFetch(`/morning/${date}/start`, { method: "POST" }),
+
+  /** ユーザーの返答を送信しAI応答を取得 */
+  reply: (date, message) =>
+    apiFetch(`/morning/${date}/reply`, {
+      method: "POST",
+      body: { message },
+    }),
+
+  /** 対話から今日のプランを生成 */
+  synthesize: (date) =>
+    apiFetch(`/morning/${date}/synthesize`, { method: "POST" }),
+
+  /** 保存済み朝問答を取得 */
+  get: (date) => apiFetch(`/morning/${date}`),
+
+  /** 朝問答を削除 */
+  delete: (date) => apiFetch(`/morning/${date}`, { method: "DELETE" }),
+};
+
 // ---- コーチングチャット ----
 
 export const coachApi = {

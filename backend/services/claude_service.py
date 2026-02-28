@@ -15,6 +15,11 @@ from prompts.socratic_dialogue import (
     SOCRATIC_FOLLOWUP_SYSTEM_PROMPT, build_socratic_followup_prompt,
     SOCRATIC_SYNTHESIS_SYSTEM_PROMPT, build_socratic_synthesis_prompt,
 )
+from prompts.morning_planning import (
+    MORNING_QUESTION_SYSTEM_PROMPT, build_morning_question_prompt,
+    MORNING_FOLLOWUP_SYSTEM_PROMPT, build_morning_followup_prompt,
+    MORNING_SYNTHESIS_SYSTEM_PROMPT, build_morning_synthesis_prompt,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -287,6 +292,95 @@ def generate_dialogue_synthesis(
         model=model,
         max_tokens=4096,
         system=SOCRATIC_SYNTHESIS_SYSTEM_PROMPT,
+        messages=[{"role": "user", "content": user_prompt}],
+    )
+
+    raw_text = response.content[0].text
+    return _extract_json(raw_text)
+
+
+def generate_morning_questions(
+    yesterday_record: dict | None,
+    yesterday_analysis: dict | None,
+    incomplete_tasks: list[str] = None,
+    active_goals: list[dict] = None,
+) -> str:
+    """朝のプランニング問答の初期質問を生成する（テキスト返却）"""
+    client = get_client()
+    model = os.getenv("DAILY_ANALYSIS_MODEL", "claude-sonnet-4-6")
+
+    user_prompt = build_morning_question_prompt(
+        yesterday_record=yesterday_record,
+        yesterday_analysis=yesterday_analysis,
+        incomplete_tasks=incomplete_tasks or [],
+        active_goals=active_goals or [],
+    )
+
+    response = _call_claude_with_retry(
+        client,
+        model=model,
+        max_tokens=1024,
+        system=MORNING_QUESTION_SYSTEM_PROMPT,
+        messages=[{"role": "user", "content": user_prompt}],
+    )
+
+    return response.content[0].text
+
+
+def generate_morning_followup(
+    yesterday_record: dict | None,
+    yesterday_analysis: dict | None,
+    incomplete_tasks: list[str],
+    messages: list[dict],
+    turn_count: int,
+    max_turns: int,
+) -> str:
+    """朝問答のフォローアップ応答を生成する（テキスト返却）"""
+    client = get_client()
+    model = os.getenv("DAILY_ANALYSIS_MODEL", "claude-sonnet-4-6")
+
+    user_prompt = build_morning_followup_prompt(
+        yesterday_record=yesterday_record,
+        yesterday_analysis=yesterday_analysis,
+        incomplete_tasks=incomplete_tasks,
+        messages=messages,
+        turn_count=turn_count,
+        max_turns=max_turns,
+    )
+
+    response = _call_claude_with_retry(
+        client,
+        model=model,
+        max_tokens=1024,
+        system=MORNING_FOLLOWUP_SYSTEM_PROMPT,
+        messages=[{"role": "user", "content": user_prompt}],
+    )
+
+    return response.content[0].text
+
+
+def generate_morning_synthesis(
+    yesterday_record: dict | None,
+    yesterday_analysis: dict | None,
+    incomplete_tasks: list[str],
+    messages: list[dict],
+) -> dict:
+    """朝問答から今日のプランを生成する（JSON返却）"""
+    client = get_client()
+    model = os.getenv("DAILY_ANALYSIS_MODEL", "claude-sonnet-4-6")
+
+    user_prompt = build_morning_synthesis_prompt(
+        yesterday_record=yesterday_record,
+        yesterday_analysis=yesterday_analysis,
+        incomplete_tasks=incomplete_tasks,
+        messages=messages,
+    )
+
+    response = _call_claude_with_retry(
+        client,
+        model=model,
+        max_tokens=4096,
+        system=MORNING_SYNTHESIS_SYSTEM_PROMPT,
         messages=[{"role": "user", "content": user_prompt}],
     )
 

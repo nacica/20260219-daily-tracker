@@ -162,6 +162,34 @@ def delete_dialogue(date: str) -> bool:
     return True
 
 
+# ---- morning_dialogues ----
+
+def get_morning_dialogue(date: str) -> Optional[dict]:
+    """指定日の朝問答を取得"""
+    db = get_db()
+    doc = db.collection("morning_dialogues").document(date).get()
+    if doc.exists:
+        return doc.to_dict()
+    return None
+
+
+def save_morning_dialogue(date: str, data: dict) -> dict:
+    """朝問答を保存（上書き）"""
+    db = get_db()
+    db.collection("morning_dialogues").document(date).set(data)
+    return data
+
+
+def delete_morning_dialogue(date: str) -> bool:
+    """朝問答を削除"""
+    db = get_db()
+    ref = db.collection("morning_dialogues").document(date)
+    if not ref.get().exists:
+        return False
+    ref.delete()
+    return True
+
+
 # ---- ナレッジグラフ: user_entities ----
 
 DEFAULT_USER_ID = "default"
