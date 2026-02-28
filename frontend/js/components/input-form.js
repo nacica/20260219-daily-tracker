@@ -5,8 +5,70 @@
  * 朝のタスク整理（ソクラテス式問答）統合
  */
 
-import { recordsApi, analysisApi, morningDialogueApi } from "../api.js?v=20260228d";
-import { showToast } from "../app.js?v=20260228d";
+import { recordsApi, analysisApi, morningDialogueApi } from "../api.js?v=20260228e";
+import { showToast } from "../app.js?v=20260228e";
+
+/* ── カテゴリ管理 ── */
+
+const CATEGORY_STORAGE_KEY = "task-categories";
+const LAST_CATEGORY_KEY = "task-last-category";
+const DEFAULT_COLORS = ["#00d4ff", "#00e676", "#ffa726", "#e040fb", "#ff5252", "#40c4ff", "#69f0ae", "#ffab40"];
+
+function getCategories() {
+  try {
+    const saved = localStorage.getItem(CATEGORY_STORAGE_KEY);
+    return saved ? JSON.parse(saved) : [];
+  } catch { return []; }
+}
+
+function saveCategories(categories) {
+  localStorage.setItem(CATEGORY_STORAGE_KEY, JSON.stringify(categories));
+}
+
+function getLastCategory() {
+  return localStorage.getItem(LAST_CATEGORY_KEY) || "";
+}
+
+function setLastCategory(name) {
+  localStorage.setItem(LAST_CATEGORY_KEY, name);
+}
+
+function parseTaskCategory(taskStr) {
+  const m = taskStr.match(/^\[(.+?)\]\s*/);
+  if (m) return { category: m[1], text: taskStr.slice(m[0].length) };
+  return { category: "", text: taskStr };
+}
+
+function formatTaskWithCategory(text, category) {
+  if (!category) return text;
+  return `[${category}] ${text}`;
+}
+
+function getCategoryColor(categoryName) {
+  const cats = getCategories();
+  const found = cats.find((c) => c.name === categoryName);
+  if (found) return found.color;
+  return DEFAULT_COLORS[0];
+}
+
+function buildCategoryOptions(selectedValue) {
+  const cats = getCategories();
+  let html = `<option value="">カテゴリなし</option>`;
+  for (const c of cats) {
+    const sel = c.name === selectedValue ? " selected" : "";
+    html += `<option value="${escapeHTML(c.name)}"${sel}>${escapeHTML(c.name)}</option>`;
+  }
+  html += `<option value="__new__">＋ 新規作成</option>`;
+  return html;
+}
+
+function refreshCategoryDropdowns() {
+  const last = getLastCategory();
+  for (const sel of document.querySelectorAll(".category-select")) {
+    const current = sel.value;
+    sel.innerHTML = buildCategoryOptions(current || last);
+  }
+}
 
 /* ── レイアウト永続化 ── */
 
@@ -202,9 +264,24 @@ function buildFormHTML(date, record, tasks, isEdit, morningDialogue) {
           ${incompleteTasks.map((t) => buildTaskItem(t, false)).join("")}
         </ul>
         <div class="task-input-row">
+          <select id="planned-category" class="category-select">${buildCategoryOptions(getLastCategory())}</select>
           <input type="text" id="planned-input" placeholder="タスクを追加..." />
           <button class="btn btn-outline btn-sm" id="btn-add-task">追加</button>
         </div>
+        <details class="category-manager">
+          <summary>カテゴリ管理</summary>
+          <ul class="category-manage-list" id="category-manage-list">
+            ${getCategories().map((c) => `
+              <li class="category-manage-item">
+                <span class="task-category-badge" style="background:${c.color}">${escapeHTML(c.name)}</span>
+                <button class="category-remove-btn" data-remove-category="${escapeHTML(c.name)}" title="削除">✕</button>
+              </li>`).join("")}
+          </ul>
+          <div class="task-input-row">
+            <input type="text" id="new-category-input" placeholder="新しいカテゴリ名..." />
+            <button class="btn btn-outline btn-sm" id="btn-add-category">追加</button>
+          </div>
+        </details>
       </div>`,
 
     "card-backlog": `
@@ -216,6 +293,7 @@ function buildFormHTML(date, record, tasks, isEdit, morningDialogue) {
           ${backlogTasks.map((t) => buildBacklogItem(t)).join("")}
         </ul>
         <div class="task-input-row">
+          <select id="backlog-category" class="category-select">${buildCategoryOptions(getLastCategory())}</select>
           <input type="text" id="backlog-input" placeholder="近日中タスクを追加..." />
           <button class="btn btn-outline btn-sm" id="btn-add-backlog">追加</button>
         </div>
@@ -282,20 +360,28 @@ function buildFormHTML(date, record, tasks, isEdit, morningDialogue) {
   `;
 }
 
+function buildCategoryBadge(category) {
+  if (!category) return "";
+  const color = getCategoryColor(category);
+  return `<span class="task-category-badge" style="background:${color}">${escapeHTML(category)}</span>`;
+}
+
 function buildTaskItem(taskText, isCompleted) {
+  const { category, text } = parseTaskCategory(taskText);
   return `
     <li class="task-item${isCompleted ? " completed" : ""}">
       <input type="checkbox" ${isCompleted ? "checked" : ""} data-task="${escapeHTML(taskText)}" />
-      <span>${escapeHTML(taskText)}</span>
+      ${buildCategoryBadge(category)}<span>${escapeHTML(text)}</span>
       ${!isCompleted ? `<button class="task-move-backlog" data-to-backlog="${escapeHTML(taskText)}" title="近日中へ移動">▼</button>` : ""}
       <button class="task-remove" data-remove="${escapeHTML(taskText)}" title="削除">✕</button>
     </li>`;
 }
 
 function buildBacklogItem(taskText) {
+  const { category, text } = parseTaskCategory(taskText);
   return `
     <li class="task-item backlog-item">
-      <span>${escapeHTML(taskText)}</span>
+      ${buildCategoryBadge(category)}<span>${escapeHTML(text)}</span>
       <button class="task-move-today" data-to-today="${escapeHTML(taskText)}" title="今日やるへ昇格">▲</button>
       <button class="task-remove" data-remove="${escapeHTML(taskText)}" title="削除">✕</button>
     </li>`;
@@ -488,14 +574,14 @@ function attachFormEvents(date, isEdit) {
     const rawInput = document.getElementById("raw-input").value.trim();
     if (!isEdit && !rawInput) return;
 
-    const incompleteTasks = [...document.querySelectorAll("#planned-list .task-item span")]
-      .map((el) => el.textContent.trim())
+    const incompleteTasks = [...document.querySelectorAll("#planned-list .task-item .task-remove")]
+      .map((el) => el.dataset.remove)
       .filter(Boolean);
-    const completedTasks = [...document.querySelectorAll("#completed-list .task-item span")]
-      .map((el) => el.textContent.trim())
+    const completedTasks = [...document.querySelectorAll("#completed-list .task-item .task-remove")]
+      .map((el) => el.dataset.remove)
       .filter(Boolean);
-    const backlogTasks = [...document.querySelectorAll("#backlog-list .task-item span")]
-      .map((el) => el.textContent.trim())
+    const backlogTasks = [...document.querySelectorAll("#backlog-list .task-item .task-remove")]
+      .map((el) => el.dataset.remove)
       .filter(Boolean);
     const plannedTasks = [...incompleteTasks, ...completedTasks];
 
@@ -567,8 +653,8 @@ function attachFormEvents(date, isEdit) {
       const incomplete = planned.filter((t) => !completed.includes(t));
 
       const existing = new Set(
-        [...document.querySelectorAll("#planned-list .task-item span, #completed-list .task-item span, #backlog-list .task-item span")]
-          .map((el) => el.textContent.trim())
+        [...document.querySelectorAll("#planned-list .task-remove, #completed-list .task-remove, #backlog-list .task-remove")]
+          .map((el) => el.dataset.remove)
       );
       let added = 0;
       for (const task of incomplete) {
@@ -601,11 +687,42 @@ function attachFormEvents(date, isEdit) {
     }
   });
 
+  // カテゴリ選択時の新規作成ハンドリング
+  function handleCategorySelect(selectEl) {
+    if (selectEl.value === "__new__") {
+      const name = prompt("新しいカテゴリ名を入力してください:");
+      if (name && name.trim()) {
+        const cats = getCategories();
+        const trimmed = name.trim();
+        if (!cats.find((c) => c.name === trimmed)) {
+          const color = DEFAULT_COLORS[cats.length % DEFAULT_COLORS.length];
+          cats.push({ name: trimmed, color });
+          saveCategories(cats);
+          renderCategoryManageList();
+        }
+        refreshCategoryDropdowns();
+        selectEl.value = trimmed;
+        setLastCategory(trimmed);
+      } else {
+        selectEl.value = getLastCategory();
+      }
+    } else {
+      setLastCategory(selectEl.value);
+    }
+  }
+
+  const plannedCategorySel = document.getElementById("planned-category");
+  const backlogCategorySel = document.getElementById("backlog-category");
+  plannedCategorySel.addEventListener("change", () => handleCategorySelect(plannedCategorySel));
+  backlogCategorySel.addEventListener("change", () => handleCategorySelect(backlogCategorySel));
+
   // タスク追加
   function addTask() {
     const text = plannedInput.value.trim();
     if (!text) return;
-    plannedList.insertAdjacentHTML("beforeend", buildTaskItem(text, false));
+    const category = plannedCategorySel.value;
+    const fullText = formatTaskWithCategory(text, category);
+    plannedList.insertAdjacentHTML("beforeend", buildTaskItem(fullText, false));
     plannedInput.value = "";
     plannedInput.focus();
     saveDataQuietly();
@@ -620,7 +737,9 @@ function attachFormEvents(date, isEdit) {
   function addBacklogTask() {
     const text = backlogInput.value.trim();
     if (!text) return;
-    backlogList.insertAdjacentHTML("beforeend", buildBacklogItem(text));
+    const category = backlogCategorySel.value;
+    const fullText = formatTaskWithCategory(text, category);
+    backlogList.insertAdjacentHTML("beforeend", buildBacklogItem(fullText));
     backlogInput.value = "";
     backlogInput.focus();
     syncBacklogCount();
@@ -644,7 +763,7 @@ function attachFormEvents(date, isEdit) {
     // 「近日中へ移動」ボタン
     if (e.target.dataset.toBacklog !== undefined) {
       const li = e.target.closest("li");
-      const taskText = li.querySelector("span").textContent.trim();
+      const taskText = e.target.dataset.toBacklog;
       li.remove();
       backlogList.insertAdjacentHTML("beforeend", buildBacklogItem(taskText));
       syncBacklogCount();
@@ -654,7 +773,7 @@ function attachFormEvents(date, isEdit) {
     // 「今日やるへ昇格」ボタン
     if (e.target.dataset.toToday !== undefined) {
       const li = e.target.closest("li");
-      const taskText = li.querySelector("span").textContent.trim();
+      const taskText = e.target.dataset.toToday;
       li.remove();
       plannedList.insertAdjacentHTML("beforeend", buildTaskItem(taskText, false));
       syncBacklogCount();
@@ -678,6 +797,56 @@ function attachFormEvents(date, isEdit) {
   plannedList.addEventListener("click", handleTaskClick);
   completedList.addEventListener("click", handleTaskClick);
   backlogList.addEventListener("click", handleTaskClick);
+
+  // カテゴリ管理
+  function renderCategoryManageList() {
+    const list = document.getElementById("category-manage-list");
+    if (!list) return;
+    const cats = getCategories();
+    list.innerHTML = cats.map((c) => `
+      <li class="category-manage-item">
+        <span class="task-category-badge" style="background:${c.color}">${escapeHTML(c.name)}</span>
+        <button class="category-remove-btn" data-remove-category="${escapeHTML(c.name)}" title="削除">✕</button>
+      </li>`).join("");
+  }
+
+  const categoryManageList = document.getElementById("category-manage-list");
+  if (categoryManageList) {
+    categoryManageList.addEventListener("click", (e) => {
+      if (e.target.dataset.removeCategory !== undefined) {
+        const name = e.target.dataset.removeCategory;
+        const cats = getCategories().filter((c) => c.name !== name);
+        saveCategories(cats);
+        renderCategoryManageList();
+        refreshCategoryDropdowns();
+      }
+    });
+  }
+
+  const btnAddCategory = document.getElementById("btn-add-category");
+  const newCategoryInput = document.getElementById("new-category-input");
+  if (btnAddCategory && newCategoryInput) {
+    function addCategory() {
+      const name = newCategoryInput.value.trim();
+      if (!name) return;
+      const cats = getCategories();
+      if (cats.find((c) => c.name === name)) {
+        showToast("同じ名前のカテゴリが既にあります", "error");
+        return;
+      }
+      const color = DEFAULT_COLORS[cats.length % DEFAULT_COLORS.length];
+      cats.push({ name, color });
+      saveCategories(cats);
+      newCategoryInput.value = "";
+      renderCategoryManageList();
+      refreshCategoryDropdowns();
+      showToast(`カテゴリ「${name}」を追加しました`, "success");
+    }
+    btnAddCategory.addEventListener("click", addCategory);
+    newCategoryInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") { e.preventDefault(); addCategory(); }
+    });
+  }
 
   // フォーム送信
   document.getElementById("btn-submit").addEventListener("click", async (e) => {
@@ -851,16 +1020,16 @@ async function submitForm(date, isEdit, btn) {
     return;
   }
 
-  const incompleteTasks = [...document.querySelectorAll("#planned-list .task-item span")]
-    .map((el) => el.textContent.trim())
+  const incompleteTasks = [...document.querySelectorAll("#planned-list .task-item .task-remove")]
+    .map((el) => el.dataset.remove)
     .filter(Boolean);
 
-  const completedTasks = [...document.querySelectorAll("#completed-list .task-item span")]
-    .map((el) => el.textContent.trim())
+  const completedTasks = [...document.querySelectorAll("#completed-list .task-item .task-remove")]
+    .map((el) => el.dataset.remove)
     .filter(Boolean);
 
-  const backlogTasks = [...document.querySelectorAll("#backlog-list .task-item span")]
-    .map((el) => el.textContent.trim())
+  const backlogTasks = [...document.querySelectorAll("#backlog-list .task-item .task-remove")]
+    .map((el) => el.dataset.remove)
     .filter(Boolean);
 
   const plannedTasks = [...incompleteTasks, ...completedTasks];

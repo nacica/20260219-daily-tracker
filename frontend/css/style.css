@@ -490,15 +490,86 @@ textarea {
   flex-shrink: 0;
 }
 
-.task-item span {
+.task-item > span {
   flex: 1;
   font-size: 0.9rem;
+  min-width: 0;
 }
 
-.task-item.completed span {
+.task-item.completed > span {
   text-decoration: line-through;
   color: var(--text-muted);
 }
+
+/* カテゴリバッジ */
+.task-category-badge {
+  flex-shrink: 0;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 4px;
+  color: #000;
+  white-space: nowrap;
+  line-height: 1.3;
+}
+
+/* カテゴリ選択ドロップダウン */
+.category-select {
+  flex-shrink: 0;
+  width: auto;
+  min-width: 90px;
+  max-width: 140px;
+  font-size: 0.82rem;
+  padding: 8px 6px;
+  background: var(--bg-input);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.category-select:focus {
+  outline: none;
+  border-color: var(--cyan);
+  box-shadow: 0 0 0 3px rgba(0, 212, 255, 0.1);
+}
+
+/* カテゴリ管理セクション */
+.category-manager {
+  margin-top: 12px;
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+}
+.category-manager summary {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  user-select: none;
+  padding: 4px 0;
+}
+.category-manager summary:hover { color: var(--cyan); }
+.category-manage-list {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0;
+}
+.category-manage-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.category-remove-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.75rem;
+  padding: 1px 4px;
+  border-radius: 3px;
+  line-height: 1;
+}
+.category-remove-btn:hover { color: var(--neon-red); }
 
 .task-remove {
   background: none;
