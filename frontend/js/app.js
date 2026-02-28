@@ -3,16 +3,16 @@
  * ルーティングの設定とホーム画面の表示を担当する
  */
 
-import { addRoute, navigate, updateNavActive } from "./router.js?v=20260228f";
-import { renderInputForm } from "./components/input-form.js?v=20260228f";
-import { renderAnalysisView } from "./components/analysis-view.js?v=20260228f";
-import { renderHistoryList } from "./components/history-list.js?v=20260228f";
-import { renderWeeklyReport } from "./components/weekly-report.js?v=20260228f";
-import { renderSuggestions } from "./components/suggestions.js?v=20260228f";
-import { renderCoachingChat } from "./components/coaching-chat.js?v=20260228f";
-import { renderKnowledgeGraph } from "./components/knowledge-graph.js?v=20260228f";
-import { renderMonthlyReport } from "./components/monthly-report.js?v=20260228f";
-import { recordsApi, analysisApi } from "./api.js?v=20260228f";
+import { addRoute, navigate, updateNavActive } from "./router.js?v=20260228g";
+import { renderInputForm } from "./components/input-form.js?v=20260228g";
+import { renderAnalysisView } from "./components/analysis-view.js?v=20260228g";
+import { renderHistoryList } from "./components/history-list.js?v=20260228g";
+import { renderWeeklyReport } from "./components/weekly-report.js?v=20260228g";
+import { renderSuggestions } from "./components/suggestions.js?v=20260228g";
+import { renderCoachingChat } from "./components/coaching-chat.js?v=20260228g";
+import { renderKnowledgeGraph } from "./components/knowledge-graph.js?v=20260228g";
+import { renderMonthlyReport } from "./components/monthly-report.js?v=20260228g";
+import { recordsApi, analysisApi } from "./api.js?v=20260228g";
 
 // ===== ユーティリティ =====
 
