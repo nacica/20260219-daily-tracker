@@ -5,8 +5,8 @@
  * 朝のタスク整理（ソクラテス式問答）統合
  */
 
-import { recordsApi, analysisApi, morningDialogueApi } from "../api.js?v=20260228q";
-import { showToast } from "../app.js?v=20260228q";
+import { recordsApi, analysisApi, morningDialogueApi } from "../api.js?v=20260301a";
+import { showToast } from "../app.js?v=20260301a";
 
 /* ── カテゴリ管理 ── */
 
@@ -636,7 +636,10 @@ function attachFormEvents(date, isEdit) {
         found = await recordsApi.get(searchedDate);
         const planned = found?.tasks?.planned || [];
         const completed = found?.tasks?.completed || [];
-        if (planned.filter((t) => !completed.includes(t)).length > 0) break;
+        const backlog = found?.tasks?.backlog || [];
+        const hasIncomplete = planned.filter((t) => !completed.includes(t)).length > 0;
+        const hasBacklog = backlog.length > 0;
+        if (hasIncomplete || hasBacklog) break;
         found = null;
       } catch {
         found = null;
@@ -645,7 +648,7 @@ function attachFormEvents(date, isEdit) {
 
     try {
       if (!found) {
-        showToast("直近7日間に未完了タスクが見つかりません", "info");
+        showToast("直近7日間に引き継ぐタスクが見つかりません", "info");
         return;
       }
       const planned = found.tasks?.planned || [];
