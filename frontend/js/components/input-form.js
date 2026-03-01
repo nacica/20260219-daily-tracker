@@ -5,8 +5,8 @@
  * 朝のタスク整理（ソクラテス式問答）統合
  */
 
-import { recordsApi, analysisApi, morningDialogueApi } from "../api.js?v=20260301a";
-import { showToast } from "../app.js?v=20260301a";
+import { recordsApi, analysisApi, morningDialogueApi } from "../api.js?v=20260301b";
+import { showToast } from "../app.js?v=20260301b";
 
 /* ── カテゴリ管理 ── */
 
@@ -370,6 +370,7 @@ function buildTaskItem(taskText, isCompleted) {
   const { category, text } = parseTaskCategory(taskText);
   return `
     <li class="task-item${isCompleted ? " completed" : ""}">
+      ${!isCompleted ? `<span class="task-drag-handle" title="ドラッグで並べ替え">⠿</span>` : ""}
       <input type="checkbox" ${isCompleted ? "checked" : ""} data-task="${escapeHTML(taskText)}" />
       ${buildCategoryBadge(category)}<span>${escapeHTML(text)}</span>
       ${!isCompleted ? `<button class="task-move-backlog" data-to-backlog="${escapeHTML(taskText)}" title="近日中へ移動">▼</button>` : ""}
@@ -381,6 +382,7 @@ function buildBacklogItem(taskText) {
   const { category, text } = parseTaskCategory(taskText);
   return `
     <li class="task-item backlog-item">
+      <span class="task-drag-handle" title="ドラッグで並べ替え">⠿</span>
       ${buildCategoryBadge(category)}<span>${escapeHTML(text)}</span>
       <button class="task-move-today" data-to-today="${escapeHTML(taskText)}" title="今日やるへ昇格">▲</button>
       <button class="task-remove" data-remove="${escapeHTML(taskText)}" title="削除">✕</button>
@@ -876,6 +878,194 @@ function attachFormEvents(date, isEdit) {
 
   // ドラッグ&ドロップ（デスクトップのみ）
   attachDragDropEvents();
+
+  // タスク並べ替え（デスクトップ＋モバイル）
+  attachTaskSortEvents(saveDataQuietly);
+}
+
+/* ── タスク並べ替え（リスト内ドラッグ&ドロップ） ── */
+
+function attachTaskSortEvents(saveDataQuietly) {
+  const lists = [
+    document.getElementById("planned-list"),
+    document.getElementById("backlog-list"),
+  ];
+
+  let draggedItem = null;
+  let touchClone = null;
+  let touchList = null;
+  let touchScrollInterval = null;
+
+  // --- デスクトップ: HTML5 Drag & Drop ---
+  for (const list of lists) {
+    if (!list) continue;
+
+    // ハンドル mousedown で draggable 有効化
+    list.addEventListener("mousedown", (e) => {
+      const handle = e.target.closest(".task-drag-handle");
+      if (!handle) return;
+      const li = handle.closest(".task-item");
+      if (li) li.setAttribute("draggable", "true");
+    });
+
+    list.addEventListener("dragstart", (e) => {
+      const li = e.target.closest(".task-item");
+      if (!li || !li.getAttribute("draggable")) { e.preventDefault(); return; }
+      draggedItem = li;
+      li.classList.add("task-dragging");
+      e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData("text/plain", "");
+      requestAnimationFrame(() => { li.style.opacity = "0.35"; });
+    });
+
+    list.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      if (!draggedItem || draggedItem.closest("ul") !== list) return;
+
+      const items = [...list.querySelectorAll(".task-item:not(.task-dragging)")];
+      const afterItem = getTaskInsertPoint(list, e.clientY, items);
+
+      // 視覚フィードバック
+      items.forEach((it) => it.classList.remove("task-drop-above"));
+      if (afterItem) afterItem.classList.add("task-drop-above");
+    });
+
+    list.addEventListener("dragleave", () => {
+      list.querySelectorAll(".task-drop-above").forEach((el) => el.classList.remove("task-drop-above"));
+    });
+
+    list.addEventListener("drop", (e) => {
+      e.preventDefault();
+      list.querySelectorAll(".task-drop-above").forEach((el) => el.classList.remove("task-drop-above"));
+      if (!draggedItem || draggedItem.closest("ul") !== list) return;
+
+      const items = [...list.querySelectorAll(".task-item:not(.task-dragging)")];
+      const afterItem = getTaskInsertPoint(list, e.clientY, items);
+
+      if (afterItem) {
+        list.insertBefore(draggedItem, afterItem);
+      } else {
+        list.appendChild(draggedItem);
+      }
+      saveDataQuietly();
+    });
+
+    list.addEventListener("dragend", () => {
+      if (draggedItem) {
+        draggedItem.classList.remove("task-dragging");
+        draggedItem.style.opacity = "";
+        draggedItem.setAttribute("draggable", "false");
+        draggedItem = null;
+      }
+      list.querySelectorAll(".task-drop-above").forEach((el) => el.classList.remove("task-drop-above"));
+    });
+
+    // --- モバイル: Touch Events ---
+    list.addEventListener("touchstart", (e) => {
+      const handle = e.target.closest(".task-drag-handle");
+      if (!handle) return;
+      const li = handle.closest(".task-item");
+      if (!li) return;
+
+      e.preventDefault();
+      draggedItem = li;
+      touchList = list;
+
+      // クローン作成（指に追従するゴースト）
+      const rect = li.getBoundingClientRect();
+      touchClone = li.cloneNode(true);
+      touchClone.classList.add("task-touch-clone");
+      touchClone.style.width = rect.width + "px";
+      touchClone.style.left = rect.left + "px";
+      touchClone.style.top = rect.top + "px";
+      document.body.appendChild(touchClone);
+
+      li.classList.add("task-dragging");
+      li.style.opacity = "0.35";
+    }, { passive: false });
+
+    list.addEventListener("touchmove", (e) => {
+      if (!draggedItem || !touchClone || touchList !== list) return;
+      e.preventDefault();
+
+      const touchY = e.touches[0].clientY;
+      touchClone.style.top = touchY - 20 + "px";
+
+      // 画面端でオートスクロール
+      clearInterval(touchScrollInterval);
+      if (touchY < 80) {
+        touchScrollInterval = setInterval(() => window.scrollBy(0, -8), 16);
+      } else if (touchY > window.innerHeight - 80) {
+        touchScrollInterval = setInterval(() => window.scrollBy(0, 8), 16);
+      }
+
+      // ドロップ位置フィードバック
+      const items = [...list.querySelectorAll(".task-item:not(.task-dragging)")];
+      items.forEach((it) => it.classList.remove("task-drop-above"));
+      const afterItem = getTaskInsertPoint(list, touchY, items);
+      if (afterItem) afterItem.classList.add("task-drop-above");
+    }, { passive: false });
+
+    list.addEventListener("touchend", () => {
+      clearInterval(touchScrollInterval);
+      touchScrollInterval = null;
+
+      if (!draggedItem || touchList !== list) return;
+
+      // クローン削除
+      if (touchClone) {
+        touchClone.remove();
+        touchClone = null;
+      }
+
+      // ドロップ位置に移動
+      const items = [...list.querySelectorAll(".task-item:not(.task-dragging)")];
+      // 最後に task-drop-above を持つ要素を探す
+      const dropTarget = list.querySelector(".task-item.task-drop-above");
+      if (dropTarget) {
+        list.insertBefore(draggedItem, dropTarget);
+      }
+      // else: 元の位置のまま（一番下に来たケースも含む）
+
+      items.forEach((it) => it.classList.remove("task-drop-above"));
+      draggedItem.classList.remove("task-dragging");
+      draggedItem.style.opacity = "";
+      draggedItem = null;
+      touchList = null;
+
+      saveDataQuietly();
+    });
+
+    list.addEventListener("touchcancel", () => {
+      clearInterval(touchScrollInterval);
+      touchScrollInterval = null;
+      if (touchClone) { touchClone.remove(); touchClone = null; }
+      if (draggedItem) {
+        draggedItem.classList.remove("task-dragging");
+        draggedItem.style.opacity = "";
+        draggedItem = null;
+      }
+      touchList = null;
+      list.querySelectorAll(".task-drop-above").forEach((el) => el.classList.remove("task-drop-above"));
+    });
+  }
+
+  // mouseup でリセット
+  document.addEventListener("mouseup", () => {
+    document.querySelectorAll(".task-item[draggable='true']").forEach((el) => {
+      el.setAttribute("draggable", "false");
+    });
+  });
+}
+
+function getTaskInsertPoint(list, mouseY, items) {
+  for (const item of items) {
+    const rect = item.getBoundingClientRect();
+    const midY = rect.top + rect.height / 2;
+    if (mouseY < midY) return item;
+  }
+  return null;
 }
 
 /* ── ドラッグ&ドロップ ── */
