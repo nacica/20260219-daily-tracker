@@ -791,13 +791,13 @@ textarea {
   flex-shrink: 0;
 }
 
-.task-item > span:not(.task-category-badge) {
+.task-item > span:not(.task-category-badge):not(.task-drag-handle) {
   flex: 1;
   font-size: 0.9rem;
   min-width: 0;
 }
 
-.task-item.completed > span:not(.task-category-badge) {
+.task-item.completed > span:not(.task-category-badge):not(.task-drag-handle) {
   text-decoration: line-through;
   color: var(--text-muted);
 }
@@ -877,8 +877,7 @@ textarea {
   cursor: grab;
   color: var(--text-muted);
   font-size: 1rem;
-  padding: 2px 0;
-  margin-right: -4px;
+  padding: 2px 4px;
   user-select: none;
   flex-shrink: 0;
   opacity: 0.5;
