@@ -5,8 +5,8 @@
  * 朝のタスク整理（ソクラテス式問答）統合
  */
 
-import { recordsApi, analysisApi, morningDialogueApi } from "../api.js?v=20260306b";
-import { showToast } from "../app.js?v=20260306b";
+import { recordsApi, analysisApi, morningDialogueApi } from "../api.js?v=20260306c";
+import { showToast } from "../app.js?v=20260306c";
 
 /* ── カテゴリ管理 ── */
 
@@ -129,6 +129,127 @@ export async function renderInputForm(date) {
   main.innerHTML = buildFormHTML(date, existingRecord, tasks, isEdit, morningDialogue);
   attachFormEvents(date, isEdit);
   attachMorningDialogueEvents(date, morningDialogue);
+  attachReminderEvents();
+}
+
+/* ── 付箋リマインダー ── */
+
+const REMINDER_STORAGE_KEY = "daily-reminders";
+const STICKY_COLORS = ["#fff59d", "#f48fb1", "#a5d6a7", "#90caf9", "#ffcc80"];
+
+function getReminders() {
+  try {
+    const saved = localStorage.getItem(REMINDER_STORAGE_KEY);
+    return saved ? JSON.parse(saved) : [];
+  } catch { return []; }
+}
+
+function saveReminders(list) {
+  localStorage.setItem(REMINDER_STORAGE_KEY, JSON.stringify(list));
+}
+
+function stickyRotation(id) {
+  // id から決定的に回転角を生成（-2〜2度）
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = ((h << 5) - h + id.charCodeAt(i)) | 0;
+  return ((h % 5) - 2);
+}
+
+function buildReminderBoardHTML() {
+  const reminders = getReminders();
+  const notesHTML = reminders.map((r) => {
+    const deg = stickyRotation(r.id);
+    return `<div class="sticky-note" data-id="${escapeHTML(r.id)}" style="background:${r.color}; transform:rotate(${deg}deg);">
+      <span class="sticky-text">${escapeHTML(r.text)}</span>
+      <button class="sticky-delete" title="削除">&times;</button>
+    </div>`;
+  }).join("");
+
+  const colorBtns = STICKY_COLORS.map((c, i) =>
+    `<button class="sticky-color-btn${i === 0 ? " selected" : ""}" data-color="${c}" style="background:${c};" title="色を選択"></button>`
+  ).join("");
+
+  return `
+    <div class="card reminder-board-card" id="card-reminder-board">
+      <div class="card-title">今日意識すること</div>
+      <div class="sticky-notes" id="sticky-notes">
+        ${notesHTML || '<p class="sticky-empty">まだメモがありません。<br>下から追加してみましょう。</p>'}
+      </div>
+      <div class="sticky-add-area">
+        <div class="sticky-add-row">
+          <input type="text" id="sticky-input" class="sticky-input" placeholder="意識することを追加..." maxlength="100" />
+          <button class="btn btn-primary btn-sm" id="btn-add-sticky">追加</button>
+        </div>
+        <div class="sticky-colors" id="sticky-colors">${colorBtns}</div>
+      </div>
+    </div>`;
+}
+
+function attachReminderEvents() {
+  const addBtn = document.getElementById("btn-add-sticky");
+  const input = document.getElementById("sticky-input");
+  if (!addBtn || !input) return;
+
+  let selectedColor = STICKY_COLORS[0];
+
+  // 色選択
+  const colorBtns = document.querySelectorAll(".sticky-color-btn");
+  colorBtns.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      colorBtns.forEach((b) => b.classList.remove("selected"));
+      btn.classList.add("selected");
+      selectedColor = btn.dataset.color;
+    });
+  });
+
+  // 追加
+  function addSticky() {
+    const text = input.value.trim();
+    if (!text) return;
+    const reminders = getReminders();
+    reminders.push({ id: Date.now().toString(36), text, color: selectedColor });
+    saveReminders(reminders);
+    refreshStickyNotes();
+    input.value = "";
+    input.focus();
+  }
+
+  addBtn.addEventListener("click", addSticky);
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); addSticky(); }
+  });
+
+  // 削除（イベント委譲）
+  const container = document.getElementById("sticky-notes");
+  if (container) {
+    container.addEventListener("click", (e) => {
+      const delBtn = e.target.closest(".sticky-delete");
+      if (!delBtn) return;
+      const note = delBtn.closest(".sticky-note");
+      if (!note) return;
+      const id = note.dataset.id;
+      const reminders = getReminders().filter((r) => r.id !== id);
+      saveReminders(reminders);
+      refreshStickyNotes();
+    });
+  }
+}
+
+function refreshStickyNotes() {
+  const container = document.getElementById("sticky-notes");
+  if (!container) return;
+  const reminders = getReminders();
+  if (reminders.length === 0) {
+    container.innerHTML = '<p class="sticky-empty">まだメモがありません。<br>下から追加してみましょう。</p>';
+    return;
+  }
+  container.innerHTML = reminders.map((r) => {
+    const deg = stickyRotation(r.id);
+    return `<div class="sticky-note" data-id="${escapeHTML(r.id)}" style="background:${r.color}; transform:rotate(${deg}deg);">
+      <span class="sticky-text">${escapeHTML(r.text)}</span>
+      <button class="sticky-delete" title="削除">&times;</button>
+    </div>`;
+  }).join("");
 }
 
 /* ── 朝問答 HTML 生成 ── */
@@ -340,14 +461,18 @@ function buildFormHTML(date, record, tasks, isEdit, morningDialogue) {
 
   columns.forEach((col) => col.sort((a, b) => a.order - b.order));
 
-  // 朝問答カードを上部に全幅で配置
+  // 朝問答 + 付箋リマインダーを2列で配置
   const morningHTML = buildMorningDialogueHTML(morningDialogue);
+  const reminderHTML = buildReminderBoardHTML();
 
   return `
     <h2 style="margin-bottom: 4px; font-size: 1.2rem;">${isEdit ? "記録を編集" : "行動を記録"}</h2>
     <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: var(--gap);">${dateLabel}</p>
 
-    ${morningHTML}
+    <div class="morning-reminder-grid">
+      <div class="morning-col">${morningHTML}</div>
+      <div class="reminder-col">${reminderHTML}</div>
+    </div>
 
     <div class="input-grid" id="input-grid">
       <div class="input-column" id="input-column-0" data-column="0">

@@ -1850,6 +1850,146 @@ textarea {
   max-width: 100%;
 }
 
+/* ===== 朝タスク + 付箋リマインダー 2列グリッド ===== */
+
+.morning-reminder-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin-bottom: var(--gap);
+}
+
+.morning-col .morning-dialogue-card,
+.reminder-col .reminder-board-card {
+  margin-bottom: 0;
+}
+
+/* ===== 付箋ボード ===== */
+
+.reminder-board-card {
+  border: 1px solid rgba(255, 170, 0, 0.18);
+}
+
+.reminder-board-card .card-title::before {
+  content: "\1F4CC";
+  font-size: 1em;
+}
+
+.sticky-notes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  min-height: 40px;
+  margin-bottom: 14px;
+}
+
+.sticky-empty {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  line-height: 1.6;
+  text-align: center;
+  width: 100%;
+  padding: 12px 0;
+}
+
+.sticky-note {
+  position: relative;
+  padding: 10px 28px 10px 12px;
+  border-radius: 3px;
+  box-shadow: 2px 3px 7px rgba(0, 0, 0, 0.18);
+  font-size: 0.88rem;
+  line-height: 1.4;
+  color: #333;
+  font-weight: 500;
+  max-width: 100%;
+  word-break: break-word;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.sticky-note:hover {
+  box-shadow: 3px 4px 12px rgba(0, 0, 0, 0.25);
+  z-index: 1;
+}
+
+.sticky-delete {
+  position: absolute;
+  top: 2px;
+  right: 4px;
+  background: none;
+  border: none;
+  font-size: 1.1rem;
+  color: rgba(0, 0, 0, 0.3);
+  cursor: pointer;
+  padding: 2px 5px;
+  line-height: 1;
+  border-radius: 50%;
+  transition: color 0.15s, background 0.15s;
+}
+
+.sticky-delete:hover {
+  color: #c62828;
+  background: rgba(198, 40, 40, 0.1);
+}
+
+.sticky-add-area {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sticky-add-row {
+  display: flex;
+  gap: 8px;
+}
+
+.sticky-input {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-input);
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  font-family: var(--font);
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.sticky-input:focus {
+  border-color: var(--cyan-dim);
+}
+
+.sticky-colors {
+  display: flex;
+  gap: 6px;
+}
+
+.sticky-color-btn {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: border-color 0.15s, transform 0.15s;
+  padding: 0;
+}
+
+.sticky-color-btn:hover {
+  transform: scale(1.15);
+}
+
+.sticky-color-btn.selected {
+  border-color: var(--cyan);
+  box-shadow: 0 0 6px rgba(0, 212, 255, 0.4);
+}
+
+/* モバイル: 縦積み */
+@media (max-width: 767px) {
+  .morning-reminder-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* ===== タブレット対応 ===== */
 
 @media (min-width: 640px) {

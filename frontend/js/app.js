@@ -3,18 +3,18 @@
  * ルーティングの設定とホーム画面の表示を担当する
  */
 
-import { addRoute, navigate, updateNavActive } from "./router.js?v=20260306b";
-import { renderInputForm } from "./components/input-form.js?v=20260306b";
-import { renderAnalysisView } from "./components/analysis-view.js?v=20260306b";
-import { renderHistoryList } from "./components/history-list.js?v=20260306b";
-import { renderWeeklyReport } from "./components/weekly-report.js?v=20260306b";
-import { renderSuggestions } from "./components/suggestions.js?v=20260306b";
-import { renderCoachingChat } from "./components/coaching-chat.js?v=20260306b";
-import { renderKnowledgeGraph } from "./components/knowledge-graph.js?v=20260306b";
-import { renderMonthlyReport } from "./components/monthly-report.js?v=20260306b";
-import { renderJournal } from "./components/journal.js?v=20260306b";
-import { recordsApi, analysisApi } from "./api.js?v=20260306b";
-import { initSwipeNav } from "./swipe-nav.js?v=20260306b";
+import { addRoute, navigate, updateNavActive } from "./router.js?v=20260306c";
+import { renderInputForm } from "./components/input-form.js?v=20260306c";
+import { renderAnalysisView } from "./components/analysis-view.js?v=20260306c";
+import { renderHistoryList } from "./components/history-list.js?v=20260306c";
+import { renderWeeklyReport } from "./components/weekly-report.js?v=20260306c";
+import { renderSuggestions } from "./components/suggestions.js?v=20260306c";
+import { renderCoachingChat } from "./components/coaching-chat.js?v=20260306c";
+import { renderKnowledgeGraph } from "./components/knowledge-graph.js?v=20260306c";
+import { renderMonthlyReport } from "./components/monthly-report.js?v=20260306c";
+import { renderJournal } from "./components/journal.js?v=20260306c";
+import { recordsApi, analysisApi } from "./api.js?v=20260306c";
+import { initSwipeNav } from "./swipe-nav.js?v=20260306c";
 
 // ===== ユーティリティ =====
 
