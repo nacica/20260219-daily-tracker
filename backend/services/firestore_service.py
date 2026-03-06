@@ -190,6 +190,34 @@ def delete_morning_dialogue(date: str) -> bool:
     return True
 
 
+# ---- diary_dialogues ----
+
+def get_diary_dialogue(date: str) -> Optional[dict]:
+    """指定日の日記入力対話を取得"""
+    db = get_db()
+    doc = db.collection("diary_dialogues").document(date).get()
+    if doc.exists:
+        return doc.to_dict()
+    return None
+
+
+def save_diary_dialogue(date: str, data: dict) -> dict:
+    """日記入力対話を保存（上書き）"""
+    db = get_db()
+    db.collection("diary_dialogues").document(date).set(data)
+    return data
+
+
+def delete_diary_dialogue(date: str) -> bool:
+    """日記入力対話を削除"""
+    db = get_db()
+    ref = db.collection("diary_dialogues").document(date)
+    if not ref.get().exists:
+        return False
+    ref.delete()
+    return True
+
+
 # ---- ナレッジグラフ: user_entities ----
 
 DEFAULT_USER_ID = "default"

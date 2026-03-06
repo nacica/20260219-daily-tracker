@@ -1850,6 +1850,59 @@ textarea {
   max-width: 100%;
 }
 
+/* ===== 日記入力モード切り替え ===== */
+
+.diary-mode-toggle {
+  display: flex;
+  gap: 0;
+  margin-bottom: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.diary-mode-btn {
+  flex: 1;
+  padding: 8px 12px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+
+.diary-mode-btn:hover {
+  background: rgba(0, 212, 255, 0.06);
+}
+
+.diary-mode-btn.active {
+  background: rgba(0, 212, 255, 0.12);
+  color: var(--cyan);
+  font-weight: 600;
+}
+
+[data-theme="light"] .diary-mode-btn.active {
+  background: rgba(59, 130, 246, 0.1);
+  color: var(--primary);
+}
+
+.diary-dialogue-completed {
+  padding: 4px 0;
+}
+
+.diary-dialogue-done-msg {
+  color: var(--neon-green);
+  font-size: 0.9rem;
+  font-weight: 500;
+  margin-bottom: 10px;
+}
+
+[data-theme="light"] .diary-dialogue-done-msg {
+  color: #16a34a;
+}
+
 /* ===== 朝タスク + 付箋リマインダー 2列グリッド ===== */
 
 .morning-reminder-grid {

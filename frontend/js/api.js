@@ -133,6 +133,31 @@ export const morningDialogueApi = {
   delete: (date) => apiFetch(`/morning/${date}`, { method: "DELETE" }),
 };
 
+// ---- 日記入力対話 ----
+
+export const diaryDialogueApi = {
+  /** 日記入力対話を開始（または再開） */
+  start: (date) =>
+    apiFetch(`/diary-dialogue/${date}/start`, { method: "POST" }),
+
+  /** ユーザーの返答を送信しAI応答を取得 */
+  reply: (date, message) =>
+    apiFetch(`/diary-dialogue/${date}/reply`, {
+      method: "POST",
+      body: { message },
+    }),
+
+  /** 対話から行動ログを生成しレコード保存 */
+  synthesize: (date) =>
+    apiFetch(`/diary-dialogue/${date}/synthesize`, { method: "POST" }),
+
+  /** 保存済み日記対話を取得 */
+  get: (date) => apiFetch(`/diary-dialogue/${date}`),
+
+  /** 日記対話を削除 */
+  delete: (date) => apiFetch(`/diary-dialogue/${date}`, { method: "DELETE" }),
+};
+
 // ---- コーチングチャット ----
 
 export const coachApi = {

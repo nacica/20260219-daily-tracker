@@ -20,6 +20,11 @@ from prompts.morning_planning import (
     MORNING_FOLLOWUP_SYSTEM_PROMPT, build_morning_followup_prompt,
     MORNING_SYNTHESIS_SYSTEM_PROMPT, build_morning_synthesis_prompt,
 )
+from prompts.diary_dialogue import (
+    DIARY_QUESTION_SYSTEM_PROMPT, build_diary_question_prompt,
+    DIARY_FOLLOWUP_SYSTEM_PROMPT, build_diary_followup_prompt,
+    DIARY_SYNTHESIS_SYSTEM_PROMPT, build_diary_synthesis_prompt,
+)
 from prompts.journal_analysis import (
     JOURNAL_ANALYSIS_SYSTEM_PROMPT, build_journal_analysis_prompt,
     WEEKLY_JOURNAL_DIGEST_SYSTEM_PROMPT, build_weekly_journal_digest_prompt,
@@ -387,6 +392,77 @@ def generate_morning_synthesis(
         model=model,
         max_tokens=4096,
         system=MORNING_SYNTHESIS_SYSTEM_PROMPT,
+        messages=[{"role": "user", "content": user_prompt}],
+    )
+
+    raw_text = response.content[0].text
+    return _extract_json(raw_text)
+
+
+def generate_diary_questions(date: str) -> str:
+    """日記入力用の初期質問を生成する（テキスト返却）"""
+    client = get_client()
+    model = os.getenv("DAILY_ANALYSIS_MODEL", "claude-sonnet-4-6")
+
+    user_prompt = build_diary_question_prompt(date=date)
+
+    response = _call_claude_with_retry(
+        client,
+        model=model,
+        max_tokens=1024,
+        system=DIARY_QUESTION_SYSTEM_PROMPT,
+        messages=[{"role": "user", "content": user_prompt}],
+    )
+
+    return response.content[0].text
+
+
+def generate_diary_followup(
+    date: str,
+    messages: list[dict],
+    turn_count: int,
+    max_turns: int,
+) -> str:
+    """日記入力対話のフォローアップ応答を生成する（テキスト返却）"""
+    client = get_client()
+    model = os.getenv("DAILY_ANALYSIS_MODEL", "claude-sonnet-4-6")
+
+    user_prompt = build_diary_followup_prompt(
+        date=date,
+        messages=messages,
+        turn_count=turn_count,
+        max_turns=max_turns,
+    )
+
+    response = _call_claude_with_retry(
+        client,
+        model=model,
+        max_tokens=1024,
+        system=DIARY_FOLLOWUP_SYSTEM_PROMPT,
+        messages=[{"role": "user", "content": user_prompt}],
+    )
+
+    return response.content[0].text
+
+
+def generate_diary_synthesis(
+    date: str,
+    messages: list[dict],
+) -> dict:
+    """対話から行動ログテキストを生成する（JSON返却）"""
+    client = get_client()
+    model = os.getenv("DAILY_ANALYSIS_MODEL", "claude-sonnet-4-6")
+
+    user_prompt = build_diary_synthesis_prompt(
+        date=date,
+        messages=messages,
+    )
+
+    response = _call_claude_with_retry(
+        client,
+        model=model,
+        max_tokens=4096,
+        system=DIARY_SYNTHESIS_SYSTEM_PROMPT,
         messages=[{"role": "user", "content": user_prompt}],
     )
 
