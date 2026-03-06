@@ -1905,8 +1905,8 @@ textarea {
   border-radius: 20px;
   background: var(--bg-input);
   border: 1px solid var(--border);
-  border-left: 3px solid var(--chip-accent, #999);
-  font-size: 0.84rem;
+  font-size: 1.2rem;
+  font-weight: 700;
   font-family: 'Klee One', cursive;
   line-height: 1.3;
   color: var(--text-primary);
@@ -1977,29 +1977,6 @@ textarea {
   border-color: var(--cyan-dim);
 }
 
-.sticky-colors {
-  display: flex;
-  gap: 6px;
-}
-
-.sticky-color-btn {
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  border: 2px solid transparent;
-  cursor: pointer;
-  transition: border-color 0.15s, transform 0.15s;
-  padding: 0;
-}
-
-.sticky-color-btn:hover {
-  transform: scale(1.15);
-}
-
-.sticky-color-btn.selected {
-  border-color: var(--text-primary);
-  box-shadow: 0 0 4px rgba(0, 0, 0, 0.15);
-}
 
 /* モバイル: 縦積み */
 @media (max-width: 767px) {

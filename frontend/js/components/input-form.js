@@ -5,8 +5,8 @@
  * 朝のタスク整理（ソクラテス式問答）統合
  */
 
-import { recordsApi, analysisApi, morningDialogueApi } from "../api.js?v=20260306f";
-import { showToast } from "../app.js?v=20260306f";
+import { recordsApi, analysisApi, morningDialogueApi } from "../api.js?v=20260306g";
+import { showToast } from "../app.js?v=20260306g";
 
 /* ── カテゴリ管理 ── */
 
@@ -135,8 +135,6 @@ export async function renderInputForm(date) {
 /* ── 付箋リマインダー ── */
 
 const REMINDER_STORAGE_KEY = "daily-reminders";
-// チップ左ボーダーのアクセントカラー（モノトーン + 控えめな差し色）
-const STICKY_COLORS = ["#888", "#6b9ece", "#7dab8e", "#c48d6e", "#a68bbd"];
 
 function getReminders() {
   try {
@@ -153,15 +151,11 @@ function saveReminders(list) {
 function buildReminderBoardHTML() {
   const reminders = getReminders();
   const notesHTML = reminders.map((r) => {
-    return `<div class="sticky-note" data-id="${escapeHTML(r.id)}" style="--chip-accent: ${r.color};">
+    return `<div class="sticky-note" data-id="${escapeHTML(r.id)}">
       <span class="sticky-text">${escapeHTML(r.text)}</span>
       <button class="sticky-delete" title="削除">&times;</button>
     </div>`;
   }).join("");
-
-  const colorBtns = STICKY_COLORS.map((c, i) =>
-    `<button class="sticky-color-btn${i === 0 ? " selected" : ""}" data-color="${c}" style="background:${c};" title="色を選択"></button>`
-  ).join("");
 
   return `
     <div class="card reminder-board-card" id="card-reminder-board">
@@ -174,7 +168,6 @@ function buildReminderBoardHTML() {
           <input type="text" id="sticky-input" class="sticky-input" placeholder="意識することを追加..." maxlength="100" />
           <button class="btn btn-primary btn-sm" id="btn-add-sticky">追加</button>
         </div>
-        <div class="sticky-colors" id="sticky-colors">${colorBtns}</div>
       </div>
     </div>`;
 }
@@ -184,24 +177,12 @@ function attachReminderEvents() {
   const input = document.getElementById("sticky-input");
   if (!addBtn || !input) return;
 
-  let selectedColor = STICKY_COLORS[0];
-
-  // 色選択
-  const colorBtns = document.querySelectorAll(".sticky-color-btn");
-  colorBtns.forEach((btn) => {
-    btn.addEventListener("click", () => {
-      colorBtns.forEach((b) => b.classList.remove("selected"));
-      btn.classList.add("selected");
-      selectedColor = btn.dataset.color;
-    });
-  });
-
   // 追加
   function addSticky() {
     const text = input.value.trim();
     if (!text) return;
     const reminders = getReminders();
-    reminders.push({ id: Date.now().toString(36), text, color: selectedColor });
+    reminders.push({ id: Date.now().toString(36), text });
     saveReminders(reminders);
     refreshStickyNotes();
     input.value = "";
@@ -238,7 +219,7 @@ function refreshStickyNotes() {
     return;
   }
   container.innerHTML = reminders.map((r) => {
-    return `<div class="sticky-note" data-id="${escapeHTML(r.id)}" style="--chip-accent: ${r.color};">
+    return `<div class="sticky-note" data-id="${escapeHTML(r.id)}">
       <span class="sticky-text">${escapeHTML(r.text)}</span>
       <button class="sticky-delete" title="削除">&times;</button>
     </div>`;
