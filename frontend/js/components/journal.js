@@ -3,8 +3,8 @@
  * 自由記述の日記 + AI自動分析（感情タグ、ブロッカー検出、トレンド）
  */
 
-import { journalApi } from "../api.js?v=20260306b";
-import { showToast } from "../app.js?v=20260306b";
+import { journalApi, diaryDialogueApi } from "../api.js?v=20260306i";
+import { showToast } from "../app.js?v=20260306i";
 
 // ===== ユーティリティ =====
 
@@ -44,6 +44,13 @@ function getWeekId(dateStr) {
   return `${d.getFullYear()}-W${String(weekNum).padStart(2, "0")}`;
 }
 
+/** HTML エスケープ */
+function escapeHTML(str) {
+  const div = document.createElement("div");
+  div.appendChild(document.createTextNode(str));
+  return div.innerHTML;
+}
+
 /** 感情の正負を判定 */
 function emotionValence(tag) {
   const positive = ["充実感", "やる気", "達成感", "感謝", "楽しさ", "安心", "集中"];
@@ -75,21 +82,24 @@ export async function renderJournal(date) {
     </div>`;
 
   // 並列でデータ取得
-  const [journalResult, recentResult] = await Promise.allSettled([
+  const [journalResult, recentResult, diaryDialogueResult] = await Promise.allSettled([
     journalApi.get(date),
     journalApi.list(getMonthStart(date), date),
+    diaryDialogueApi.get(date),
   ]);
 
   const journal = journalResult.status === "fulfilled" ? journalResult.value : null;
   const recentEntries = recentResult.status === "fulfilled" ? recentResult.value : [];
+  const diaryDialogue = diaryDialogueResult.status === "fulfilled" ? diaryDialogueResult.value : null;
 
   // 月間ブロッカー集計
   const monthlyBlockers = aggregateBlockers(recentEntries);
   // 直近7日のエントリ（トレンド用）
   const last7 = recentEntries.filter((e) => e.is_analyzed).slice(0, 7).reverse();
 
-  main.innerHTML = buildJournalHTML(date, journal, last7, monthlyBlockers, recentEntries);
+  main.innerHTML = buildJournalHTML(date, journal, last7, monthlyBlockers, recentEntries, diaryDialogue);
   attachJournalEvents(date, journal);
+  attachDiaryDialogueEvents(date);
 }
 
 /** 月初日を返す */
@@ -126,13 +136,18 @@ function modeSeverity(arr) {
 
 // ===== HTML ビルダー =====
 
-function buildJournalHTML(date, journal, last7, monthlyBlockers, recentEntries) {
+function buildJournalHTML(date, journal, last7, monthlyBlockers, recentEntries, diaryDialogue) {
   const dateJP = formatDateJP(date);
   const isToday = date === today();
   const isFuture = date > today();
   const content = journal?.content || "";
   const analysis = journal?.ai_analysis;
   const isAnalyzed = journal?.is_analyzed;
+
+  // 入力モード判定
+  const savedMode = localStorage.getItem("journal-input-mode") || "free";
+  const hasDiaryInProgress = diaryDialogue && diaryDialogue.status === "in_progress";
+  const activeMode = hasDiaryInProgress ? "socratic" : savedMode;
 
   return `
     <div class="journal-page">
@@ -151,22 +166,31 @@ function buildJournalHTML(date, journal, last7, monthlyBlockers, recentEntries) 
       <!-- 書き込みエリア -->
       <div class="card">
         <div class="card-title">今日の気持ち・出来事</div>
-        <textarea
-          class="journal-textarea"
-          id="journal-content"
-          placeholder="今日感じたこと、起きたこと、タスクが進まない理由など、自由に書いてください..."
-          ${isFuture ? "disabled" : ""}
-        >${content}</textarea>
-        <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
-          <button class="btn btn-primary" id="journal-save" ${isFuture ? "disabled" : ""}>
-            ${journal ? "更新する" : "保存する"}
-          </button>
-          <button class="btn btn-secondary" id="journal-analyze" ${isFuture ? "disabled" : ""}>
-            ${isAnalyzed ? "再分析する" : "分析・アドバイス"}
-          </button>
-          ${journal ? `
-            <button class="btn btn-ghost btn-sm" id="journal-delete" style="margin-left:auto;color:var(--neon-red)">削除</button>
-          ` : ""}
+        <div class="diary-mode-toggle">
+          <button class="diary-mode-btn ${activeMode === "free" ? "active" : ""}" data-mode="free">フリー入力</button>
+          <button class="diary-mode-btn ${activeMode === "socratic" ? "active" : ""}" data-mode="socratic">問答で記録</button>
+        </div>
+        <div id="journal-free-mode" style="${activeMode === "free" ? "" : "display:none"}">
+          <textarea
+            class="journal-textarea"
+            id="journal-content"
+            placeholder="今日感じたこと、起きたこと、タスクが進まない理由など、自由に書いてください..."
+            ${isFuture ? "disabled" : ""}
+          >${content}</textarea>
+          <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+            <button class="btn btn-primary" id="journal-save" ${isFuture ? "disabled" : ""}>
+              ${journal ? "更新する" : "保存する"}
+            </button>
+            <button class="btn btn-secondary" id="journal-analyze" ${isFuture ? "disabled" : ""}>
+              ${isAnalyzed ? "再分析する" : "分析・アドバイス"}
+            </button>
+            ${journal ? `
+              <button class="btn btn-ghost btn-sm" id="journal-delete" style="margin-left:auto;color:var(--neon-red)">削除</button>
+            ` : ""}
+          </div>
+        </div>
+        <div id="journal-socratic-mode" style="${activeMode === "socratic" ? "" : "display:none"}">
+          ${buildDiaryDialogueHTML(diaryDialogue)}
         </div>
       </div>
 
@@ -177,6 +201,222 @@ function buildJournalHTML(date, journal, last7, monthlyBlockers, recentEntries) 
       ${buildRecentList(recentEntries, date)}
     </div>
   `;
+}
+
+// ===== 日記入力対話 HTML =====
+
+function buildDiaryDialogueHTML(diaryDialogue) {
+  if (diaryDialogue && diaryDialogue.status === "completed") {
+    const messages = diaryDialogue.messages || [];
+    return `
+      <div class="diary-dialogue-completed">
+        <p class="diary-dialogue-done-msg">問答から日記テキストを生成しました。フリー入力に反映済みです。</p>
+        <button class="btn btn-outline btn-sm" id="btn-diary-dialogue-toggle">対話を見る</button>
+        <div class="morning-dialogue-history" id="diary-dialogue-history" style="display:none; margin-top: 12px;">
+          ${messages.map((m) => `
+            <div class="dialogue-bubble ${m.role === "ai" ? "dialogue-bubble-ai" : "dialogue-bubble-user"}">
+              <div class="dialogue-bubble-label">${m.role === "ai" ? "AI" : "あなた"}</div>
+              <div class="dialogue-bubble-content">${escapeHTML(m.content)}</div>
+            </div>
+          `).join("")}
+        </div>
+        <button class="btn btn-outline btn-sm btn-danger" id="btn-diary-dialogue-reset" style="margin-top: 8px;">
+          対話をリセット
+        </button>
+      </div>`;
+  }
+
+  if (diaryDialogue && diaryDialogue.status === "in_progress") {
+    const messages = diaryDialogue.messages || [];
+    const turnCount = diaryDialogue.turn_count || 0;
+    const maxTurns = diaryDialogue.max_turns || 5;
+    const isMaxed = turnCount >= maxTurns;
+
+    return `
+      <div id="diary-dialogue-chat">
+        <div class="dialogue-header">
+          <span>ターン ${turnCount}/${maxTurns}</span>
+          <div class="dialogue-progress">
+            <div class="dialogue-progress-bar" style="width: ${(turnCount / maxTurns) * 100}%"></div>
+          </div>
+        </div>
+        <div class="dialogue-messages" id="diary-dialogue-messages">
+          ${messages.map((m) => `
+            <div class="dialogue-bubble ${m.role === "ai" ? "dialogue-bubble-ai" : "dialogue-bubble-user"}">
+              <div class="dialogue-bubble-label">${m.role === "ai" ? "AI" : "あなた"}</div>
+              <div class="dialogue-bubble-content">${escapeHTML(m.content)}</div>
+            </div>
+          `).join("")}
+        </div>
+        ${!isMaxed ? `
+        <div class="dialogue-input-area">
+          <textarea id="diary-dialogue-input" rows="2" placeholder="回答を入力..."></textarea>
+          <button class="btn btn-primary btn-sm" id="btn-diary-dialogue-send">送信</button>
+        </div>` : `
+        <div class="dialogue-maxed-notice">
+          <p>ターン上限に達しました。日記をまとめましょう。</p>
+        </div>`}
+        <div class="dialogue-actions" style="margin-top: 8px;">
+          ${turnCount >= 1 ? `
+          <button class="btn btn-primary btn-sm" id="btn-diary-dialogue-synthesize">
+            日記をまとめる
+          </button>` : ""}
+          <button class="btn btn-outline btn-sm btn-danger" id="btn-diary-dialogue-cancel">
+            キャンセル
+          </button>
+        </div>
+      </div>`;
+  }
+
+  return `
+    <div id="diary-dialogue-start">
+      <p style="color:var(--text-secondary);font-size:0.9rem;line-height:1.7;margin-bottom:14px">
+        AIの質問に答えるだけで、今日の出来事や気持ちが日記になります。
+      </p>
+      <button class="btn btn-primary" id="btn-start-diary-dialogue" style="width: 100%;">
+        問答を始める
+      </button>
+    </div>`;
+}
+
+// ===== 日記入力対話イベント =====
+
+function attachDiaryDialogueEvents(date) {
+  // モード切り替え
+  const modeButtons = document.querySelectorAll(".diary-mode-btn");
+  for (const btn of modeButtons) {
+    btn.addEventListener("click", () => {
+      const mode = btn.dataset.mode;
+      localStorage.setItem("journal-input-mode", mode);
+      for (const b of modeButtons) b.classList.toggle("active", b.dataset.mode === mode);
+      const freeArea = document.getElementById("journal-free-mode");
+      const socraticArea = document.getElementById("journal-socratic-mode");
+      if (freeArea) freeArea.style.display = mode === "free" ? "" : "none";
+      if (socraticArea) socraticArea.style.display = mode === "socratic" ? "" : "none";
+    });
+  }
+
+  // 開始
+  const btnStart = document.getElementById("btn-start-diary-dialogue");
+  if (btnStart) {
+    btnStart.addEventListener("click", async () => {
+      btnStart.disabled = true;
+      btnStart.textContent = "準備中...";
+      try {
+        await diaryDialogueApi.start(date);
+        await renderJournal(date);
+      } catch (err) {
+        showToast("問答の開始に失敗しました: " + err.message, "error");
+        btnStart.disabled = false;
+        btnStart.textContent = "問答を始める";
+      }
+    });
+  }
+
+  // 送信
+  const btnSend = document.getElementById("btn-diary-dialogue-send");
+  if (btnSend) {
+    const input = document.getElementById("diary-dialogue-input");
+
+    async function sendReply() {
+      const message = input.value.trim();
+      if (!message) return;
+      btnSend.disabled = true;
+      btnSend.textContent = "...";
+      input.disabled = true;
+      try {
+        await diaryDialogueApi.reply(date, message);
+        await renderJournal(date);
+      } catch (err) {
+        showToast("送信に失敗しました: " + err.message, "error");
+        btnSend.disabled = false;
+        btnSend.textContent = "送信";
+        input.disabled = false;
+      }
+    }
+
+    btnSend.addEventListener("click", sendReply);
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendReply(); }
+    });
+
+    const messagesEl = document.getElementById("diary-dialogue-messages");
+    if (messagesEl) messagesEl.scrollTop = messagesEl.scrollHeight;
+    input.focus();
+  }
+
+  // まとめる
+  const btnSynthesize = document.getElementById("btn-diary-dialogue-synthesize");
+  if (btnSynthesize) {
+    btnSynthesize.addEventListener("click", async () => {
+      btnSynthesize.disabled = true;
+      btnSynthesize.textContent = "まとめ中...";
+      try {
+        const result = await diaryDialogueApi.synthesize(date);
+        const text = result.raw_input || "";
+
+        // フリー入力モードに切り替え、テキストを反映
+        localStorage.setItem("journal-input-mode", "free");
+        await renderJournal(date);
+        // テキストエリアに反映
+        const textarea = document.getElementById("journal-content");
+        if (textarea && text) {
+          const existing = textarea.value.trim();
+          textarea.value = existing ? existing + "\n\n" + text : text;
+        }
+        showToast("日記テキストを生成しました！", "success");
+      } catch (err) {
+        showToast("まとめに失敗しました: " + err.message, "error");
+        btnSynthesize.disabled = false;
+        btnSynthesize.textContent = "日記をまとめる";
+      }
+    });
+  }
+
+  // キャンセル
+  const btnCancel = document.getElementById("btn-diary-dialogue-cancel");
+  if (btnCancel) {
+    btnCancel.addEventListener("click", async () => {
+      btnCancel.disabled = true;
+      try {
+        await diaryDialogueApi.delete(date);
+        showToast("問答をキャンセルしました", "info");
+        await renderJournal(date);
+      } catch (err) {
+        showToast("キャンセルに失敗しました: " + err.message, "error");
+        btnCancel.disabled = false;
+      }
+    });
+  }
+
+  // 完了済み対話トグル
+  const btnToggle = document.getElementById("btn-diary-dialogue-toggle");
+  if (btnToggle) {
+    btnToggle.addEventListener("click", () => {
+      const history = document.getElementById("diary-dialogue-history");
+      if (history) {
+        const isHidden = history.style.display === "none";
+        history.style.display = isHidden ? "" : "none";
+        btnToggle.textContent = isHidden ? "対話を閉じる" : "対話を見る";
+      }
+    });
+  }
+
+  // リセット
+  const btnReset = document.getElementById("btn-diary-dialogue-reset");
+  if (btnReset) {
+    btnReset.addEventListener("click", async () => {
+      btnReset.disabled = true;
+      try {
+        await diaryDialogueApi.delete(date);
+        showToast("対話をリセットしました", "info");
+        await renderJournal(date);
+      } catch (err) {
+        showToast("リセットに失敗しました: " + err.message, "error");
+        btnReset.disabled = false;
+      }
+    });
+  }
 }
 
 function buildAnalysisSection(a) {

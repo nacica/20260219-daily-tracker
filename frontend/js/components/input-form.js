@@ -5,8 +5,8 @@
  * 朝のタスク整理（ソクラテス式問答）統合
  */
 
-import { recordsApi, analysisApi, morningDialogueApi, diaryDialogueApi } from "../api.js?v=20260306h";
-import { showToast } from "../app.js?v=20260306h";
+import { recordsApi, analysisApi, morningDialogueApi } from "../api.js?v=20260306i";
+import { showToast } from "../app.js?v=20260306i";
 
 /* ── カテゴリ管理 ── */
 
@@ -111,28 +111,24 @@ export async function renderInputForm(date) {
   const main = document.querySelector("main");
   main.innerHTML = `<div class="loading"><div class="spinner"></div><p>読み込み中...</p></div>`;
 
-  // 既存レコード・朝問答・日記対話を並行取得
+  // 既存レコードと朝問答を並行取得
   let existingRecord = null;
   let morningDialogue = null;
-  let diaryDialogue = null;
 
-  const [recordResult, morningResult, diaryResult] = await Promise.allSettled([
+  const [recordResult, morningResult] = await Promise.allSettled([
     recordsApi.get(date),
     morningDialogueApi.get(date),
-    diaryDialogueApi.get(date),
   ]);
 
   if (recordResult.status === "fulfilled") existingRecord = recordResult.value;
   if (morningResult.status === "fulfilled") morningDialogue = morningResult.value;
-  if (diaryResult.status === "fulfilled") diaryDialogue = diaryResult.value;
 
   const isEdit = !!existingRecord;
   const tasks = existingRecord?.tasks || { planned: [], completed: [], backlog: [] };
 
-  main.innerHTML = buildFormHTML(date, existingRecord, tasks, isEdit, morningDialogue, diaryDialogue);
+  main.innerHTML = buildFormHTML(date, existingRecord, tasks, isEdit, morningDialogue);
   attachFormEvents(date, isEdit);
   attachMorningDialogueEvents(date, morningDialogue);
-  attachDiaryDialogueEvents(date, diaryDialogue);
   attachReminderEvents();
 }
 
@@ -322,229 +318,9 @@ function buildMorningDialogueHTML(morningDialogue) {
     </div>`;
 }
 
-/* ── 日記入力対話 HTML 生成 ── */
-
-function buildDiaryDialogueHTML(diaryDialogue) {
-  // 完了済み: 結果表示
-  if (diaryDialogue && diaryDialogue.status === "completed") {
-    const messages = diaryDialogue.messages || [];
-    return `
-      <div class="diary-dialogue-completed">
-        <p class="diary-dialogue-done-msg">問答から行動ログを生成しました。</p>
-        <button class="btn btn-outline btn-sm" id="btn-diary-dialogue-toggle">対話を見る</button>
-        <div class="morning-dialogue-history" id="diary-dialogue-history" style="display:none; margin-top: 12px;">
-          ${messages.map((m) => `
-            <div class="dialogue-bubble ${m.role === "ai" ? "dialogue-bubble-ai" : "dialogue-bubble-user"}">
-              <div class="dialogue-bubble-label">${m.role === "ai" ? "AI" : "あなた"}</div>
-              <div class="dialogue-bubble-content">${escapeHTML(m.content)}</div>
-            </div>
-          `).join("")}
-        </div>
-        <button class="btn btn-outline btn-sm btn-danger" id="btn-diary-dialogue-reset" style="margin-top: 8px;">
-          対話をリセット
-        </button>
-      </div>`;
-  }
-
-  // 進行中: 対話UIを表示
-  if (diaryDialogue && diaryDialogue.status === "in_progress") {
-    const messages = diaryDialogue.messages || [];
-    const turnCount = diaryDialogue.turn_count || 0;
-    const maxTurns = diaryDialogue.max_turns || 5;
-    const isMaxed = turnCount >= maxTurns;
-
-    return `
-      <div id="diary-dialogue-chat">
-        <div class="dialogue-header">
-          <span>ターン ${turnCount}/${maxTurns}</span>
-          <div class="dialogue-progress">
-            <div class="dialogue-progress-bar" style="width: ${(turnCount / maxTurns) * 100}%"></div>
-          </div>
-        </div>
-        <div class="dialogue-messages" id="diary-dialogue-messages">
-          ${messages.map((m) => `
-            <div class="dialogue-bubble ${m.role === "ai" ? "dialogue-bubble-ai" : "dialogue-bubble-user"}">
-              <div class="dialogue-bubble-label">${m.role === "ai" ? "AI" : "あなた"}</div>
-              <div class="dialogue-bubble-content">${escapeHTML(m.content)}</div>
-            </div>
-          `).join("")}
-        </div>
-        ${!isMaxed ? `
-        <div class="dialogue-input-area">
-          <textarea id="diary-dialogue-input" rows="2" placeholder="回答を入力..."></textarea>
-          <button class="btn btn-primary btn-sm" id="btn-diary-dialogue-send">送信</button>
-        </div>` : `
-        <div class="dialogue-maxed-notice">
-          <p>ターン上限に達しました。記録をまとめましょう。</p>
-        </div>`}
-        <div class="dialogue-actions" style="margin-top: 8px;">
-          ${turnCount >= 1 ? `
-          <button class="btn btn-primary btn-sm" id="btn-diary-dialogue-synthesize">
-            記録をまとめる
-          </button>` : ""}
-          <button class="btn btn-outline btn-sm btn-danger" id="btn-diary-dialogue-cancel">
-            キャンセル
-          </button>
-        </div>
-      </div>`;
-  }
-
-  // 未開始: 開始ボタン
-  return `
-    <div id="diary-dialogue-start">
-      <p class="morning-description">
-        AIの質問に答えるだけで、一日の行動ログが自動で作成されます。
-      </p>
-      <button class="btn btn-primary" id="btn-start-diary-dialogue" style="width: 100%;">
-        問答を始める
-      </button>
-    </div>`;
-}
-
-/* ── 日記入力対話イベント ── */
-
-function attachDiaryDialogueEvents(date, diaryDialogue) {
-  // モード切り替えボタン
-  const modeButtons = document.querySelectorAll(".diary-mode-btn");
-  for (const btn of modeButtons) {
-    btn.addEventListener("click", () => {
-      const mode = btn.dataset.mode;
-      localStorage.setItem("diary-input-mode", mode);
-      for (const b of modeButtons) b.classList.toggle("active", b.dataset.mode === mode);
-      const freeArea = document.getElementById("diary-free-mode");
-      const socraticArea = document.getElementById("diary-socratic-mode");
-      if (freeArea) freeArea.style.display = mode === "free" ? "" : "none";
-      if (socraticArea) socraticArea.style.display = mode === "socratic" ? "" : "none";
-    });
-  }
-
-  // 開始ボタン
-  const btnStart = document.getElementById("btn-start-diary-dialogue");
-  if (btnStart) {
-    btnStart.addEventListener("click", async () => {
-      btnStart.disabled = true;
-      btnStart.textContent = "準備中...";
-      try {
-        await diaryDialogueApi.start(date);
-        await renderInputForm(date);
-      } catch (err) {
-        showToast("日記対話の開始に失敗しました: " + err.message, "error");
-        btnStart.disabled = false;
-        btnStart.textContent = "問答を始める";
-      }
-    });
-  }
-
-  // 送信ボタン
-  const btnSend = document.getElementById("btn-diary-dialogue-send");
-  if (btnSend) {
-    const input = document.getElementById("diary-dialogue-input");
-
-    async function sendReply() {
-      const message = input.value.trim();
-      if (!message) return;
-
-      btnSend.disabled = true;
-      btnSend.textContent = "...";
-      input.disabled = true;
-
-      try {
-        await diaryDialogueApi.reply(date, message);
-        await renderInputForm(date);
-      } catch (err) {
-        showToast("送信に失敗しました: " + err.message, "error");
-        btnSend.disabled = false;
-        btnSend.textContent = "送信";
-        input.disabled = false;
-      }
-    }
-
-    btnSend.addEventListener("click", sendReply);
-    input.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" && !e.shiftKey) {
-        e.preventDefault();
-        sendReply();
-      }
-    });
-
-    // メッセージを最下部にスクロール
-    const messagesEl = document.getElementById("diary-dialogue-messages");
-    if (messagesEl) {
-      messagesEl.scrollTop = messagesEl.scrollHeight;
-    }
-    input.focus();
-  }
-
-  // 記録をまとめるボタン
-  const btnSynthesize = document.getElementById("btn-diary-dialogue-synthesize");
-  if (btnSynthesize) {
-    btnSynthesize.addEventListener("click", async () => {
-      btnSynthesize.disabled = true;
-      btnSynthesize.textContent = "まとめ中...";
-      try {
-        await diaryDialogueApi.synthesize(date);
-
-        showToast("行動ログを生成しました！", "success");
-        // フリー入力モードに切り替え、生成テキストを反映して再レンダリング
-        localStorage.setItem("diary-input-mode", "free");
-        await renderInputForm(date);
-      } catch (err) {
-        showToast("記録のまとめに失敗しました: " + err.message, "error");
-        btnSynthesize.disabled = false;
-        btnSynthesize.textContent = "記録をまとめる";
-      }
-    });
-  }
-
-  // キャンセルボタン
-  const btnCancel = document.getElementById("btn-diary-dialogue-cancel");
-  if (btnCancel) {
-    btnCancel.addEventListener("click", async () => {
-      btnCancel.disabled = true;
-      try {
-        await diaryDialogueApi.delete(date);
-        showToast("日記対話をキャンセルしました", "info");
-        await renderInputForm(date);
-      } catch (err) {
-        showToast("キャンセルに失敗しました: " + err.message, "error");
-        btnCancel.disabled = false;
-      }
-    });
-  }
-
-  // 対話履歴トグルボタン（完了済み）
-  const btnToggle = document.getElementById("btn-diary-dialogue-toggle");
-  if (btnToggle) {
-    btnToggle.addEventListener("click", () => {
-      const history = document.getElementById("diary-dialogue-history");
-      if (history) {
-        const isHidden = history.style.display === "none";
-        history.style.display = isHidden ? "" : "none";
-        btnToggle.textContent = isHidden ? "対話を閉じる" : "対話を見る";
-      }
-    });
-  }
-
-  // リセットボタン（完了済み対話を削除して再開可能に）
-  const btnReset = document.getElementById("btn-diary-dialogue-reset");
-  if (btnReset) {
-    btnReset.addEventListener("click", async () => {
-      btnReset.disabled = true;
-      try {
-        await diaryDialogueApi.delete(date);
-        showToast("対話をリセットしました", "info");
-        await renderInputForm(date);
-      } catch (err) {
-        showToast("リセットに失敗しました: " + err.message, "error");
-        btnReset.disabled = false;
-      }
-    });
-  }
-}
-
 /* ── HTML 生成 ── */
 
-function buildFormHTML(date, record, tasks, isEdit, morningDialogue, diaryDialogue) {
+function buildFormHTML(date, record, tasks, isEdit, morningDialogue) {
   const dateLabel = new Date(date + "T00:00:00").toLocaleDateString("ja-JP", {
     year: "numeric", month: "long", day: "numeric", weekday: "long",
   });
@@ -556,32 +332,18 @@ function buildFormHTML(date, record, tasks, isEdit, morningDialogue, diaryDialog
   const hasCompleted = completedTasks.length > 0;
   const incompleteTasks = plannedTasks.filter((t) => !completedTasks.includes(t));
 
-  // 入力モード判定: 進行中の日記対話があれば問答モード
-  const savedMode = localStorage.getItem("diary-input-mode") || "free";
-  const hasDiaryInProgress = diaryDialogue && diaryDialogue.status === "in_progress";
-  const activeMode = hasDiaryInProgress ? "socratic" : savedMode;
-
   // 各カードの HTML をマップで管理
   const cards = {
     "card-activity-log": `
       <div class="card draggable-card" id="card-activity-log" draggable="false">
         <div class="card-drag-handle" title="ドラッグで移動">⠿</div>
         <div class="card-title">行動ログ</div>
-        <div class="diary-mode-toggle">
-          <button class="diary-mode-btn ${activeMode === "free" ? "active" : ""}" data-mode="free">フリー入力</button>
-          <button class="diary-mode-btn ${activeMode === "socratic" ? "active" : ""}" data-mode="socratic">問答で記録</button>
-        </div>
-        <div id="diary-free-mode" style="${activeMode === "free" ? "" : "display:none"}">
-          <div class="form-group">
-            <label for="raw-input">今日の行動を自由に入力してください</label>
-            <textarea
-              id="raw-input"
-              placeholder="8:00 起床&#10;8:30 朝食&#10;9:00-12:00 仕事（企画書作成）&#10;12:00 昼食&#10;13:00-14:30 YouTube視聴&#10;15:00-18:00 コードレビュー&#10;19:00 夕食&#10;20:00-22:00 読書&#10;23:00 就寝"
-            >${rawInput}</textarea>
-          </div>
-        </div>
-        <div id="diary-socratic-mode" style="${activeMode === "socratic" ? "" : "display:none"}">
-          ${buildDiaryDialogueHTML(diaryDialogue)}
+        <div class="form-group">
+          <label for="raw-input">今日の行動を自由に入力してください</label>
+          <textarea
+            id="raw-input"
+            placeholder="8:00 起床&#10;8:30 朝食&#10;9:00-12:00 仕事（企画書作成）&#10;12:00 昼食&#10;13:00-14:30 YouTube視聴&#10;15:00-18:00 コードレビュー&#10;19:00 夕食&#10;20:00-22:00 読書&#10;23:00 就寝"
+          >${rawInput}</textarea>
         </div>
       </div>`,
 

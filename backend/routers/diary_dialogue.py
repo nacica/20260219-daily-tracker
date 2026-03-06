@@ -122,8 +122,8 @@ async def reply_diary_dialogue(date: str, body: DialogueReplyRequest):
 @router.post("/diary-dialogue/{date}/synthesize")
 async def synthesize_diary_dialogue(date: str):
     """
-    対話から行動ログテキストを生成し、daily_records に保存する。
-    既存レコードがあれば raw_input を更新、なければ新規作成。
+    対話から日記テキストを生成する。
+    テキストはレスポンスで返し、フロントエンドが日記テキストエリアに反映する。
     """
     try:
         dialogue = firestore_service.get_diary_dialogue(date)
@@ -134,7 +134,7 @@ async def synthesize_diary_dialogue(date: str):
 
         messages = dialogue.get("messages", [])
 
-        # 行動ログテキストを生成
+        # 日記テキストを生成
         try:
             result = claude_service.generate_diary_synthesis(
                 date=date,
@@ -145,34 +145,10 @@ async def synthesize_diary_dialogue(date: str):
 
         raw_input = result.get("raw_input", "")
         if not raw_input:
-            raise HTTPException(status_code=500, detail="行動ログの生成に失敗しました。")
-
-        # daily_records に保存
-        now = now_jst()
-        existing_record = firestore_service.get_record(date)
-        if existing_record:
-            firestore_service.update_record(date, {
-                "raw_input": raw_input,
-                "updated_at": now,
-            })
-        else:
-            record_doc = {
-                "id": date,
-                "date": date,
-                "raw_input": raw_input,
-                "parsed_activities": [],
-                "tasks": {
-                    "planned": [],
-                    "completed": [],
-                    "backlog": [],
-                    "completion_rate": 0.0,
-                },
-                "created_at": now,
-                "updated_at": now,
-            }
-            firestore_service.create_record(date, record_doc)
+            raise HTTPException(status_code=500, detail="日記テキストの生成に失敗しました。")
 
         # 対話を completed に更新
+        now = now_jst()
         dialogue["status"] = "completed"
         dialogue["updated_at"] = now
         dialogue["raw_input"] = raw_input
