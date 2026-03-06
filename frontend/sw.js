@@ -5,7 +5,7 @@
  *   - API リクエスト: Network First（オフライン時はキャッシュ）
  */
 
-const CACHE_NAME = "daily-tracker-v53";
+const CACHE_NAME = "daily-tracker-v54";
 const STATIC_ASSETS = [
   "/",
   "/index.html",

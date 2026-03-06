@@ -3,8 +3,8 @@
  * 自由記述の日記 + AI自動分析（感情タグ、ブロッカー検出、トレンド）
  */
 
-import { journalApi, diaryDialogueApi } from "../api.js?v=20260306i";
-import { showToast } from "../app.js?v=20260306i";
+import { journalApi, diaryDialogueApi } from "../api.js?v=20260306j";
+import { showToast } from "../app.js?v=20260306j";
 
 // ===== ユーティリティ =====
 
@@ -165,7 +165,7 @@ function buildJournalHTML(date, journal, last7, monthlyBlockers, recentEntries, 
 
       <!-- 書き込みエリア -->
       <div class="card">
-        <div class="card-title">今日の気持ち・出来事</div>
+        <div class="card-title">最近の気持ち・出来事</div>
         <div class="diary-mode-toggle">
           <button class="diary-mode-btn ${activeMode === "free" ? "active" : ""}" data-mode="free">フリー入力</button>
           <button class="diary-mode-btn ${activeMode === "socratic" ? "active" : ""}" data-mode="socratic">問答で記録</button>
@@ -174,7 +174,7 @@ function buildJournalHTML(date, journal, last7, monthlyBlockers, recentEntries, 
           <textarea
             class="journal-textarea"
             id="journal-content"
-            placeholder="今日感じたこと、起きたこと、タスクが進まない理由など、自由に書いてください..."
+            placeholder="最近感じたこと、起きたこと、考えていることなど、自由に書いてください..."
             ${isFuture ? "disabled" : ""}
           >${content}</textarea>
           <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
@@ -271,7 +271,7 @@ function buildDiaryDialogueHTML(diaryDialogue) {
   return `
     <div id="diary-dialogue-start">
       <p style="color:var(--text-secondary);font-size:0.9rem;line-height:1.7;margin-bottom:14px">
-        AIの質問に答えるだけで、今日の出来事や気持ちが日記になります。
+        AIの質問に答えるだけで、最近の出来事や気持ちが日記になります。
       </p>
       <button class="btn btn-primary" id="btn-start-diary-dialogue" style="width: 100%;">
         問答を始める
