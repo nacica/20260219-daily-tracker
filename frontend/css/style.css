@@ -1942,6 +1942,13 @@ textarea {
   gap: 8px;
 }
 
+.sticky-add-row .btn {
+  width: 50px;
+  min-width: 50px;
+  padding-left: 0;
+  padding-right: 0;
+}
+
 .sticky-input {
   flex: 1;
   padding: 8px 12px;
