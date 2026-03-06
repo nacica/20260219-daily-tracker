@@ -5,8 +5,8 @@
  * 朝のタスク整理（ソクラテス式問答）統合
  */
 
-import { recordsApi, analysisApi, morningDialogueApi } from "../api.js?v=20260306d";
-import { showToast } from "../app.js?v=20260306d";
+import { recordsApi, analysisApi, morningDialogueApi } from "../api.js?v=20260306e";
+import { showToast } from "../app.js?v=20260306e";
 
 /* ── カテゴリ管理 ── */
 
@@ -135,7 +135,14 @@ export async function renderInputForm(date) {
 /* ── 付箋リマインダー ── */
 
 const REMINDER_STORAGE_KEY = "daily-reminders";
-const STICKY_COLORS = ["#fff59d", "#f48fb1", "#a5d6a7", "#90caf9", "#ffcc80"];
+const STICKY_COLORS = ["#e8dff5", "#fce4ec", "#e0f2e9", "#e3f2fd", "#fff8e1"];
+const TAPE_COLORS = {
+  "#e8dff5": "rgba(180,160,220,0.45)",
+  "#fce4ec": "rgba(240,150,170,0.40)",
+  "#e0f2e9": "rgba(130,200,160,0.40)",
+  "#e3f2fd": "rgba(130,180,230,0.40)",
+  "#fff8e1": "rgba(230,200,100,0.40)",
+};
 
 function getReminders() {
   try {
@@ -148,18 +155,12 @@ function saveReminders(list) {
   localStorage.setItem(REMINDER_STORAGE_KEY, JSON.stringify(list));
 }
 
-function stickyRotation(id) {
-  // id から決定的に回転角を生成（-2〜2度）
-  let h = 0;
-  for (let i = 0; i < id.length; i++) h = ((h << 5) - h + id.charCodeAt(i)) | 0;
-  return ((h % 5) - 2);
-}
 
 function buildReminderBoardHTML() {
   const reminders = getReminders();
   const notesHTML = reminders.map((r) => {
-    const deg = stickyRotation(r.id);
-    return `<div class="sticky-note" data-id="${escapeHTML(r.id)}" style="background:${r.color}; transform:rotate(${deg}deg);">
+    const tape = TAPE_COLORS[r.color] || "rgba(180,160,220,0.45)";
+    return `<div class="sticky-note" data-id="${escapeHTML(r.id)}" style="border-left: 4px solid ${tape}; --tape-color: ${tape};">
       <span class="sticky-text">${escapeHTML(r.text)}</span>
       <button class="sticky-delete" title="削除">&times;</button>
     </div>`;
@@ -244,8 +245,8 @@ function refreshStickyNotes() {
     return;
   }
   container.innerHTML = reminders.map((r) => {
-    const deg = stickyRotation(r.id);
-    return `<div class="sticky-note" data-id="${escapeHTML(r.id)}" style="background:${r.color}; transform:rotate(${deg}deg);">
+    const tape = TAPE_COLORS[r.color] || "rgba(180,160,220,0.45)";
+    return `<div class="sticky-note" data-id="${escapeHTML(r.id)}" style="border-left: 4px solid ${tape}; --tape-color: ${tape};">
       <span class="sticky-text">${escapeHTML(r.text)}</span>
       <button class="sticky-delete" title="削除">&times;</button>
     </div>`;
