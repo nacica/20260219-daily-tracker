@@ -33,6 +33,8 @@ class JournalAnalysis(BaseModel):
     insights: list[str] = []
     gratitude: list[str] = []
     summary: str = ""
+    advice: list[str] = []
+    encouragement: str = ""
 
 
 # ---- API リクエスト ----

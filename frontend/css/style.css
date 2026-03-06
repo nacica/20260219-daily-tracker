@@ -3482,6 +3482,13 @@ main.swipe-enter-right {
   background: rgba(0, 212, 255, 0.03);
 }
 
+/* 励ましカード */
+.journal-encouragement {
+  background: linear-gradient(135deg, rgba(0, 255, 148, 0.06), rgba(0, 212, 255, 0.06));
+  border: 1px solid rgba(0, 255, 148, 0.15);
+  color: var(--text-primary);
+}
+
 /* ライトテーマ */
 [data-theme="light"] .emotion-pill.positive {
   background: rgba(4, 120, 87, 0.08);

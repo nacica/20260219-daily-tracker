@@ -3,8 +3,8 @@
  * 自由記述の日記 + AI自動分析（感情タグ、ブロッカー検出、トレンド）
  */
 
-import { journalApi } from "../api.js?v=20260306a";
-import { showToast } from "../app.js?v=20260306a";
+import { journalApi } from "../api.js?v=20260306b";
+import { showToast } from "../app.js?v=20260306b";
 
 // ===== ユーティリティ =====
 
@@ -161,10 +161,10 @@ function buildJournalHTML(date, journal, last7, monthlyBlockers, recentEntries) 
           <button class="btn btn-primary" id="journal-save" ${isFuture ? "disabled" : ""}>
             ${journal ? "更新する" : "保存する"}
           </button>
+          <button class="btn btn-secondary" id="journal-analyze" ${isFuture ? "disabled" : ""}>
+            ${isAnalyzed ? "再分析する" : "分析・アドバイス"}
+          </button>
           ${journal ? `
-            <button class="btn btn-secondary" id="journal-analyze" ${!journal.content ? "disabled" : ""}>
-              ${isAnalyzed ? "再分析する" : "AI分析する"}
-            </button>
             <button class="btn btn-ghost btn-sm" id="journal-delete" style="margin-left:auto;color:var(--neon-red)">削除</button>
           ` : ""}
         </div>
@@ -184,6 +184,23 @@ function buildAnalysisSection(a) {
   const energyLabel = { high: "高い", medium: "普通", low: "低い" }[a.energy_level] || a.energy_level;
 
   return `
+    ${a.encouragement ? `
+      <!-- 励まし -->
+      <div class="card journal-encouragement">
+        <p style="font-size:0.95rem;line-height:1.7;margin:0">${a.encouragement}</p>
+      </div>
+    ` : ""}
+
+    ${(a.advice?.length) ? `
+      <!-- アドバイス -->
+      <div class="card">
+        <div class="card-title">アドバイス</div>
+        <ul class="analysis-list tip">
+          ${a.advice.map((adv) => `<li>${adv}</li>`).join("")}
+        </ul>
+      </div>
+    ` : ""}
+
     <!-- 感情分析 -->
     <div class="card">
       <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
@@ -384,20 +401,35 @@ function attachJournalEvents(date, journal) {
     }
   });
 
-  // AI分析
+  // AI分析（未保存の場合は先に保存してから分析）
   document.getElementById("journal-analyze")?.addEventListener("click", async () => {
+    const content = document.getElementById("journal-content")?.value?.trim();
+    if (!content) {
+      showToast("内容を入力してください", "error");
+      return;
+    }
+
     const btn = document.getElementById("journal-analyze");
     btn.disabled = true;
-    btn.textContent = "分析中...";
 
     try {
+      // 未保存 or 内容変更時は先に保存
+      if (!journal) {
+        btn.textContent = "保存中...";
+        await journalApi.create(date, content);
+      } else if (content !== journal.content) {
+        btn.textContent = "更新中...";
+        await journalApi.update(date, content);
+      }
+
+      btn.textContent = "分析中...";
       await journalApi.analyze(date);
-      showToast("AI分析が完了しました", "success");
+      showToast("分析が完了しました", "success");
       renderJournal(date);
     } catch (err) {
       showToast(err.message, "error");
       btn.disabled = false;
-      btn.textContent = "AI分析する";
+      btn.textContent = "分析・アドバイス";
     }
   });
 
