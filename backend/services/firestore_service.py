@@ -346,3 +346,72 @@ def save_coaching_summary(year_month: str, data: dict, user_id: str = DEFAULT_US
     """月次コーチングサマリーを保存"""
     _user_ref(user_id).collection("coaching_summaries").document(year_month).set(data)
     return data
+
+
+# ---- journal_entries ----
+
+def get_journal(date: str) -> Optional[dict]:
+    """指定日のジャーナルを取得"""
+    db = get_db()
+    doc = db.collection("journal_entries").document(date).get()
+    if doc.exists:
+        return doc.to_dict()
+    return None
+
+
+def list_journals(start_date: Optional[str] = None, end_date: Optional[str] = None) -> list[dict]:
+    """ジャーナル一覧を取得（日付範囲指定可能）"""
+    db = get_db()
+    query = db.collection("journal_entries").order_by("date", direction=firestore.Query.DESCENDING)
+
+    if start_date:
+        query = query.where(filter=FieldFilter("date", ">=", start_date))
+    if end_date:
+        query = query.where(filter=FieldFilter("date", "<=", end_date))
+
+    return [doc.to_dict() for doc in query.stream()]
+
+
+def create_journal(date: str, data: dict) -> dict:
+    """ジャーナルを作成"""
+    db = get_db()
+    db.collection("journal_entries").document(date).set(data)
+    return data
+
+
+def update_journal(date: str, data: dict) -> Optional[dict]:
+    """ジャーナルを更新"""
+    db = get_db()
+    ref = db.collection("journal_entries").document(date)
+    if not ref.get().exists:
+        return None
+    ref.update(data)
+    return ref.get().to_dict()
+
+
+def delete_journal(date: str) -> bool:
+    """ジャーナルを削除"""
+    db = get_db()
+    ref = db.collection("journal_entries").document(date)
+    if not ref.get().exists:
+        return False
+    ref.delete()
+    return True
+
+
+# ---- weekly_journal_digests ----
+
+def get_journal_digest(week_id: str) -> Optional[dict]:
+    """週次ジャーナルダイジェストを取得"""
+    db = get_db()
+    doc = db.collection("weekly_journal_digests").document(week_id).get()
+    if doc.exists:
+        return doc.to_dict()
+    return None
+
+
+def save_journal_digest(week_id: str, data: dict) -> dict:
+    """週次ジャーナルダイジェストを保存"""
+    db = get_db()
+    db.collection("weekly_journal_digests").document(week_id).set(data)
+    return data

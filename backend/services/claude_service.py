@@ -20,6 +20,10 @@ from prompts.morning_planning import (
     MORNING_FOLLOWUP_SYSTEM_PROMPT, build_morning_followup_prompt,
     MORNING_SYNTHESIS_SYSTEM_PROMPT, build_morning_synthesis_prompt,
 )
+from prompts.journal_analysis import (
+    JOURNAL_ANALYSIS_SYSTEM_PROMPT, build_journal_analysis_prompt,
+    WEEKLY_JOURNAL_DIGEST_SYSTEM_PROMPT, build_weekly_journal_digest_prompt,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -388,6 +392,64 @@ def generate_morning_synthesis(
 
     raw_text = response.content[0].text
     return _extract_json(raw_text)
+
+
+def analyze_journal_entry(
+    content: str,
+    date: str,
+    daily_record: dict | None = None,
+    daily_analysis: dict | None = None,
+) -> dict:
+    """
+    ジャーナルエントリを分析し、感情タグ・ブロッカー等を返す
+    """
+    client = get_client()
+    model = os.getenv("DAILY_ANALYSIS_MODEL", "claude-sonnet-4-6")
+
+    user_prompt = build_journal_analysis_prompt(
+        content=content,
+        date=date,
+        daily_record=daily_record,
+        daily_analysis=daily_analysis,
+    )
+
+    response = _call_claude_with_retry(
+        client,
+        model=model,
+        max_tokens=2048,
+        system=JOURNAL_ANALYSIS_SYSTEM_PROMPT,
+        messages=[{"role": "user", "content": user_prompt}],
+    )
+
+    return _extract_json(response.content[0].text)
+
+
+def generate_weekly_journal_digest(
+    week_id: str,
+    journal_entries: list[dict],
+    daily_analyses: list[dict] | None = None,
+) -> dict:
+    """
+    週次ジャーナルダイジェストを生成する
+    """
+    client = get_client()
+    model = os.getenv("WEEKLY_ANALYSIS_MODEL", "claude-sonnet-4-6")
+
+    user_prompt = build_weekly_journal_digest_prompt(
+        week_id=week_id,
+        journal_entries=journal_entries,
+        daily_analyses=daily_analyses,
+    )
+
+    response = _call_claude_with_retry(
+        client,
+        model=model,
+        max_tokens=4096,
+        system=WEEKLY_JOURNAL_DIGEST_SYSTEM_PROMPT,
+        messages=[{"role": "user", "content": user_prompt}],
+    )
+
+    return _extract_json(response.content[0].text)
 
 
 def _extract_json(text: str) -> dict | list:

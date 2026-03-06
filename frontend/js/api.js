@@ -177,6 +177,46 @@ export const knowledgeApi = {
   summary: () => apiFetch("/knowledge/summary"),
 };
 
+// ---- フリージャーナル ----
+
+export const journalApi = {
+  /** ジャーナル作成 */
+  create: (date, content) =>
+    apiFetch("/journal", {
+      method: "POST",
+      body: { date, content },
+    }),
+
+  /** ジャーナル一覧 */
+  list: (startDate, endDate) => {
+    const params = new URLSearchParams();
+    if (startDate) params.set("start_date", startDate);
+    if (endDate) params.set("end_date", endDate);
+    return apiFetch(`/journal?${params}`);
+  },
+
+  /** 指定日のジャーナル取得 */
+  get: (date) => apiFetch(`/journal/${date}`),
+
+  /** ジャーナル更新 */
+  update: (date, content) =>
+    apiFetch(`/journal/${date}`, { method: "PUT", body: { content } }),
+
+  /** ジャーナル削除 */
+  delete: (date) => apiFetch(`/journal/${date}`, { method: "DELETE" }),
+
+  /** AI分析を実行 */
+  analyze: (date) =>
+    apiFetch(`/journal/${date}/analyze`, { method: "POST" }),
+
+  /** 週次ダイジェスト取得 */
+  getDigest: (weekId) => apiFetch(`/journal/digest/${weekId}`),
+
+  /** 週次ダイジェスト生成 */
+  generateDigest: (weekId) =>
+    apiFetch(`/journal/digest/${weekId}/generate`, { method: "POST" }),
+};
+
 // ---- 月次サマリー ----
 
 export const summariesApi = {

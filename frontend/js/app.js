@@ -3,17 +3,18 @@
  * ルーティングの設定とホーム画面の表示を担当する
  */
 
-import { addRoute, navigate, updateNavActive } from "./router.js?v=20260301d";
-import { renderInputForm } from "./components/input-form.js?v=20260301d";
-import { renderAnalysisView } from "./components/analysis-view.js?v=20260301d";
-import { renderHistoryList } from "./components/history-list.js?v=20260301d";
-import { renderWeeklyReport } from "./components/weekly-report.js?v=20260301d";
-import { renderSuggestions } from "./components/suggestions.js?v=20260301d";
-import { renderCoachingChat } from "./components/coaching-chat.js?v=20260301d";
-import { renderKnowledgeGraph } from "./components/knowledge-graph.js?v=20260301d";
-import { renderMonthlyReport } from "./components/monthly-report.js?v=20260301d";
-import { recordsApi, analysisApi } from "./api.js?v=20260301d";
-import { initSwipeNav } from "./swipe-nav.js?v=20260301d";
+import { addRoute, navigate, updateNavActive } from "./router.js?v=20260306a";
+import { renderInputForm } from "./components/input-form.js?v=20260306a";
+import { renderAnalysisView } from "./components/analysis-view.js?v=20260306a";
+import { renderHistoryList } from "./components/history-list.js?v=20260306a";
+import { renderWeeklyReport } from "./components/weekly-report.js?v=20260306a";
+import { renderSuggestions } from "./components/suggestions.js?v=20260306a";
+import { renderCoachingChat } from "./components/coaching-chat.js?v=20260306a";
+import { renderKnowledgeGraph } from "./components/knowledge-graph.js?v=20260306a";
+import { renderMonthlyReport } from "./components/monthly-report.js?v=20260306a";
+import { renderJournal } from "./components/journal.js?v=20260306a";
+import { recordsApi, analysisApi } from "./api.js?v=20260306a";
+import { initSwipeNav } from "./swipe-nav.js?v=20260306a";
 
 // ===== ユーティリティ =====
 
@@ -46,6 +47,7 @@ const ROUTE_TITLES = {
   "/coach": { title: "コーチング", breadcrumb: "パーソナルコーチ" },
   "/knowledge": { title: "ナレッジグラフ", breadcrumb: "行動パターン" },
   "/monthly": { title: "月次レポート", breadcrumb: "月次サマリー" },
+  "/journal": { title: "フリージャーナル", breadcrumb: "ジャーナル" },
 };
 
 /** デスクトップヘッダーのタイトルと日付を更新 */
@@ -238,6 +240,8 @@ addRoute("/coach", () => renderCoachingChat());
 addRoute("/knowledge", () => renderKnowledgeGraph());
 addRoute("/monthly", () => renderMonthlyReport(null));
 addRoute("/monthly/:yearMonth", ({ yearMonth }) => renderMonthlyReport(yearMonth));
+addRoute("/journal", () => renderJournal(today()));
+addRoute("/journal/:date", ({ date }) => renderJournal(date));
 
 // ===== 初期化 =====
 
