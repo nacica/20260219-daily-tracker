@@ -1864,13 +1864,10 @@ textarea {
   margin-bottom: 0;
 }
 
-/* ===== 付箋ボード（グラスモーフィズム + 手書きノート風） ===== */
+/* ===== 付箋ボード（チップ型・モノトーン） ===== */
 
 .reminder-board-card {
-  border: 1px solid rgba(180, 160, 220, 0.25);
-  background: linear-gradient(135deg, rgba(230, 220, 250, 0.4), rgba(200, 235, 220, 0.3));
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid var(--border);
 }
 
 .reminder-board-card .card-title {
@@ -1878,83 +1875,63 @@ textarea {
 }
 
 .reminder-board-card .card-title::before {
-  content: "\270D\FE0F";
+  content: "\1F4CC";
   font-size: 1em;
 }
 
 .sticky-notes {
   display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
   gap: 8px;
-  min-height: 40px;
+  min-height: 32px;
   margin-bottom: 14px;
 }
 
 .sticky-empty {
   color: var(--text-muted);
-  font-size: 0.85rem;
+  font-size: 0.82rem;
   font-family: 'Klee One', cursive;
   line-height: 1.6;
   text-align: center;
   width: 100%;
-  padding: 16px 0;
+  padding: 12px 0;
 }
 
 .sticky-note {
-  position: relative;
-  padding: 12px 32px 12px 16px;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.5);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.6);
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.7);
-  font-size: 0.9rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 20px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--chip-accent, #999);
+  font-size: 0.84rem;
   font-family: 'Klee One', cursive;
-  line-height: 1.5;
-  color: #3a3a3a;
+  line-height: 1.3;
+  color: var(--text-primary);
   max-width: 100%;
   word-break: break-word;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-  /* 罫線背景 */
-  background-image: repeating-linear-gradient(
-    transparent,
-    transparent 23px,
-    rgba(180, 160, 200, 0.15) 23px,
-    rgba(180, 160, 200, 0.15) 24px
-  );
-  background-position: 0 12px;
-}
-
-/* マスキングテープ装飾 */
-.sticky-note::before {
-  content: "";
-  position: absolute;
-  top: -6px;
-  left: 50%;
-  transform: translateX(-50%) rotate(-1.5deg);
-  width: 48px;
-  height: 12px;
-  border-radius: 2px;
-  background: var(--tape-color, rgba(180,160,220,0.45));
+  transition: background 0.15s, box-shadow 0.15s;
 }
 
 .sticky-note:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.7);
-  z-index: 1;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
 }
 
 .sticky-delete {
-  position: absolute;
-  top: 4px;
-  right: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
   background: none;
   border: none;
-  font-size: 1.05rem;
-  color: rgba(0, 0, 0, 0.25);
+  font-size: 0.85rem;
+  color: var(--text-muted);
   cursor: pointer;
-  padding: 2px 5px;
+  padding: 0;
   line-height: 1;
   border-radius: 50%;
   transition: color 0.15s, background 0.15s;
@@ -1962,7 +1939,7 @@ textarea {
 
 .sticky-delete:hover {
   color: #c62828;
-  background: rgba(198, 40, 40, 0.08);
+  background: rgba(198, 40, 40, 0.1);
 }
 
 .sticky-add-area {
@@ -1985,22 +1962,19 @@ textarea {
 
 .sticky-input {
   flex: 1;
-  padding: 8px 12px;
-  border: 1px solid rgba(180, 160, 220, 0.3);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.5);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  padding: 7px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-input);
   color: var(--text-primary);
-  font-size: 0.88rem;
+  font-size: 0.84rem;
   font-family: 'Klee One', cursive;
   outline: none;
-  transition: border-color 0.2s, box-shadow 0.2s;
+  transition: border-color 0.2s;
 }
 
 .sticky-input:focus {
-  border-color: rgba(160, 140, 210, 0.5);
-  box-shadow: 0 0 8px rgba(160, 140, 210, 0.2);
+  border-color: var(--cyan-dim);
 }
 
 .sticky-colors {
@@ -2009,8 +1983,8 @@ textarea {
 }
 
 .sticky-color-btn {
-  width: 22px;
-  height: 22px;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
   border: 2px solid transparent;
   cursor: pointer;
@@ -2023,8 +1997,8 @@ textarea {
 }
 
 .sticky-color-btn.selected {
-  border-color: rgba(140, 120, 200, 0.7);
-  box-shadow: 0 0 8px rgba(140, 120, 200, 0.35);
+  border-color: var(--text-primary);
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.15);
 }
 
 /* モバイル: 縦積み */
