@@ -1903,15 +1903,7 @@ textarea {
   color: #16a34a;
 }
 
-/* ===== 朝タスク + 付箋リマインダー 2列グリッド ===== */
-
-.morning-reminder-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  align-items: start;
-  gap: 20px;
-  margin-bottom: 0;
-}
+/* ===== 朝タスク + 付箋リマインダー (各列内に配置) ===== */
 
 .morning-col .morning-dialogue-card,
 .reminder-col .reminder-board-card {
@@ -2031,13 +2023,6 @@ textarea {
   border-color: var(--cyan-dim);
 }
 
-
-/* モバイル: 縦積み */
-@media (max-width: 767px) {
-  .morning-reminder-grid {
-    grid-template-columns: 1fr;
-  }
-}
 
 /* ===== タブレット対応 ===== */
 

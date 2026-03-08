@@ -5,8 +5,8 @@
  * 朝のタスク整理（ソクラテス式問答）統合
  */
 
-import { recordsApi, analysisApi, morningDialogueApi } from "../api.js?v=20260308f";
-import { showToast } from "../app.js?v=20260308f";
+import { recordsApi, analysisApi, morningDialogueApi } from "../api.js?v=20260308g";
+import { showToast } from "../app.js?v=20260308g";
 
 /* ── カテゴリ管理 ── */
 
@@ -435,7 +435,7 @@ function buildFormHTML(date, record, tasks, isEdit, morningDialogue) {
 
   columns.forEach((col) => col.sort((a, b) => a.order - b.order));
 
-  // 朝問答 + 付箋リマインダーを2列で配置
+  // 朝問答 + 付箋リマインダーを各列の先頭に組み込み
   const morningHTML = buildMorningDialogueHTML(morningDialogue);
   const reminderHTML = buildReminderBoardHTML();
 
@@ -443,16 +443,13 @@ function buildFormHTML(date, record, tasks, isEdit, morningDialogue) {
     <h2 style="margin-bottom: 4px; font-size: 1.2rem;">${isEdit ? "記録を編集" : "行動を記録"}</h2>
     <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: var(--gap);">${dateLabel}</p>
 
-    <div class="morning-reminder-grid">
-      <div class="morning-col">${morningHTML}</div>
-      <div class="reminder-col">${reminderHTML}</div>
-    </div>
-
     <div class="input-grid" id="input-grid">
       <div class="input-column" id="input-column-0" data-column="0">
+        <div class="morning-col">${morningHTML}</div>
         ${columns[0].map((c) => c.cardHTML).join("")}
       </div>
       <div class="input-column" id="input-column-1" data-column="1">
+        <div class="reminder-col">${reminderHTML}</div>
         ${columns[1].map((c) => c.cardHTML).join("")}
       </div>
     </div>
