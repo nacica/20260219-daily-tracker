@@ -2390,9 +2390,7 @@ textarea {
   }
 
   .date-picker-calendar {
-    position: absolute;
-    top: calc(100% + 8px);
-    right: 0;
+    position: fixed;
     z-index: 1000;
     background: var(--card-bg);
     border: 1px solid var(--border);
