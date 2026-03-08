@@ -3223,10 +3223,53 @@ textarea {
 
 .kg-graph {
   width: 100%;
-  height: 400px;
+  height: 500px;
   background: var(--bg-secondary);
   border-radius: 8px;
   overflow: hidden;
+  position: relative;
+  touch-action: none;
+}
+
+.kg-graph svg {
+  display: block;
+}
+
+.kg-node-label {
+  font-family: 'Klee One', 'Space Grotesk', sans-serif;
+  font-size: 11px;
+  fill: var(--text-primary, #dce8ff);
+  text-shadow: 0 0 4px rgba(0,0,0,0.8);
+  transition: opacity 0.2s;
+}
+
+.kg-tooltip {
+  position: absolute;
+  background: rgba(10, 14, 20, 0.95);
+  border: 1px solid rgba(0, 212, 255, 0.3);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 0.8rem;
+  color: var(--text-primary, #dce8ff);
+  pointer-events: none;
+  z-index: 10;
+  max-width: 260px;
+  line-height: 1.5;
+  transition: opacity 0.15s;
+  backdrop-filter: blur(8px);
+}
+
+.kg-tooltip-type {
+  font-size: 0.7rem;
+  color: var(--text-muted, #64748b);
+}
+
+.kg-tooltip-rels {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(0,212,255,0.15);
+  font-size: 0.75rem;
+  color: var(--text-secondary, #94a3b8);
 }
 
 .kg-legend {

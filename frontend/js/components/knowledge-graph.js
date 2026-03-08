@@ -3,8 +3,8 @@
  * エンティティ・リレーションの一覧とグラフ表示
  */
 
-import { knowledgeApi } from "../api.js?v=20260306b";
-import { showToast } from "../app.js?v=20260306b";
+import { knowledgeApi } from "../api.js?v=20260308i";
+import { showToast } from "../app.js?v=20260308i";
 
 /** メインコンテンツエリアを返す */
 function getMain() {
@@ -225,89 +225,213 @@ function _setupFilters(allEntities) {
   statusFilter.addEventListener("change", applyFilter);
 }
 
-/** Canvas ベースのグラフ可視化 */
+/** D3.js 力指向グラフ可視化 */
 function _renderGraph(entities, relations) {
   const container = document.getElementById("kg-graph");
   if (!container) return;
+  if (typeof d3 === "undefined") return;
 
-  const canvas = document.createElement("canvas");
+  container.innerHTML = "";
   const width = container.clientWidth || 600;
-  const height = 400;
-  canvas.width = width;
-  canvas.height = height;
-  canvas.style.width = "100%";
-  canvas.style.height = height + "px";
-  container.appendChild(canvas);
+  const height = 500;
+  container.style.height = height + "px";
 
-  const ctx = canvas.getContext("2d");
+  // SVG 作成
+  const svg = d3.select(container)
+    .append("svg")
+    .attr("viewBox", [0, 0, width, height])
+    .attr("width", "100%")
+    .attr("height", height);
 
-  // ノード位置を計算（力指向レイアウトの簡易版）
-  const nodes = entities.map((e, i) => {
-    const angle = (2 * Math.PI * i) / entities.length;
-    const radius = Math.min(width, height) * 0.35;
-    return {
-      id: e.id,
-      name: e.name,
-      type: e.entityType,
-      x: width / 2 + radius * Math.cos(angle),
-      y: height / 2 + radius * Math.sin(angle),
-      color: TYPE_COLORS[e.entityType] || "#6b7280",
-    };
-  });
+  // 矢印マーカー定義
+  svg.append("defs").append("marker")
+    .attr("id", "kg-arrow")
+    .attr("viewBox", "0 -5 10 10")
+    .attr("refX", 20)
+    .attr("refY", 0)
+    .attr("markerWidth", 6)
+    .attr("markerHeight", 6)
+    .attr("orient", "auto")
+    .append("path")
+    .attr("d", "M0,-5L10,0L0,5")
+    .attr("fill", "rgba(0,212,255,0.5)");
 
-  const nodeMap = {};
-  nodes.forEach(n => { nodeMap[n.name] = n; });
+  // ズーム用グループ
+  const g = svg.append("g");
+  svg.call(d3.zoom()
+    .scaleExtent([0.3, 4])
+    .on("zoom", (event) => g.attr("transform", event.transform)));
+
+  // ノードデータ
+  const nodes = entities.map(e => ({
+    id: e.name,
+    entityId: e.id,
+    type: e.entityType,
+    color: TYPE_COLORS[e.entityType] || "#6b7280",
+    obsCount: e.observation_count || 0,
+  }));
+
+  const nodeSet = new Set(nodes.map(n => n.id));
+
+  // リンクデータ（両端が存在するもののみ）
+  const links = relations
+    .filter(r => nodeSet.has(r.from_entity) && nodeSet.has(r.to_entity))
+    .map(r => ({
+      source: r.from_entity,
+      target: r.to_entity,
+      strength: r.strength || 0.3,
+      type: r.relation_type,
+      desc: r.description || "",
+    }));
+
+  // 力指向シミュレーション
+  const simulation = d3.forceSimulation(nodes)
+    .force("link", d3.forceLink(links).id(d => d.id).distance(120))
+    .force("charge", d3.forceManyBody().strength(-300))
+    .force("center", d3.forceCenter(width / 2, height / 2))
+    .force("collision", d3.forceCollide().radius(40))
+    .force("x", d3.forceX(width / 2).strength(0.05))
+    .force("y", d3.forceY(height / 2).strength(0.05));
 
   // エッジ描画
-  ctx.lineWidth = 1;
-  for (const r of relations) {
-    const from = nodeMap[r.from_entity];
-    const to = nodeMap[r.to_entity];
-    if (!from || !to) continue;
+  const link = g.append("g")
+    .selectAll("line")
+    .data(links)
+    .join("line")
+    .attr("stroke", d => `rgba(0,212,255,${d.strength * 0.6})`)
+    .attr("stroke-width", d => 1 + d.strength * 2)
+    .attr("marker-end", "url(#kg-arrow)");
 
-    const strength = r.strength || 0.3;
-    ctx.strokeStyle = `rgba(0, 212, 255, ${strength * 0.6})`;
-    ctx.lineWidth = 1 + strength * 2;
-    ctx.beginPath();
-    ctx.moveTo(from.x, from.y);
-    ctx.lineTo(to.x, to.y);
-    ctx.stroke();
+  // ノードグループ
+  const node = g.append("g")
+    .selectAll("g")
+    .data(nodes)
+    .join("g")
+    .call(d3.drag()
+      .on("start", (event, d) => {
+        if (!event.active) simulation.alphaTarget(0.3).restart();
+        d.fx = d.x; d.fy = d.y;
+      })
+      .on("drag", (event, d) => {
+        d.fx = event.x; d.fy = event.y;
+      })
+      .on("end", (event, d) => {
+        if (!event.active) simulation.alphaTarget(0);
+        d.fx = null; d.fy = null;
+      }));
 
-    // 矢印
-    const dx = to.x - from.x;
-    const dy = to.y - from.y;
-    const len = Math.sqrt(dx * dx + dy * dy);
-    if (len > 0) {
-      const mx = from.x + dx * 0.65;
-      const my = from.y + dy * 0.65;
-      const ax = dx / len;
-      const ay = dy / len;
-      ctx.fillStyle = ctx.strokeStyle;
-      ctx.beginPath();
-      ctx.moveTo(mx + ax * 6, my + ay * 6);
-      ctx.lineTo(mx - ay * 4, my + ax * 4);
-      ctx.lineTo(mx + ay * 4, my - ax * 4);
-      ctx.fill();
+  // ノード円（グロー）
+  node.append("circle")
+    .attr("r", d => 6 + Math.min(d.obsCount, 10))
+    .attr("fill", d => d.color)
+    .attr("stroke", d => d.color)
+    .attr("stroke-width", 2)
+    .attr("stroke-opacity", 0.4)
+    .style("filter", "url(#kg-glow)");
+
+  // グローフィルター
+  const defs = svg.select("defs");
+  const filter = defs.append("filter").attr("id", "kg-glow");
+  filter.append("feGaussianBlur").attr("stdDeviation", 3).attr("result", "blur");
+  const merge = filter.append("feMerge");
+  merge.append("feMergeNode").attr("in", "blur");
+  merge.append("feMergeNode").attr("in", "SourceGraphic");
+
+  // ラベル（通常時は非表示、ホバーで表示）
+  const label = node.append("text")
+    .text(d => d.id)
+    .attr("dy", d => -(10 + Math.min(d.obsCount, 10)))
+    .attr("text-anchor", "middle")
+    .attr("class", "kg-node-label")
+    .style("opacity", 0)
+    .style("pointer-events", "none");
+
+  // ツールチップ用テキスト（関係性情報）
+  const tooltip = d3.select(container)
+    .append("div")
+    .attr("class", "kg-tooltip")
+    .style("opacity", 0);
+
+  // ホバーインタラクション
+  node.on("mouseenter", (event, d) => {
+    // 接続されたノードを取得
+    const connected = new Set();
+    links.forEach(l => {
+      const src = typeof l.source === "object" ? l.source.id : l.source;
+      const tgt = typeof l.target === "object" ? l.target.id : l.target;
+      if (src === d.id) connected.add(tgt);
+      if (tgt === d.id) connected.add(src);
+    });
+    connected.add(d.id);
+
+    // 非接続ノードを薄くする
+    node.style("opacity", n => connected.has(n.id) ? 1 : 0.15);
+    link.style("opacity", l => {
+      const src = typeof l.source === "object" ? l.source.id : l.source;
+      const tgt = typeof l.target === "object" ? l.target.id : l.target;
+      return (src === d.id || tgt === d.id) ? 1 : 0.05;
+    });
+
+    // 接続ノードのラベルも表示
+    label.style("opacity", n => connected.has(n.id) ? 1 : 0);
+
+    // ツールチップ
+    const typeLabel = TYPE_LABELS[d.type] || d.type;
+    const relInfo = links
+      .filter(l => {
+        const src = typeof l.source === "object" ? l.source.id : l.source;
+        const tgt = typeof l.target === "object" ? l.target.id : l.target;
+        return src === d.id || tgt === d.id;
+      })
+      .map(l => {
+        const src = typeof l.source === "object" ? l.source.id : l.source;
+        const tgt = typeof l.target === "object" ? l.target.id : l.target;
+        const relLabel = RELATION_LABELS[l.type] || l.type;
+        return src === d.id ? `→ ${relLabel} → ${tgt}` : `${src} → ${relLabel} →`;
+      })
+      .slice(0, 5)
+      .join("<br>");
+
+    tooltip
+      .html(`<strong style="color:${d.color}">${d.id}</strong><br>
+             <span class="kg-tooltip-type">${typeLabel}</span><br>
+             ${relInfo ? `<div class="kg-tooltip-rels">${relInfo}</div>` : ""}`)
+      .style("left", (event.offsetX + 15) + "px")
+      .style("top", (event.offsetY - 10) + "px")
+      .style("opacity", 1);
+  })
+  .on("mouseleave", () => {
+    node.style("opacity", 1);
+    link.style("opacity", 1);
+    label.style("opacity", 0);
+    tooltip.style("opacity", 0);
+  });
+
+  // タッチデバイス: タップでトグル
+  let activeNode = null;
+  node.on("touchstart", (event, d) => {
+    event.preventDefault();
+    if (activeNode === d.id) {
+      activeNode = null;
+      node.style("opacity", 1);
+      link.style("opacity", 1);
+      label.style("opacity", 0);
+      tooltip.style("opacity", 0);
+    } else {
+      activeNode = d.id;
+      node.dispatch("mouseenter", { detail: d });
     }
-  }
+  });
 
-  // ノード描画
-  for (const node of nodes) {
-    // グロー
-    ctx.shadowColor = node.color;
-    ctx.shadowBlur = 12;
-    ctx.fillStyle = node.color;
-    ctx.beginPath();
-    ctx.arc(node.x, node.y, 8, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.shadowBlur = 0;
-
-    // ラベル
-    ctx.fillStyle = "#dce8ff";
-    ctx.font = "11px 'Space Grotesk', sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText(node.name, node.x, node.y + 20);
-  }
+  // tick 更新
+  simulation.on("tick", () => {
+    link
+      .attr("x1", d => d.source.x)
+      .attr("y1", d => d.source.y)
+      .attr("x2", d => d.target.x)
+      .attr("y2", d => d.target.y);
+    node.attr("transform", d => `translate(${d.x},${d.y})`);
+  });
 }
 
 function _esc(text) {
