@@ -532,16 +532,24 @@ def _extract_json(text: str) -> dict | list:
     """
     テキストから JSON を抽出してパースする
     コードブロック（```json ... ```）も対応
+    閉じ ``` が無い場合でも末尾まで取得してパースを試みる
     """
     # ```json ... ``` ブロックを優先して抽出
     if "```json" in text:
         start = text.index("```json") + 7
-        end = text.index("```", start)
-        text = text[start:end].strip()
+        try:
+            end = text.index("```", start)
+            text = text[start:end].strip()
+        except ValueError:
+            # 閉じ ``` が無い場合は末尾まで取得
+            text = text[start:].strip()
     elif "```" in text:
         start = text.index("```") + 3
-        end = text.index("```", start)
-        text = text[start:end].strip()
+        try:
+            end = text.index("```", start)
+            text = text[start:end].strip()
+        except ValueError:
+            text = text[start:].strip()
 
     # JSON 部分だけ抽出（{ または [ から始まる部分）
     for i, ch in enumerate(text):
@@ -549,4 +557,16 @@ def _extract_json(text: str) -> dict | list:
             text = text[i:]
             break
 
-    return json.loads(text)
+    # 末尾の不完全なテキストを除去（閉じ括弧で終わるようにする）
+    # JSON が途中で切れている場合に対応
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        # 末尾にゴミがある場合: 最後の } または ] を探す
+        for j in range(len(text) - 1, -1, -1):
+            if text[j] in ("}", "]"):
+                try:
+                    return json.loads(text[: j + 1])
+                except json.JSONDecodeError:
+                    continue
+        raise ValueError(f"有効な JSON が見つかりません: {text[:200]}")
