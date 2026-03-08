@@ -1805,8 +1805,8 @@ textarea {
 }
 
 .morning-dialogue-card .card-title::before {
-  content: "\2600";
-  font-size: 1.1em;
+  content: '';
+  font-size: 0;
 }
 
 .morning-description {
@@ -1921,8 +1921,8 @@ textarea {
 }
 
 .reminder-board-card .card-title::before {
-  content: "\1F4CC";
-  font-size: 1em;
+  content: '';
+  font-size: 0;
 }
 
 .sticky-notes {
