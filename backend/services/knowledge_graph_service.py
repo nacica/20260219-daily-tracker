@@ -22,6 +22,136 @@ logger = logging.getLogger(__name__)
 KG_MODEL = "claude-haiku-4-5-20251001"
 
 
+REWRITE_SYSTEM_PROMPT = """あなたは日本語のリライト専門家です。
+行動分析ツールのナレッジグラフに保存されたエンティティ名・観測テキスト・関係性の説明を、
+**高校生が読んでも一発でわかる具体的な日本語** に書き換えてください。
+
+## 書き換えルール
+1. エンティティ名: 短く具体的に（15文字以内目安）
+   ❌「ネガティブ認知負荷の除去動機」→ ✅「嫌なことを避けたくなる癖」
+   ❌「体系的なリカバリー習慣の欠如」→ ✅「疲れた後の休み方がわからない」
+   ❌「中長期探索タスクの常時後回し傾向」→ ✅「難しいタスクをつい後回しにする」
+
+2. 観測テキスト: 「何があって → どういう意味か」を1〜2文で具体的に
+   ❌「認知負荷回避が行動選択に影響している」
+   ✅「タスクが15個もあって全部は無理と感じ、簡単な作業だけで終わりにした」
+
+3. 関係性の説明: 「AがBにどう影響するか」を具体的に
+   ❌「認知負荷と行動選択の相関」
+   ✅「やることが多すぎると、難しいタスクを避けて楽なものだけ選んでしまう」
+
+## 出力形式（JSON のみ出力、説明不要）
+```json
+{
+  "entities": [
+    {"old_name": "元の名前", "new_name": "新しい名前", "observations": ["書き換え後の観測1", "書き換え後の観測2"]}
+  ],
+  "relations": [
+    {"from": "元のfrom名", "to": "元のto名", "type": "relation_type", "new_from": "新しいfrom名", "new_to": "新しいto名", "new_description": "書き換え後の説明"}
+  ]
+}
+```"""
+
+
+def rewrite_kg_labels():
+    """既存の全エンティティ名・観測・リレーション説明を平易な日本語に書き換える"""
+    try:
+        entities = firestore_service.list_entities(limit=200)
+        relations = firestore_service.list_relations(limit=200)
+
+        if not entities:
+            logger.info("書き換え対象のエンティティなし")
+            return
+
+        # 現データをサマリーにしてClaudeに渡す
+        entity_lines = []
+        for e in entities:
+            obs_texts = [o.get("content", "") for o in e.get("observations", [])]
+            entity_lines.append(f"- 名前: {e.get('name')} (type: {e.get('entityType')})\n  観測: {' / '.join(obs_texts)}")
+
+        rel_lines = []
+        for r in relations:
+            rel_lines.append(f"- {r.get('from_entity')} → {r.get('to_entity')} ({r.get('relation_type')}): {r.get('description', '')}")
+
+        user_prompt = f"""以下の全エンティティと全リレーションを書き換えてください。
+
+## エンティティ一覧（{len(entities)}件）
+{chr(10).join(entity_lines)}
+
+## リレーション一覧（{len(relations)}件）
+{chr(10).join(rel_lines)}
+
+すべてのエンティティとリレーションを書き換えて、JSON形式で出力してください。"""
+
+        client = get_client()
+        response = _call_claude_with_retry(
+            client,
+            model="claude-sonnet-4-6-20250514",
+            max_tokens=8192,
+            system=REWRITE_SYSTEM_PROMPT,
+            messages=[{"role": "user", "content": user_prompt}],
+        )
+
+        raw_text = response.content[0].text
+        rewrite_data = _extract_json(raw_text)
+        now = now_jst()
+
+        # エンティティ書き換え適用
+        name_to_entity = {e.get("name"): e for e in entities}
+        old_to_new_name = {}
+
+        for re_ent in rewrite_data.get("entities", []):
+            old_name = re_ent.get("old_name", "")
+            new_name = re_ent.get("new_name", old_name)
+            new_obs_texts = re_ent.get("observations", [])
+            entity = name_to_entity.get(old_name)
+            if not entity:
+                continue
+
+            old_to_new_name[old_name] = new_name
+
+            # 観測テキストを書き換え（件数は保持）
+            existing_obs = entity.get("observations", [])
+            for i, obs in enumerate(existing_obs):
+                if i < len(new_obs_texts):
+                    obs["content"] = new_obs_texts[i]
+
+            update_data = {
+                "name": new_name,
+                "observations": existing_obs,
+                "updated_at": now,
+            }
+            firestore_service.update_entity(entity.get("id"), update_data)
+
+        # リレーション書き換え適用
+        for re_rel in rewrite_data.get("relations", []):
+            old_from = re_rel.get("from", "")
+            old_to = re_rel.get("to", "")
+            rel_type = re_rel.get("type", "")
+            new_from = re_rel.get("new_from", old_to_new_name.get(old_from, old_from))
+            new_to = re_rel.get("new_to", old_to_new_name.get(old_to, old_to))
+            new_desc = re_rel.get("new_description", "")
+
+            existing_rel = firestore_service.find_relation(old_from, old_to, rel_type)
+            if not existing_rel:
+                continue
+
+            update_data = {
+                "from_entity": new_from,
+                "to_entity": new_to,
+                "description": new_desc,
+                "updated_at": now,
+            }
+            firestore_service.update_relation(existing_rel.get("id"), update_data)
+
+        logger.info("KGラベル書き換え完了: %d entities, %d relations",
+                     len(rewrite_data.get("entities", [])),
+                     len(rewrite_data.get("relations", [])))
+
+    except Exception as e:
+        logger.error("KGラベル書き換えエラー: %s", e, exc_info=True)
+
+
 def _build_entities_summary(entities: list[dict]) -> str:
     """エンティティ一覧を「名前 (type)」形式のサマリーに変換"""
     if not entities:

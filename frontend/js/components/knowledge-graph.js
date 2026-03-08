@@ -3,8 +3,8 @@
  * エンティティ・リレーションの一覧とグラフ表示
  */
 
-import { knowledgeApi } from "../api.js?v=20260308l";
-import { showToast } from "../app.js?v=20260308l";
+import { knowledgeApi } from "../api.js?v=20260308m";
+import { showToast } from "../app.js?v=20260308m";
 
 /** メインコンテンツエリアを返す */
 function getMain() {
@@ -352,8 +352,10 @@ function _renderGraph(entities, relations) {
     .style("opacity", 0)
     .style("pointer-events", "none");
 
-  // ツールチップ用テキスト（関係性情報）
-  const tooltip = d3.select(container)
+  // ツールチップ（bodyに追加して切れを防止）
+  // 既存のツールチップがあれば削除
+  d3.select("body").selectAll(".kg-tooltip").remove();
+  const tooltip = d3.select("body")
     .append("div")
     .attr("class", "kg-tooltip")
     .style("opacity", 0);
@@ -427,22 +429,25 @@ function _renderGraph(entities, relations) {
       </div>`;
     }
 
-    tooltip.html(html).style("opacity", 0).style("left", "0").style("top", "0");
+    tooltip.html(html).style("opacity", 0).style("left", "-9999px").style("top", "-9999px");
 
-    // ツールチップサイズ取得後に位置を調整（はみ出し防止）
+    // ツールチップサイズ取得後にビューポート内に収まるよう位置調整
     const tipEl = tooltip.node();
     const tipW = tipEl.offsetWidth;
     const tipH = tipEl.offsetHeight;
-    const cRect = container.getBoundingClientRect();
-    let tx = event.offsetX + 15;
-    let ty = event.offsetY - 10;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    let tx = event.clientX + 15;
+    let ty = event.clientY + 10;
 
     // 右にはみ出す場合は左に表示
-    if (tx + tipW > cRect.width) tx = event.offsetX - tipW - 15;
+    if (tx + tipW > vw - 8) tx = event.clientX - tipW - 15;
     // 下にはみ出す場合は上に表示
-    if (ty + tipH > cRect.height) ty = cRect.height - tipH - 8;
+    if (ty + tipH > vh - 8) ty = event.clientY - tipH - 10;
     // 上にはみ出す場合
-    if (ty < 0) ty = 8;
+    if (ty < 8) ty = 8;
+    // 左にはみ出す場合
+    if (tx < 8) tx = 8;
 
     tooltip
       .style("left", tx + "px")

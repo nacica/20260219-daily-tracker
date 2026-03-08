@@ -3250,7 +3250,7 @@ textarea {
 }
 
 .kg-tooltip {
-  position: absolute;
+  position: fixed;
   background: rgba(2, 4, 8, 0.97);
   border: 1px solid rgba(0, 212, 255, 0.3);
   border-radius: 10px;
@@ -3258,8 +3258,10 @@ textarea {
   font-size: 0.85rem;
   color: #ffffff;
   pointer-events: none;
-  z-index: 10;
+  z-index: 9999;
   max-width: 320px;
+  max-height: 80vh;
+  overflow-y: auto;
   line-height: 1.6;
   transition: opacity 0.15s;
   backdrop-filter: blur(12px);

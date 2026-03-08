@@ -7,7 +7,7 @@ GET  /api/v1/knowledge/relations       - リレーション一覧
 GET  /api/v1/knowledge/summary         - ナレッジグラフサマリー
 """
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
 from typing import Optional
 
 from models.schemas import (
@@ -16,6 +16,7 @@ from models.schemas import (
 )
 from services import firestore_service
 from services.coaching_service import generate_coaching_reply
+from services.knowledge_graph_service import rewrite_kg_labels
 
 router = APIRouter()
 
@@ -91,6 +92,13 @@ async def delete_relation(relation_id: str):
     deleted = firestore_service.delete_relation(relation_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="リレーションが見つかりません。")
+
+
+@router.post("/knowledge/rewrite-labels")
+async def rewrite_labels(background_tasks: BackgroundTasks):
+    """既存エンティティ名・観測・リレーション説明を平易な日本語に書き換える（一度きりのマイグレーション）"""
+    background_tasks.add_task(rewrite_kg_labels)
+    return {"status": "started", "message": "バックグラウンドで書き換え中です。数分後にKGタブをリロードしてください。"}
 
 
 @router.get("/knowledge/summary")
