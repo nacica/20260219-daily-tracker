@@ -3226,13 +3226,15 @@ textarea {
   height: 500px;
   background: var(--bg-secondary);
   border-radius: 8px;
-  overflow: hidden;
+  overflow: visible;
   position: relative;
   touch-action: none;
 }
 
 .kg-graph svg {
   display: block;
+  overflow: hidden;
+  border-radius: 8px;
 }
 
 .kg-node-label {

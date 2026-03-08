@@ -3,8 +3,8 @@
  * エンティティ・リレーションの一覧とグラフ表示
  */
 
-import { knowledgeApi } from "../api.js?v=20260308k";
-import { showToast } from "../app.js?v=20260308k";
+import { knowledgeApi } from "../api.js?v=20260308l";
+import { showToast } from "../app.js?v=20260308l";
 
 /** メインコンテンツエリアを返す */
 function getMain() {
@@ -427,10 +427,26 @@ function _renderGraph(entities, relations) {
       </div>`;
     }
 
+    tooltip.html(html).style("opacity", 0).style("left", "0").style("top", "0");
+
+    // ツールチップサイズ取得後に位置を調整（はみ出し防止）
+    const tipEl = tooltip.node();
+    const tipW = tipEl.offsetWidth;
+    const tipH = tipEl.offsetHeight;
+    const cRect = container.getBoundingClientRect();
+    let tx = event.offsetX + 15;
+    let ty = event.offsetY - 10;
+
+    // 右にはみ出す場合は左に表示
+    if (tx + tipW > cRect.width) tx = event.offsetX - tipW - 15;
+    // 下にはみ出す場合は上に表示
+    if (ty + tipH > cRect.height) ty = cRect.height - tipH - 8;
+    // 上にはみ出す場合
+    if (ty < 0) ty = 8;
+
     tooltip
-      .html(html)
-      .style("left", (event.offsetX + 15) + "px")
-      .style("top", (event.offsetY - 10) + "px")
+      .style("left", tx + "px")
+      .style("top", ty + "px")
       .style("opacity", 1);
   })
   .on("mouseleave", () => {
