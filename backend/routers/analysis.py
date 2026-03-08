@@ -5,7 +5,7 @@ GET  /api/v1/analysis/{date}           - 保存済み分析を取得
 GET  /api/v1/analysis                  - 分析一覧を取得
 """
 
-from fastapi import APIRouter, HTTPException, Query, BackgroundTasks
+from fastapi import APIRouter, HTTPException, Query, BackgroundTasks, Response
 from typing import Optional
 
 from models.schemas import DailyAnalysis, AnalysisSummary, AnalysisDetail
@@ -72,10 +72,7 @@ async def get_analysis(date: str):
     """保存済みの日次分析を取得する"""
     analysis = firestore_service.get_analysis(date)
     if not analysis:
-        raise HTTPException(
-            status_code=404,
-            detail=f"{date} の分析が見つかりません。POST /analysis/{date}/generate で生成してください。",
-        )
+        return Response(status_code=204)
     return _build_response(analysis)
 
 

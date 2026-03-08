@@ -9,7 +9,7 @@ DELETE /api/v1/morning/{date}           - 朝問答を削除
 
 from datetime import datetime, timedelta
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Response
 
 from models.schemas import AnalysisDialogue, DialogueReplyRequest, DialogueMessage
 from services import firestore_service, claude_service
@@ -253,7 +253,7 @@ async def get_morning_dialogue(date: str):
     """保存済みの朝問答を取得する"""
     dialogue = firestore_service.get_morning_dialogue(date)
     if not dialogue:
-        raise HTTPException(status_code=404, detail=f"{date} の朝問答が見つかりません。")
+        return Response(status_code=204)
     return _build_dialogue_response(dialogue)
 
 

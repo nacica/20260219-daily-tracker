@@ -34,9 +34,9 @@ export async function renderAnalysisView(date) {
     recordsApi.get(date),
   ]);
 
-  const hasAnalysis = analysisResult.status === "fulfilled";
-  const hasDialogue = dialogueResult.status === "fulfilled";
-  const hasRecord = recordResult.status === "fulfilled";
+  const hasAnalysis = analysisResult.status === "fulfilled" && analysisResult.value != null;
+  const hasDialogue = dialogueResult.status === "fulfilled" && dialogueResult.value != null;
+  const hasRecord = recordResult.status === "fulfilled" && recordResult.value != null;
 
   if (hasAnalysis) {
     // 状態1: 分析済み → 既存表示 + 対話履歴トグル

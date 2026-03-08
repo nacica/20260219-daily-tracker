@@ -7,7 +7,7 @@ PUT    /api/v1/records/{date}
 DELETE /api/v1/records/{date}
 """
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Response
 from typing import Optional
 
 from models.schemas import RecordCreate, RecordUpdate, DailyRecord, Tasks
@@ -70,7 +70,7 @@ async def get_record(date: str):
     """指定日の行動記録を取得する"""
     record = firestore_service.get_record(date)
     if not record:
-        raise HTTPException(status_code=404, detail=f"{date} の記録が見つかりません")
+        return Response(status_code=204)
     return DailyRecord(**record)
 
 

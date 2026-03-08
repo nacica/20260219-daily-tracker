@@ -7,7 +7,7 @@ GET  /api/v1/dialogue/{date}             - 保存済み対話を取得
 DELETE /api/v1/dialogue/{date}           - 対話を削除
 """
 
-from fastapi import APIRouter, HTTPException, BackgroundTasks
+from fastapi import APIRouter, HTTPException, BackgroundTasks, Response
 
 from models.schemas import AnalysisDialogue, DialogueReplyRequest, DialogueMessage
 from services import firestore_service, claude_service
@@ -219,7 +219,7 @@ async def get_dialogue(date: str):
     """保存済みの対話を取得する"""
     dialogue = firestore_service.get_dialogue(date)
     if not dialogue:
-        raise HTTPException(status_code=404, detail=f"{date} の対話が見つかりません。")
+        return Response(status_code=204)
     return _build_dialogue_response(dialogue)
 
 

@@ -9,7 +9,7 @@ GET    /api/v1/diary-dialogue/{date}              - 保存済み対話を取得
 DELETE /api/v1/diary-dialogue/{date}              - 対話を削除
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Response
 
 from models.schemas import AnalysisDialogue, DialogueReplyRequest, DialogueMessage
 from services import firestore_service, claude_service
@@ -170,7 +170,7 @@ async def get_diary_dialogue(date: str):
     """保存済みの日記対話を取得する"""
     dialogue = firestore_service.get_diary_dialogue(date)
     if not dialogue:
-        raise HTTPException(status_code=404, detail=f"{date} の日記対話が見つかりません。")
+        return Response(status_code=204)
     return _build_response(dialogue)
 
 
