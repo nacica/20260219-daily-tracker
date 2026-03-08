@@ -3,8 +3,8 @@
  * 自由記述の日記 + AI自動分析（感情タグ、ブロッカー検出、トレンド）
  */
 
-import { journalApi, diaryDialogueApi } from "../api.js?v=20260306j";
-import { showToast } from "../app.js?v=20260306j";
+import { journalApi, diaryDialogueApi } from "../api.js?v=20260308n";
+import { showToast } from "../app.js?v=20260308n";
 
 // ===== ユーティリティ =====
 
@@ -184,10 +184,14 @@ function buildJournalHTML(date, journal, last7, monthlyBlockers, recentEntries, 
             <button class="btn btn-secondary" id="journal-analyze" ${isFuture ? "disabled" : ""}>
               ${isAnalyzed ? "再分析する" : "分析・アドバイス"}
             </button>
+            <button class="btn btn-secondary" id="journal-md-summary" ${isFuture ? "disabled" : ""}>
+              MD要約
+            </button>
             ${journal ? `
               <button class="btn btn-ghost btn-sm" id="journal-delete" style="margin-left:auto;color:var(--neon-red)">削除</button>
             ` : ""}
           </div>
+          <div id="journal-md-output" style="display:none;margin-top:12px;padding:16px;background:#f8f9fa;border-radius:8px;border:1px solid #e0e0e0;line-height:1.7;overflow-wrap:break-word"></div>
         </div>
         <div id="journal-socratic-mode" style="${activeMode === "socratic" ? "" : "display:none"}">
           ${buildDiaryDialogueHTML(diaryDialogue)}
@@ -671,6 +675,22 @@ function attachJournalEvents(date, journal) {
       btn.disabled = false;
       btn.textContent = "分析・アドバイス";
     }
+  });
+
+  // MD要約表示
+  document.getElementById("journal-md-summary")?.addEventListener("click", () => {
+    const content = document.getElementById("journal-content")?.value?.trim();
+    if (!content) {
+      showToast("内容を入力してください", "error");
+      return;
+    }
+    const output = document.getElementById("journal-md-output");
+    if (output.style.display !== "none") {
+      output.style.display = "none";
+      return;
+    }
+    output.innerHTML = window.marked ? marked.parse(content) : content.replace(/\n/g, "<br>");
+    output.style.display = "block";
   });
 
   // 削除
