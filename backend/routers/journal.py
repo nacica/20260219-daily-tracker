@@ -197,3 +197,14 @@ async def analyze_journal(date: str):
 
     updated = firestore_service.update_journal(date, update_data)
     return JournalEntry(**updated)
+
+
+@router.post("/journal/{date}/summarize")
+async def summarize_journal(date: str):
+    """ジャーナルをマークダウン形式で要約する"""
+    journal = firestore_service.get_journal(date)
+    if not journal:
+        raise HTTPException(status_code=404, detail=f"{date} のジャーナルが見つかりません")
+
+    markdown = claude_service.summarize_journal_as_markdown(journal["content"])
+    return {"markdown": markdown}

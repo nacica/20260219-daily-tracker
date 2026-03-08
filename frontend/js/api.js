@@ -234,6 +234,10 @@ export const journalApi = {
   analyze: (date) =>
     apiFetch(`/journal/${date}/analyze`, { method: "POST" }),
 
+  /** マークダウン要約を生成 */
+  summarize: (date) =>
+    apiFetch(`/journal/${date}/summarize`, { method: "POST" }),
+
   /** 週次ダイジェスト取得 */
   getDigest: (weekId) => apiFetch(`/journal/digest/${weekId}`),
 

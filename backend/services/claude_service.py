@@ -500,6 +500,32 @@ def analyze_journal_entry(
     return _extract_json(response.content[0].text)
 
 
+def summarize_journal_as_markdown(content: str) -> str:
+    """
+    ジャーナル内容をマークダウン形式で要約する
+    """
+    client = get_client()
+    model = os.getenv("DAILY_ANALYSIS_MODEL", "claude-sonnet-4-6")
+
+    system_prompt = (
+        "あなたは日記の要約を作成するアシスタントです。"
+        "ユーザーの日記テキストを読み、内容をマークダウン形式で構造化して要約してください。"
+        "見出し(##)、箇条書き(-)、太字(**)などを活用し、読みやすくまとめてください。"
+        "要約は日本語で、元の内容の要点を漏らさず、簡潔にまとめてください。"
+        "マークダウンのみを出力し、余計な前置きや説明は不要です。"
+    )
+
+    response = _call_claude_with_retry(
+        client,
+        model=model,
+        max_tokens=2048,
+        system=system_prompt,
+        messages=[{"role": "user", "content": content}],
+    )
+
+    return response.content[0].text
+
+
 def generate_weekly_journal_digest(
     week_id: str,
     journal_entries: list[dict],

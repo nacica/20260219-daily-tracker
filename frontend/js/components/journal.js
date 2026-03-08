@@ -3,8 +3,8 @@
  * 自由記述の日記 + AI自動分析（感情タグ、ブロッカー検出、トレンド）
  */
 
-import { journalApi, diaryDialogueApi } from "../api.js?v=20260308n";
-import { showToast } from "../app.js?v=20260308n";
+import { journalApi, diaryDialogueApi } from "../api.js?v=20260308o";
+import { showToast } from "../app.js?v=20260308o";
 
 // ===== ユーティリティ =====
 
@@ -678,19 +678,44 @@ function attachJournalEvents(date, journal) {
   });
 
   // MD要約表示
-  document.getElementById("journal-md-summary")?.addEventListener("click", () => {
+  document.getElementById("journal-md-summary")?.addEventListener("click", async () => {
     const content = document.getElementById("journal-content")?.value?.trim();
     if (!content) {
       showToast("内容を入力してください", "error");
       return;
     }
     const output = document.getElementById("journal-md-output");
-    if (output.style.display !== "none") {
+    if (output.style.display !== "none" && output.dataset.generated) {
       output.style.display = "none";
       return;
     }
-    output.innerHTML = window.marked ? marked.parse(content) : content.replace(/\n/g, "<br>");
-    output.style.display = "block";
+
+    const btn = document.getElementById("journal-md-summary");
+    btn.disabled = true;
+
+    try {
+      // 未保存の場合は先に保存
+      if (!journal) {
+        btn.textContent = "保存中...";
+        await journalApi.create(date, content);
+      } else if (content !== journal.content) {
+        btn.textContent = "更新中...";
+        await journalApi.update(date, content);
+      }
+
+      btn.textContent = "要約中...";
+      const result = await journalApi.summarize(date);
+      const md = result.markdown || result;
+      output.innerHTML = window.marked ? marked.parse(md) : md.replace(/\n/g, "<br>");
+      output.dataset.generated = "true";
+      output.style.display = "block";
+      btn.textContent = "MD要約";
+      btn.disabled = false;
+    } catch (err) {
+      showToast(err.message, "error");
+      btn.textContent = "MD要約";
+      btn.disabled = false;
+    }
   });
 
   // 削除
