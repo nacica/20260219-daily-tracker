@@ -5,8 +5,8 @@
  * 朝のタスク整理（ソクラテス式問答）統合
  */
 
-import { recordsApi, analysisApi, morningDialogueApi } from "../api.js?v=20260308d";
-import { showToast } from "../app.js?v=20260308d";
+import { recordsApi, analysisApi, morningDialogueApi } from "../api.js?v=20260308e";
+import { showToast } from "../app.js?v=20260308e";
 
 /* ── カテゴリ管理 ── */
 
@@ -443,17 +443,16 @@ function buildFormHTML(date, record, tasks, isEdit, morningDialogue) {
     <h2 style="margin-bottom: 4px; font-size: 1.2rem;">${isEdit ? "記録を編集" : "行動を記録"}</h2>
     <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: var(--gap);">${dateLabel}</p>
 
-    <div class="morning-reminder-grid">
+    <div class="input-page-grid">
       <div class="morning-col">${morningHTML}</div>
       <div class="reminder-col">${reminderHTML}</div>
-    </div>
-
-    <div class="input-grid" id="input-grid">
-      <div class="input-column" id="input-column-0" data-column="0">
-        ${columns[0].map((c) => c.cardHTML).join("")}
-      </div>
-      <div class="input-column" id="input-column-1" data-column="1">
-        ${columns[1].map((c) => c.cardHTML).join("")}
+      <div class="input-grid" id="input-grid">
+        <div class="input-column" id="input-column-0" data-column="0">
+          ${columns[0].map((c) => c.cardHTML).join("")}
+        </div>
+        <div class="input-column" id="input-column-1" data-column="1">
+          ${columns[1].map((c) => c.cardHTML).join("")}
+        </div>
       </div>
     </div>
   `;

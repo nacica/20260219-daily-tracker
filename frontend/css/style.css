@@ -1903,14 +1903,10 @@ textarea {
   color: #16a34a;
 }
 
-/* ===== 朝タスク + 付箋リマインダー 2列グリッド ===== */
+/* ===== 入力ページ全体 2列グリッド ===== */
 
-.morning-reminder-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  align-items: start;
-  gap: 20px;
-  margin-bottom: var(--gap);
+.input-page-grid {
+  display: block;
 }
 
 .morning-col .morning-dialogue-card,
@@ -2032,12 +2028,7 @@ textarea {
 }
 
 
-/* モバイル: 縦積み */
-@media (max-width: 767px) {
-  .morning-reminder-grid {
-    grid-template-columns: 1fr;
-  }
-}
+/* モバイル: 縦積み（input-page-grid はブロック表示のまま） */
 
 /* ===== タブレット対応 ===== */
 
@@ -2657,23 +2648,36 @@ textarea {
     gap: 12px;
   }
 
-  /* ── Input Form 2-Column Grid ── */
-  .input-grid {
+  /* ── Input Page 2-Column Grid ── */
+  .input-page-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 20px;
     align-items: start;
   }
 
+  .input-page-grid > .morning-col {
+    grid-column: 1;
+  }
+
+  .input-page-grid > .reminder-col {
+    grid-column: 2;
+  }
+
+  .input-page-grid > .input-grid {
+    display: contents;
+  }
+
   .input-column {
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
-    min-height: 200px;
-    position: relative;
-    border-radius: var(--radius);
-    transition: background 0.2s, border-color 0.2s;
-    border: 2px solid transparent;
+    display: contents;
+  }
+
+  .input-column[data-column="0"] > .card {
+    grid-column: 1;
+  }
+
+  .input-column[data-column="1"] > .card {
+    grid-column: 2;
   }
 
   .input-column > .card {
