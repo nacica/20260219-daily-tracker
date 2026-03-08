@@ -1908,6 +1908,7 @@ textarea {
 .morning-reminder-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
+  align-items: start;
   gap: 20px;
   margin-bottom: var(--gap);
 }
