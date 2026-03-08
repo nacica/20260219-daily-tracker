@@ -3,8 +3,8 @@
  * 自由記述の日記 + AI自動分析（感情タグ、ブロッカー検出、トレンド）
  */
 
-import { journalApi, diaryDialogueApi } from "../api.js?v=20260308q";
-import { showToast } from "../app.js?v=20260308q";
+import { journalApi, diaryDialogueApi } from "../api.js?v=20260308r";
+import { showToast } from "../app.js?v=20260308r";
 
 // ===== ユーティリティ =====
 
@@ -205,7 +205,14 @@ function buildJournalHTML(date, journal, last7, monthlyBlockers, recentEntries, 
               <button class="btn btn-ghost btn-sm" id="journal-delete" style="margin-left:auto;color:var(--neon-red)">削除</button>
             ` : ""}
           </div>
-          <div id="journal-md-output" style="${mdSummary ? "" : "display:none;"}margin-top:12px;padding:16px;background:#f8f9fa;border-radius:8px;border:1px solid #e0e0e0;line-height:1.7;overflow-wrap:break-word">${mdSummary ? renderMd(mdSummary) : ""}</div>
+          <div id="journal-md-wrapper" style="${mdSummary ? "" : "display:none;"}margin-top:12px">
+            <div id="journal-md-fontctl" style="display:none;text-align:right;margin-bottom:6px">
+              <button class="btn btn-ghost btn-sm" id="md-font-down" style="font-size:0.85rem;padding:2px 10px">A-</button>
+              <span id="md-font-label" style="font-size:0.8rem;color:var(--text-secondary);margin:0 4px">16px</span>
+              <button class="btn btn-ghost btn-sm" id="md-font-up" style="font-size:0.85rem;padding:2px 10px">A+</button>
+            </div>
+            <div id="journal-md-output" style="padding:16px;background:#f8f9fa;border-radius:8px;border:1px solid #e0e0e0;line-height:1.7;overflow-wrap:break-word">${mdSummary ? renderMd(mdSummary) : ""}</div>
+          </div>
         </div>
         <div id="journal-socratic-mode" style="${activeMode === "socratic" ? "" : "display:none"}">
           ${buildDiaryDialogueHTML(diaryDialogue)}
@@ -691,6 +698,35 @@ function attachJournalEvents(date, journal) {
     }
   });
 
+  // MD要約: フォントサイズ制御 (スマホのみ表示)
+  const mdWrapper = document.getElementById("journal-md-wrapper");
+  const mdOutput = document.getElementById("journal-md-output");
+  const mdFontCtl = document.getElementById("journal-md-fontctl");
+  const MD_FONT_KEY = "md-summary-font-size";
+  const MD_FONT_MIN = 12;
+  const MD_FONT_MAX = 28;
+  let mdFontSize = parseInt(localStorage.getItem(MD_FONT_KEY)) || 16;
+
+  function applyMdFontSize() {
+    if (mdOutput) mdOutput.style.fontSize = mdFontSize + "px";
+    const label = document.getElementById("md-font-label");
+    if (label) label.textContent = mdFontSize + "px";
+    localStorage.setItem(MD_FONT_KEY, mdFontSize);
+  }
+
+  // スマホ判定でフォントコントロール表示
+  if (mdFontCtl && window.innerWidth <= 768) {
+    mdFontCtl.style.display = "block";
+    applyMdFontSize();
+  }
+
+  document.getElementById("md-font-down")?.addEventListener("click", () => {
+    if (mdFontSize > MD_FONT_MIN) { mdFontSize -= 2; applyMdFontSize(); }
+  });
+  document.getElementById("md-font-up")?.addEventListener("click", () => {
+    if (mdFontSize < MD_FONT_MAX) { mdFontSize += 2; applyMdFontSize(); }
+  });
+
   // MD要約表示
   document.getElementById("journal-md-summary")?.addEventListener("click", async () => {
     const content = document.getElementById("journal-content")?.value?.trim();
@@ -698,9 +734,8 @@ function attachJournalEvents(date, journal) {
       showToast("内容を入力してください", "error");
       return;
     }
-    const output = document.getElementById("journal-md-output");
-    if (output.style.display !== "none" && output.dataset.generated) {
-      output.style.display = "none";
+    if (mdWrapper.style.display !== "none" && mdOutput.dataset.generated) {
+      mdWrapper.style.display = "none";
       return;
     }
 
@@ -720,9 +755,10 @@ function attachJournalEvents(date, journal) {
       btn.textContent = "要約中...";
       const result = await journalApi.summarize(date);
       const md = result.md_summary || "";
-      output.innerHTML = renderMd(md);
-      output.dataset.generated = "true";
-      output.style.display = "block";
+      mdOutput.innerHTML = renderMd(md);
+      mdOutput.dataset.generated = "true";
+      mdWrapper.style.display = "block";
+      applyMdFontSize();
       btn.textContent = "MD要約";
       btn.disabled = false;
     } catch (err) {
