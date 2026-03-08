@@ -3,18 +3,18 @@
  * ルーティングの設定とホーム画面の表示を担当する
  */
 
-import { addRoute, navigate, updateNavActive } from "./router.js?v=20260306j";
-import { renderInputForm } from "./components/input-form.js?v=20260306j";
-import { renderAnalysisView } from "./components/analysis-view.js?v=20260306j";
-import { renderHistoryList } from "./components/history-list.js?v=20260306j";
-import { renderWeeklyReport } from "./components/weekly-report.js?v=20260306j";
-import { renderSuggestions } from "./components/suggestions.js?v=20260306j";
-import { renderCoachingChat } from "./components/coaching-chat.js?v=20260306j";
-import { renderKnowledgeGraph } from "./components/knowledge-graph.js?v=20260306j";
-import { renderMonthlyReport } from "./components/monthly-report.js?v=20260306j";
-import { renderJournal } from "./components/journal.js?v=20260306j";
-import { recordsApi, analysisApi } from "./api.js?v=20260306j";
-import { initSwipeNav } from "./swipe-nav.js?v=20260306j";
+import { addRoute, navigate, updateNavActive } from "./router.js?v=20260308a";
+import { renderInputForm } from "./components/input-form.js?v=20260308a";
+import { renderAnalysisView } from "./components/analysis-view.js?v=20260308a";
+import { renderHistoryList } from "./components/history-list.js?v=20260308a";
+import { renderWeeklyReport } from "./components/weekly-report.js?v=20260308a";
+import { renderSuggestions } from "./components/suggestions.js?v=20260308a";
+import { renderCoachingChat } from "./components/coaching-chat.js?v=20260308a";
+import { renderKnowledgeGraph } from "./components/knowledge-graph.js?v=20260308a";
+import { renderMonthlyReport } from "./components/monthly-report.js?v=20260308a";
+import { renderJournal } from "./components/journal.js?v=20260308a";
+import { recordsApi, analysisApi } from "./api.js?v=20260308a";
+import { initSwipeNav } from "./swipe-nav.js?v=20260308a";
 
 // ===== ユーティリティ =====
 
@@ -58,7 +58,6 @@ function updateDesktopHeader() {
   if (!titleEl) return;
 
   const hash = window.location.hash.slice(1) || "/";
-  // ルートの先頭部分でマッチ（/input/:date → /input）
   const baseRoute = "/" + (hash.split("/")[1] || "");
   const route = ROUTE_TITLES[baseRoute] || ROUTE_TITLES["/"];
 
@@ -69,6 +68,152 @@ function updateDesktopHeader() {
   const now = new Date();
   const weekdays = ["日", "月", "火", "水", "木", "金", "土"];
   dateEl.textContent = `${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日（${weekdays[now.getDay()]}）`;
+
+  // カレンダーピッカーのイベント登録（初回のみ）
+  if (!dateEl.dataset.calInit) {
+    dateEl.dataset.calInit = "1";
+    dateEl.addEventListener("click", (e) => {
+      e.stopPropagation();
+      toggleDatePicker(dateEl);
+    });
+  }
+}
+
+// ===== カレンダー日付ピッカー =====
+
+let calendarState = { year: null, month: null, recordDates: new Set() };
+
+function toggleDatePicker(anchorEl) {
+  const existing = document.querySelector(".date-picker-calendar");
+  if (existing) { closeDatePicker(); return; }
+
+  const now = new Date();
+  calendarState.year = now.getFullYear();
+  calendarState.month = now.getMonth();
+
+  openDatePicker(anchorEl);
+}
+
+function closeDatePicker() {
+  document.querySelector(".date-picker-calendar")?.remove();
+  document.querySelector(".date-picker-overlay")?.remove();
+}
+
+async function openDatePicker(anchorEl) {
+  closeDatePicker();
+
+  // 記録のある日を取得
+  await fetchRecordDatesForMonth(calendarState.year, calendarState.month);
+
+  const cal = document.createElement("div");
+  cal.className = "date-picker-calendar";
+  cal.innerHTML = buildCalendarHTML(calendarState.year, calendarState.month);
+
+  // クリック外で閉じるオーバーレイ
+  const overlay = document.createElement("div");
+  overlay.className = "date-picker-overlay";
+  overlay.addEventListener("click", closeDatePicker);
+
+  document.body.appendChild(overlay);
+
+  // anchorEl の親(.desktop-header-right)に配置
+  const wrapper = anchorEl.closest(".desktop-header-right");
+  wrapper.style.position = "relative";
+  wrapper.appendChild(cal);
+
+  // カレンダー内のイベント
+  cal.addEventListener("click", async (e) => {
+    e.stopPropagation();
+
+    const navBtn = e.target.closest(".cal-nav-btn");
+    if (navBtn) {
+      const dir = parseInt(navBtn.dataset.dir);
+      calendarState.month += dir;
+      if (calendarState.month < 0) { calendarState.month = 11; calendarState.year--; }
+      if (calendarState.month > 11) { calendarState.month = 0; calendarState.year++; }
+      await fetchRecordDatesForMonth(calendarState.year, calendarState.month);
+      cal.innerHTML = buildCalendarHTML(calendarState.year, calendarState.month);
+      return;
+    }
+
+    const dayEl = e.target.closest(".cal-day");
+    if (dayEl && !dayEl.classList.contains("future")) {
+      const date = dayEl.dataset.date;
+      if (date) {
+        closeDatePicker();
+        window.location.hash = `/input/${date}`;
+      }
+    }
+  });
+}
+
+async function fetchRecordDatesForMonth(year, month) {
+  try {
+    const startDate = `${year}-${String(month + 1).padStart(2, "0")}-01`;
+    const lastDay = new Date(year, month + 1, 0).getDate();
+    const endDate = `${year}-${String(month + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+    const records = await recordsApi.list(startDate, endDate);
+    const dates = new Set(records.map((r) => r.date));
+    calendarState.recordDates = dates;
+  } catch {
+    calendarState.recordDates = new Set();
+  }
+}
+
+function buildCalendarHTML(year, month) {
+  const todayStr = today();
+  const monthNames = ["1月", "2月", "3月", "4月", "5月", "6月", "7月", "8月", "9月", "10月", "11月", "12月"];
+
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const daysInPrevMonth = new Date(year, month, 0).getDate();
+
+  let days = "";
+
+  // 前月の余白
+  for (let i = firstDay - 1; i >= 0; i--) {
+    const d = daysInPrevMonth - i;
+    const prevMonth = month === 0 ? 12 : month;
+    const prevYear = month === 0 ? year - 1 : year;
+    const dateStr = `${prevYear}-${String(prevMonth).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+    days += `<div class="cal-day other-month" data-date="${dateStr}">${d}</div>`;
+  }
+
+  // 今月
+  const todayDate = new Date();
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+    const isFuture = new Date(year, month, d) > todayDate;
+    const isToday = dateStr === todayStr;
+    const hasRecord = calendarState.recordDates.has(dateStr);
+    const classes = ["cal-day"];
+    if (isToday) classes.push("today");
+    if (isFuture) classes.push("future");
+    if (hasRecord) classes.push("has-record");
+    days += `<div class="${classes.join(" ")}" data-date="${dateStr}">${d}</div>`;
+  }
+
+  // 次月の余白
+  const totalCells = firstDay + daysInMonth;
+  const remaining = totalCells % 7 === 0 ? 0 : 7 - (totalCells % 7);
+  for (let d = 1; d <= remaining; d++) {
+    const nextMonth = month === 11 ? 1 : month + 2;
+    const nextYear = month === 11 ? year + 1 : year;
+    const dateStr = `${nextYear}-${String(nextMonth).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+    days += `<div class="cal-day other-month future" data-date="${dateStr}">${d}</div>`;
+  }
+
+  return `
+    <div class="cal-header">
+      <button class="cal-nav-btn" data-dir="-1">◀</button>
+      <span class="cal-header-title">${year}年 ${monthNames[month]}</span>
+      <button class="cal-nav-btn" data-dir="1">▶</button>
+    </div>
+    <div class="cal-weekdays">
+      <span>日</span><span>月</span><span>火</span><span>水</span><span>木</span><span>金</span><span>土</span>
+    </div>
+    <div class="cal-days">${days}</div>
+  `;
 }
 
 /** ローディング表示 */

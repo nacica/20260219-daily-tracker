@@ -2365,6 +2365,157 @@ textarea {
     background: rgba(0, 212, 255, 0.04);
     border-radius: var(--radius-xs);
     border: 1px solid var(--border);
+    cursor: pointer;
+    position: relative;
+    user-select: none;
+    transition: background 0.15s, border-color 0.15s;
+  }
+
+  .desktop-header-date:hover {
+    background: rgba(0, 212, 255, 0.1);
+    border-color: rgba(0, 212, 255, 0.3);
+  }
+
+  .desktop-header-date::after {
+    content: " ▾";
+    font-size: 0.7em;
+    opacity: 0.5;
+  }
+
+  /* ── Date Picker Calendar ── */
+  .date-picker-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 999;
+  }
+
+  .date-picker-calendar {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    z-index: 1000;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    padding: 16px;
+    min-width: 300px;
+    animation: calendarSlideIn 0.15s ease-out;
+  }
+
+  @keyframes calendarSlideIn {
+    from { opacity: 0; transform: translateY(-8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .cal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+
+  .cal-header-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .cal-nav-btn {
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text-secondary);
+    width: 30px;
+    height: 30px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8rem;
+    transition: background 0.15s;
+  }
+
+  .cal-nav-btn:hover {
+    background: rgba(0, 212, 255, 0.1);
+    color: var(--text-primary);
+  }
+
+  .cal-weekdays {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    text-align: center;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+    font-weight: 600;
+  }
+
+  .cal-weekdays span {
+    padding: 4px 0;
+  }
+
+  .cal-days {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 2px;
+  }
+
+  .cal-day {
+    position: relative;
+    text-align: center;
+    padding: 6px 0;
+    font-size: 0.8rem;
+    border-radius: 8px;
+    cursor: pointer;
+    color: var(--text-secondary);
+    transition: background 0.1s;
+  }
+
+  .cal-day:hover {
+    background: rgba(0, 212, 255, 0.1);
+  }
+
+  .cal-day.today {
+    font-weight: 700;
+    color: var(--accent, #00d4ff);
+    border: 1px solid rgba(0, 212, 255, 0.3);
+  }
+
+  .cal-day.has-record::after {
+    content: "";
+    position: absolute;
+    bottom: 2px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--accent, #00d4ff);
+  }
+
+  .cal-day.other-month {
+    color: var(--text-muted);
+    opacity: 0.4;
+  }
+
+  .cal-day.future {
+    opacity: 0.25;
+    cursor: default;
+  }
+
+  .cal-day.future:hover {
+    background: none;
+  }
+
+  .cal-day.selected {
+    background: var(--accent, #00d4ff);
+    color: #000;
+    font-weight: 600;
+  }
+
+  .cal-day.selected::after {
+    background: #000;
   }
 
   /* ── Main Content Layout ── */
