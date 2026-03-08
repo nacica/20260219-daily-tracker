@@ -3,10 +3,23 @@
  * 自由記述の日記 + AI自動分析（感情タグ、ブロッカー検出、トレンド）
  */
 
-import { journalApi, diaryDialogueApi } from "../api.js?v=20260308p";
-import { showToast } from "../app.js?v=20260308p";
+import { journalApi, diaryDialogueApi } from "../api.js?v=20260308q";
+import { showToast } from "../app.js?v=20260308q";
 
 // ===== ユーティリティ =====
+
+/** マークダウン文字列をHTMLに変換する */
+function renderMd(text) {
+  if (!text || typeof text !== "string") return "";
+  const m = window.marked;
+  if (m) {
+    // CDN版: marked.parse() or marked.marked.parse()
+    if (typeof m.parse === "function") return m.parse(text);
+    if (m.marked && typeof m.marked.parse === "function") return m.marked.parse(text);
+    if (typeof m === "function") return m(text);
+  }
+  return text.replace(/\n/g, "<br>");
+}
 
 /** 日付を日本語表記にフォーマット */
 function formatDateJP(dateStr) {
@@ -192,7 +205,7 @@ function buildJournalHTML(date, journal, last7, monthlyBlockers, recentEntries, 
               <button class="btn btn-ghost btn-sm" id="journal-delete" style="margin-left:auto;color:var(--neon-red)">削除</button>
             ` : ""}
           </div>
-          <div id="journal-md-output" style="${mdSummary ? "" : "display:none;"}margin-top:12px;padding:16px;background:#f8f9fa;border-radius:8px;border:1px solid #e0e0e0;line-height:1.7;overflow-wrap:break-word">${mdSummary ? (window.marked ? marked.parse(mdSummary) : mdSummary.replace(/\n/g, "<br>")) : ""}</div>
+          <div id="journal-md-output" style="${mdSummary ? "" : "display:none;"}margin-top:12px;padding:16px;background:#f8f9fa;border-radius:8px;border:1px solid #e0e0e0;line-height:1.7;overflow-wrap:break-word">${mdSummary ? renderMd(mdSummary) : ""}</div>
         </div>
         <div id="journal-socratic-mode" style="${activeMode === "socratic" ? "" : "display:none"}">
           ${buildDiaryDialogueHTML(diaryDialogue)}
@@ -707,7 +720,7 @@ function attachJournalEvents(date, journal) {
       btn.textContent = "要約中...";
       const result = await journalApi.summarize(date);
       const md = result.md_summary || "";
-      output.innerHTML = window.marked ? marked.parse(md) : md.replace(/\n/g, "<br>");
+      output.innerHTML = renderMd(md);
       output.dataset.generated = "true";
       output.style.display = "block";
       btn.textContent = "MD要約";
