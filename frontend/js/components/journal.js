@@ -3,8 +3,8 @@
  * 自由記述の日記 + AI自動分析（感情タグ、ブロッカー検出、トレンド）
  */
 
-import { journalApi, diaryDialogueApi } from "../api.js?v=20260308o";
-import { showToast } from "../app.js?v=20260308o";
+import { journalApi, diaryDialogueApi } from "../api.js?v=20260308p";
+import { showToast } from "../app.js?v=20260308p";
 
 // ===== ユーティリティ =====
 
@@ -143,6 +143,7 @@ function buildJournalHTML(date, journal, last7, monthlyBlockers, recentEntries, 
   const content = journal?.content || "";
   const analysis = journal?.ai_analysis;
   const isAnalyzed = journal?.is_analyzed;
+  const mdSummary = journal?.md_summary || "";
 
   // 入力モード判定
   const savedMode = localStorage.getItem("journal-input-mode") || "free";
@@ -191,7 +192,7 @@ function buildJournalHTML(date, journal, last7, monthlyBlockers, recentEntries, 
               <button class="btn btn-ghost btn-sm" id="journal-delete" style="margin-left:auto;color:var(--neon-red)">削除</button>
             ` : ""}
           </div>
-          <div id="journal-md-output" style="display:none;margin-top:12px;padding:16px;background:#f8f9fa;border-radius:8px;border:1px solid #e0e0e0;line-height:1.7;overflow-wrap:break-word"></div>
+          <div id="journal-md-output" style="${mdSummary ? "" : "display:none;"}margin-top:12px;padding:16px;background:#f8f9fa;border-radius:8px;border:1px solid #e0e0e0;line-height:1.7;overflow-wrap:break-word">${mdSummary ? (window.marked ? marked.parse(mdSummary) : mdSummary.replace(/\n/g, "<br>")) : ""}</div>
         </div>
         <div id="journal-socratic-mode" style="${activeMode === "socratic" ? "" : "display:none"}">
           ${buildDiaryDialogueHTML(diaryDialogue)}
@@ -705,7 +706,7 @@ function attachJournalEvents(date, journal) {
 
       btn.textContent = "要約中...";
       const result = await journalApi.summarize(date);
-      const md = result.markdown || result;
+      const md = result.md_summary || "";
       output.innerHTML = window.marked ? marked.parse(md) : md.replace(/\n/g, "<br>");
       output.dataset.generated = "true";
       output.style.display = "block";

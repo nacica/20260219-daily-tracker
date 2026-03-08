@@ -59,6 +59,7 @@ class JournalEntry(BaseModel):
     content: str
     ai_analysis: Optional[JournalAnalysis] = None
     is_analyzed: bool = False
+    md_summary: Optional[str] = None
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
 

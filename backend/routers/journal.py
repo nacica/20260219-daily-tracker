@@ -152,10 +152,11 @@ async def update_journal(date: str, body: JournalUpdate):
 
     if body.content is not None:
         update_data["content"] = body.content
-        # 内容が変更された場合は分析をリセット
+        # 内容が変更された場合は分析・要約をリセット
         if body.content != existing.get("content", ""):
             update_data["is_analyzed"] = False
             update_data["ai_analysis"] = None
+            update_data["md_summary"] = None
 
     updated = firestore_service.update_journal(date, update_data)
     return JournalEntry(**updated)
@@ -199,12 +200,18 @@ async def analyze_journal(date: str):
     return JournalEntry(**updated)
 
 
-@router.post("/journal/{date}/summarize")
+@router.post("/journal/{date}/summarize", response_model=JournalEntry)
 async def summarize_journal(date: str):
-    """ジャーナルをマークダウン形式で要約する"""
+    """ジャーナルをマークダウン形式で要約し保存する"""
     journal = firestore_service.get_journal(date)
     if not journal:
         raise HTTPException(status_code=404, detail=f"{date} のジャーナルが見つかりません")
 
     markdown = claude_service.summarize_journal_as_markdown(journal["content"])
-    return {"markdown": markdown}
+
+    update_data = {
+        "md_summary": markdown,
+        "updated_at": now_jst(),
+    }
+    updated = firestore_service.update_journal(date, update_data)
+    return JournalEntry(**updated)
