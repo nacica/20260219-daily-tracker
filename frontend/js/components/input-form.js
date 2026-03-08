@@ -5,8 +5,8 @@
  * 朝のタスク整理（ソクラテス式問答）統合
  */
 
-import { recordsApi, analysisApi, morningDialogueApi } from "../api.js?v=20260308r";
-import { showToast } from "../app.js?v=20260308r";
+import { recordsApi, analysisApi, morningDialogueApi } from "../api.js?v=20260309a";
+import { showToast } from "../app.js?v=20260309a";
 
 /* ── カテゴリ管理 ── */
 
@@ -342,7 +342,7 @@ function buildFormHTML(date, record, tasks, isEdit, morningDialogue) {
           <label for="raw-input">今日の行動を自由に入力してください</label>
           <textarea
             id="raw-input"
-            placeholder="8:00 起床&#10;8:30 朝食&#10;9:00-12:00 仕事（企画書作成）&#10;12:00 昼食&#10;13:00-14:30 YouTube視聴&#10;15:00-18:00 コードレビュー&#10;19:00 夕食&#10;20:00-22:00 読書&#10;23:00 就寝"
+            placeholder=""
           >${rawInput}</textarea>
         </div>
       </div>`,
