@@ -3250,33 +3250,73 @@ textarea {
 .kg-tooltip {
   position: absolute;
   background: rgba(2, 4, 8, 0.97);
-  border: 1px solid rgba(0, 212, 255, 0.4);
+  border: 1px solid rgba(0, 212, 255, 0.3);
   border-radius: 10px;
-  padding: 12px 16px;
+  padding: 14px 16px;
   font-size: 0.85rem;
   color: #ffffff;
   pointer-events: none;
   z-index: 10;
-  max-width: 280px;
+  max-width: 320px;
   line-height: 1.6;
   transition: opacity 0.15s;
   backdrop-filter: blur(12px);
-  box-shadow: 0 4px 20px rgba(0,0,0,0.6);
+  box-shadow: 0 4px 24px rgba(0,0,0,0.7);
+}
+
+.kg-tooltip-header {
+  margin-bottom: 8px;
 }
 
 .kg-tooltip-type {
+  display: block;
   font-size: 0.75rem;
   color: #94a3b8;
-  font-weight: 500;
+  margin-top: 2px;
+}
+
+.kg-tooltip-obs {
+  font-size: 0.82rem;
+  color: #e2e8f0;
+  background: rgba(255,255,255,0.05);
+  border-radius: 6px;
+  padding: 8px 10px;
+  margin-bottom: 8px;
+  line-height: 1.5;
 }
 
 .kg-tooltip-rels {
-  margin-top: 8px;
+  border-top: 1px solid rgba(0,212,255,0.15);
   padding-top: 8px;
-  border-top: 1px solid rgba(0,212,255,0.2);
+}
+
+.kg-tooltip-rels-title {
+  display: block;
+  font-size: 0.7rem;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 4px;
+}
+
+.kg-tooltip-rel-item {
+  display: block;
   font-size: 0.8rem;
-  color: #e2e8f0;
-  line-height: 1.7;
+  color: #cbd5e1;
+  padding: 3px 0;
+  line-height: 1.5;
+}
+
+.kg-tooltip-rel-item strong {
+  color: #ffffff;
+}
+
+.kg-tooltip-desc {
+  display: block;
+  font-size: 0.75rem;
+  color: #94a3b8;
+  padding-left: 8px;
+  font-style: italic;
 }
 
 .kg-legend {

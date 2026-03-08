@@ -3,8 +3,8 @@
  * エンティティ・リレーションの一覧とグラフ表示
  */
 
-import { knowledgeApi } from "../api.js?v=20260308j";
-import { showToast } from "../app.js?v=20260308j";
+import { knowledgeApi } from "../api.js?v=20260308k";
+import { showToast } from "../app.js?v=20260308k";
 
 /** メインコンテンツエリアを返す */
 function getMain() {
@@ -262,14 +262,20 @@ function _renderGraph(entities, relations) {
     .scaleExtent([0.3, 4])
     .on("zoom", (event) => g.attr("transform", event.transform)));
 
-  // ノードデータ
-  const nodes = entities.map(e => ({
-    id: e.name,
-    entityId: e.id,
-    type: e.entityType,
-    color: TYPE_COLORS[e.entityType] || "#6b7280",
-    obsCount: e.observation_count || 0,
-  }));
+  // ノードデータ（観測情報も保持）
+  const nodes = entities.map(e => {
+    const obs = e.observations || [];
+    const latestObs = obs.length > 0 ? obs[obs.length - 1].content : "";
+    return {
+      id: e.name,
+      entityId: e.id,
+      type: e.entityType,
+      color: TYPE_COLORS[e.entityType] || "#6b7280",
+      obsCount: e.observation_count || 0,
+      latestObs,
+      lastObserved: e.last_observed || "",
+    };
+  });
 
   const nodeSet = new Set(nodes.map(n => n.id));
 
@@ -375,9 +381,11 @@ function _renderGraph(entities, relations) {
     // 接続ノードのラベルも表示
     label.style("opacity", n => connected.has(n.id) ? 1 : 0);
 
-    // ツールチップ
+    // ツールチップ（理解→行動につなげる記述）
     const typeLabel = TYPE_LABELS[d.type] || d.type;
-    const relInfo = links
+
+    // 関係性を自然文に変換
+    const relLines = links
       .filter(l => {
         const src = typeof l.source === "object" ? l.source.id : l.source;
         const tgt = typeof l.target === "object" ? l.target.id : l.target;
@@ -387,15 +395,40 @@ function _renderGraph(entities, relations) {
         const src = typeof l.source === "object" ? l.source.id : l.source;
         const tgt = typeof l.target === "object" ? l.target.id : l.target;
         const relLabel = RELATION_LABELS[l.type] || l.type;
-        return src === d.id ? `→ ${relLabel} → ${tgt}` : `${src} → ${relLabel} →`;
+        const desc = l.desc ? `<span class="kg-tooltip-desc">${l.desc}</span>` : "";
+        if (src === d.id) {
+          return `<span class="kg-tooltip-rel-item">
+            <strong>${d.id}</strong> が <strong>${tgt}</strong> を${relLabel}
+            ${desc}</span>`;
+        } else {
+          return `<span class="kg-tooltip-rel-item">
+            <strong>${src}</strong> が <strong>${d.id}</strong> を${relLabel}
+            ${desc}</span>`;
+        }
       })
-      .slice(0, 5)
-      .join("<br>");
+      .slice(0, 4);
+
+    // 観測回数に応じた頻度テキスト
+    const freqText = d.obsCount >= 5 ? "頻繁に観測" : d.obsCount >= 3 ? "複数回観測" : "観測あり";
+
+    let html = `<div class="kg-tooltip-header" style="border-left: 3px solid ${d.color}; padding-left: 8px;">
+      <strong style="color:${d.color}; font-size: 0.95rem;">${d.id}</strong>
+      <span class="kg-tooltip-type">${typeLabel} / ${freqText}（${d.obsCount}回）</span>
+    </div>`;
+
+    if (d.latestObs) {
+      html += `<div class="kg-tooltip-obs">${d.latestObs}</div>`;
+    }
+
+    if (relLines.length > 0) {
+      html += `<div class="kg-tooltip-rels">
+        <span class="kg-tooltip-rels-title">つながり</span>
+        ${relLines.join("")}
+      </div>`;
+    }
 
     tooltip
-      .html(`<strong style="color:${d.color}">${d.id}</strong><br>
-             <span class="kg-tooltip-type">${typeLabel}</span><br>
-             ${relInfo ? `<div class="kg-tooltip-rels">${relInfo}</div>` : ""}`)
+      .html(html)
       .style("left", (event.offsetX + 15) + "px")
       .style("top", (event.offsetY - 10) + "px")
       .style("opacity", 1);
