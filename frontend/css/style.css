@@ -3237,39 +3237,46 @@ textarea {
 
 .kg-node-label {
   font-family: 'Klee One', 'Space Grotesk', sans-serif;
-  font-size: 11px;
-  fill: var(--text-primary, #dce8ff);
-  text-shadow: 0 0 4px rgba(0,0,0,0.8);
+  font-size: 12px;
+  font-weight: 600;
+  fill: #ffffff;
+  paint-order: stroke;
+  stroke: rgba(2, 4, 8, 0.9);
+  stroke-width: 3px;
+  stroke-linejoin: round;
   transition: opacity 0.2s;
 }
 
 .kg-tooltip {
   position: absolute;
-  background: rgba(10, 14, 20, 0.95);
-  border: 1px solid rgba(0, 212, 255, 0.3);
-  border-radius: 8px;
-  padding: 10px 14px;
-  font-size: 0.8rem;
-  color: var(--text-primary, #dce8ff);
+  background: rgba(2, 4, 8, 0.97);
+  border: 1px solid rgba(0, 212, 255, 0.4);
+  border-radius: 10px;
+  padding: 12px 16px;
+  font-size: 0.85rem;
+  color: #ffffff;
   pointer-events: none;
   z-index: 10;
-  max-width: 260px;
-  line-height: 1.5;
+  max-width: 280px;
+  line-height: 1.6;
   transition: opacity 0.15s;
-  backdrop-filter: blur(8px);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.6);
 }
 
 .kg-tooltip-type {
-  font-size: 0.7rem;
-  color: var(--text-muted, #64748b);
+  font-size: 0.75rem;
+  color: #94a3b8;
+  font-weight: 500;
 }
 
 .kg-tooltip-rels {
-  margin-top: 6px;
-  padding-top: 6px;
-  border-top: 1px solid rgba(0,212,255,0.15);
-  font-size: 0.75rem;
-  color: var(--text-secondary, #94a3b8);
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(0,212,255,0.2);
+  font-size: 0.8rem;
+  color: #e2e8f0;
+  line-height: 1.7;
 }
 
 .kg-legend {
