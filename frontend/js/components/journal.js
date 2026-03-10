@@ -3,8 +3,8 @@
  * 自由記述の日記 + AI自動分析（感情タグ、ブロッカー検出、トレンド）
  */
 
-import { journalApi, diaryDialogueApi } from "../api.js?v=20260308r";
-import { showToast } from "../app.js?v=20260308r";
+import { journalApi, diaryDialogueApi } from "../api.js?v=20260310a";
+import { showToast } from "../app.js?v=20260310a";
 
 // ===== ユーティリティ =====
 

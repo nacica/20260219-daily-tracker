@@ -1791,6 +1791,45 @@ textarea {
   max-width: 100%;
 }
 
+/* ===== おやすみモード ===== */
+
+.rest-day-banner {
+  border: 1px solid rgba(168, 85, 247, 0.3);
+  background: rgba(168, 85, 247, 0.08);
+  margin-bottom: var(--gap);
+}
+
+.rest-day-btn {
+  border-color: rgba(168, 85, 247, 0.4);
+  color: var(--violet);
+}
+.rest-day-btn:hover {
+  background: rgba(168, 85, 247, 0.12);
+  border-color: var(--violet);
+}
+
+.rest-day-modal {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.6);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.rest-day-modal-content {
+  max-width: 380px;
+  width: 100%;
+  animation: modalSlideIn 0.2s ease-out;
+}
+
+@keyframes modalSlideIn {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
 /* ===== 朝のタスク整理 ===== */
 
 .morning-dialogue-card {

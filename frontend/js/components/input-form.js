@@ -5,8 +5,8 @@
  * 朝のタスク整理（ソクラテス式問答）統合
  */
 
-import { recordsApi, analysisApi, morningDialogueApi } from "../api.js?v=20260309a";
-import { showToast } from "../app.js?v=20260309a";
+import { recordsApi, analysisApi, morningDialogueApi } from "../api.js?v=20260310a";
+import { showToast } from "../app.js?v=20260310a";
 
 /* ── カテゴリ管理 ── */
 
@@ -126,10 +126,14 @@ export async function renderInputForm(date) {
   const isEdit = !!existingRecord;
   const tasks = existingRecord?.tasks || { planned: [], completed: [], backlog: [] };
 
-  main.innerHTML = buildFormHTML(date, existingRecord, tasks, isEdit, morningDialogue);
+  const isRestDay = existingRecord?.rest_day || false;
+  const restReason = existingRecord?.rest_reason || "";
+
+  main.innerHTML = buildFormHTML(date, existingRecord, tasks, isEdit, morningDialogue, isRestDay, restReason);
   attachFormEvents(date, isEdit);
   attachMorningDialogueEvents(date, morningDialogue);
   attachReminderEvents();
+  attachRestDayEvents(date, isRestDay);
 }
 
 /* ── 付箋リマインダー ── */
@@ -226,6 +230,65 @@ function refreshStickyNotes() {
   }).join("");
 }
 
+/* ── おやすみモード ── */
+
+function attachRestDayEvents(date, isRestDay) {
+  // おやすみボタン → モーダル表示
+  const btnRest = document.getElementById("btn-rest-day");
+  if (btnRest) {
+    btnRest.addEventListener("click", () => {
+      const modal = document.getElementById("rest-day-modal");
+      if (modal) modal.style.display = "flex";
+    });
+  }
+
+  // モーダル確定
+  const btnConfirm = document.getElementById("btn-confirm-rest");
+  if (btnConfirm) {
+    btnConfirm.addEventListener("click", async () => {
+      const reason = document.getElementById("rest-day-reason")?.value || "";
+      btnConfirm.disabled = true;
+      btnConfirm.textContent = "設定中...";
+      try {
+        await recordsApi.toggleRestDay(date, true, reason);
+        showToast("おやすみモードに設定しました", "success");
+        await renderInputForm(date);
+      } catch (err) {
+        showToast("設定に失敗しました: " + err.message, "error");
+        btnConfirm.disabled = false;
+        btnConfirm.textContent = "おやすみにする";
+      }
+    });
+  }
+
+  // モーダルキャンセル
+  const btnCancelModal = document.getElementById("btn-cancel-rest-modal");
+  if (btnCancelModal) {
+    btnCancelModal.addEventListener("click", () => {
+      const modal = document.getElementById("rest-day-modal");
+      if (modal) modal.style.display = "none";
+    });
+  }
+
+  // おやすみ解除
+  const btnCancelRest = document.getElementById("btn-cancel-rest");
+  if (btnCancelRest) {
+    btnCancelRest.addEventListener("click", async () => {
+      btnCancelRest.disabled = true;
+      btnCancelRest.textContent = "解除中...";
+      try {
+        await recordsApi.toggleRestDay(date, false, "");
+        showToast("おやすみモードを解除しました", "success");
+        await renderInputForm(date);
+      } catch (err) {
+        showToast("解除に失敗しました: " + err.message, "error");
+        btnCancelRest.disabled = false;
+        btnCancelRest.textContent = "解除する";
+      }
+    });
+  }
+}
+
 /* ── 朝問答 HTML 生成 ── */
 
 function buildMorningDialogueHTML(morningDialogue) {
@@ -320,7 +383,7 @@ function buildMorningDialogueHTML(morningDialogue) {
 
 /* ── HTML 生成 ── */
 
-function buildFormHTML(date, record, tasks, isEdit, morningDialogue) {
+function buildFormHTML(date, record, tasks, isEdit, morningDialogue, isRestDay = false, restReason = "") {
   const dateLabel = new Date(date + "T00:00:00").toLocaleDateString("ja-JP", {
     year: "numeric", month: "long", day: "numeric", weekday: "long",
   });
@@ -439,9 +502,51 @@ function buildFormHTML(date, record, tasks, isEdit, morningDialogue) {
   const morningHTML = buildMorningDialogueHTML(morningDialogue);
   const reminderHTML = buildReminderBoardHTML();
 
+  // おやすみモード理由選択肢
+  const REST_REASONS = ["残業", "体調不良", "出張", "予定あり", "その他"];
+  const reasonOptions = REST_REASONS.map(
+    (r) => `<option value="${r}"${r === restReason ? " selected" : ""}>${r}</option>`
+  ).join("");
+
   return `
     <h2 style="margin-bottom: 4px; font-size: 1.2rem;">${isEdit ? "記録を編集" : "行動を記録"}</h2>
     <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: var(--gap);">${dateLabel}</p>
+
+    ${isRestDay ? `
+    <div class="card rest-day-banner" id="rest-day-banner">
+      <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+        <span style="font-size: 1.3rem;">🌙</span>
+        <div style="flex: 1;">
+          <div style="font-weight: 600; color: var(--text-primary);">おやすみモード</div>
+          <div style="font-size: 0.82rem; color: var(--text-secondary);">
+            この日は分析対象外です${restReason ? `（${escapeHTML(restReason)}）` : ""}
+          </div>
+        </div>
+        <button class="btn btn-outline btn-sm" id="btn-cancel-rest">解除する</button>
+      </div>
+    </div>` : `
+    <div style="margin-bottom: var(--gap);">
+      <button class="btn btn-outline btn-sm rest-day-btn" id="btn-rest-day">
+        🌙 今日はおやすみ
+      </button>
+    </div>`}
+
+    <div id="rest-day-modal" class="rest-day-modal" style="display:none;">
+      <div class="rest-day-modal-content card">
+        <div class="card-title">おやすみモード</div>
+        <p style="color: var(--text-secondary); font-size: 0.88rem; margin-bottom: 12px;">
+          この日を分析対象外にします。理由を選んでください（任意）。
+        </p>
+        <select id="rest-day-reason" style="width:100%; margin-bottom: 12px; padding: 8px; border-radius: 8px; background: var(--bg-input); color: var(--text-primary); border: 1px solid var(--border);">
+          <option value="">理由なし</option>
+          ${reasonOptions}
+        </select>
+        <div style="display: flex; gap: 8px;">
+          <button class="btn btn-primary btn-sm" id="btn-confirm-rest" style="flex:1;">おやすみにする</button>
+          <button class="btn btn-outline btn-sm" id="btn-cancel-rest-modal" style="flex:1;">キャンセル</button>
+        </div>
+      </div>
+    </div>
 
     <div class="input-grid" id="input-grid">
       <div class="input-column" id="input-column-0" data-column="0">

@@ -62,6 +62,13 @@ export const recordsApi = {
 
   /** 行動記録を削除 */
   delete: (date) => apiFetch(`/records/${date}`, { method: "DELETE" }),
+
+  /** おやすみモード切替 */
+  toggleRestDay: (date, restDay, restReason = "") =>
+    apiFetch(`/records/${date}/rest-day`, {
+      method: "PUT",
+      body: { rest_day: restDay, rest_reason: restReason },
+    }),
 };
 
 // ---- AI 分析 ----

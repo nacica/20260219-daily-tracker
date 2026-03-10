@@ -31,8 +31,20 @@ async def generate_analysis(date: str, background_tasks: BackgroundTasks):
                 detail=f"{date} の行動記録が見つかりません。先に POST /records で記録を作成してください。",
             )
 
-        # 過去データの取得（比較分析用）
-        past_records = firestore_service.get_past_records(date, days=7)
+        # おやすみモードの日は分析をスキップ
+        if record.get("rest_day"):
+            reason = record.get("rest_reason", "")
+            msg = f"{date} はおやすみモードのため分析対象外です"
+            if reason:
+                msg += f"（理由: {reason}）"
+            raise HTTPException(status_code=422, detail=msg)
+
+        # 過去データの取得（比較分析用）— おやすみ日と記録の少ない日を除外
+        past_records_raw = firestore_service.get_past_records(date, days=7)
+        past_records = [
+            r for r in past_records_raw
+            if not r.get("rest_day") and len(r.get("parsed_activities", [])) >= 1
+        ]
         past_analyses = firestore_service.get_past_analyses(date, days=7)
 
         # Claude API で分析を生成

@@ -44,7 +44,12 @@ async def generate_weekly_analysis(week_id: str):
     week_start, week_end = _week_id_to_dates(week_id)
 
     # 今週のデータを取得
-    daily_records = firestore_service.list_records(start_date=week_start, end_date=week_end)
+    daily_records_raw = firestore_service.list_records(start_date=week_start, end_date=week_end)
+    # おやすみ日と記録の少ない日を除外
+    daily_records = [
+        r for r in daily_records_raw
+        if not r.get("rest_day") and len(r.get("parsed_activities", [])) >= 1
+    ]
     daily_analyses = firestore_service.list_analyses(start_date=week_start, end_date=week_end)
 
     if not daily_records:

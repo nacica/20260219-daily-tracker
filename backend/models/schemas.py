@@ -56,6 +56,14 @@ class RecordUpdate(BaseModel):
     tasks_planned: Optional[list[str]] = None
     tasks_completed: Optional[list[str]] = None
     tasks_backlog: Optional[list[str]] = None
+    rest_day: Optional[bool] = None
+    rest_reason: Optional[str] = None
+
+
+class RestDayRequest(BaseModel):
+    """おやすみモード切替リクエスト"""
+    rest_day: bool = Field(..., description="おやすみモードの有効/無効")
+    rest_reason: str = Field(default="", description="理由（残業・体調不良・出張など）")
 
 
 # ---- API レスポンス ----
@@ -68,6 +76,8 @@ class DailyRecord(BaseModel):
     parsed_activities: list[Activity] = []
     screen_time: Optional[ScreenTime] = None
     tasks: Tasks = Tasks()
+    rest_day: bool = False
+    rest_reason: str = ""
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
 

@@ -10,7 +10,7 @@ DELETE /api/v1/records/{date}
 from fastapi import APIRouter, HTTPException, Query, Response
 from typing import Optional
 
-from models.schemas import RecordCreate, RecordUpdate, DailyRecord, Tasks
+from models.schemas import RecordCreate, RecordUpdate, DailyRecord, Tasks, RestDayRequest
 from services import firestore_service, claude_service
 from utils.helpers import now_jst
 
@@ -93,6 +93,11 @@ async def update_record(date: str, body: RecordUpdate):
             except Exception:
                 pass
 
+    if body.rest_day is not None:
+        update_data["rest_day"] = body.rest_day
+    if body.rest_reason is not None:
+        update_data["rest_reason"] = body.rest_reason
+
     if body.tasks_planned is not None or body.tasks_completed is not None or body.tasks_backlog is not None:
         planned = body.tasks_planned if body.tasks_planned is not None else existing.get("tasks", {}).get("planned", [])
         completed = body.tasks_completed if body.tasks_completed is not None else existing.get("tasks", {}).get("completed", [])
@@ -107,6 +112,38 @@ async def update_record(date: str, body: RecordUpdate):
 
     updated = firestore_service.update_record(date, update_data)
     return DailyRecord(**updated)
+
+
+@router.put("/records/{date}/rest-day", response_model=DailyRecord)
+async def toggle_rest_day(date: str, body: RestDayRequest):
+    """おやすみモードを切り替える。レコードが存在しない場合は空レコードを作成する。"""
+    now = now_jst()
+    existing = firestore_service.get_record(date)
+
+    if existing:
+        update_data = {
+            "rest_day": body.rest_day,
+            "rest_reason": body.rest_reason,
+            "updated_at": now,
+        }
+        updated = firestore_service.update_record(date, update_data)
+        return DailyRecord(**updated)
+    else:
+        # レコードが無い場合は最小限のレコードを作成
+        record_data = {
+            "id": date,
+            "date": date,
+            "raw_input": "",
+            "parsed_activities": [],
+            "screen_time": None,
+            "tasks": Tasks().dict(),
+            "rest_day": body.rest_day,
+            "rest_reason": body.rest_reason,
+            "created_at": now,
+            "updated_at": now,
+        }
+        saved = firestore_service.create_record(date, record_data)
+        return DailyRecord(**saved)
 
 
 @router.delete("/records/{date}", status_code=204)
