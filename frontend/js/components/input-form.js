@@ -5,9 +5,9 @@
  * 朝のタスク整理（ソクラテス式問答）統合
  */
 
-import { recordsApi, analysisApi, morningDialogueApi } from "../api.js?v=20260311l";
-import { showToast } from "../app.js?v=20260311l";
-import { showTaskCompleteAnimation, buildTaskStatsCards } from "./task-stats.js?v=20260311l";
+import { recordsApi, analysisApi, morningDialogueApi } from "../api.js?v=20260311m";
+import { showToast } from "../app.js?v=20260311m";
+import { showTaskCompleteAnimation, buildTaskStatsCards } from "./task-stats.js?v=20260311m";
 
 /* ── カテゴリ管理 ── */
 
@@ -186,9 +186,9 @@ function formatReminderDate(timestamp) {
   return `${m}/${day}(${w}) ${h}:${min}`;
 }
 
-function buildStickyNoteHTML(r) {
+function buildStickyNoteHTML(r, activeClass = "") {
   const dateStr = formatReminderDate(r.createdAt);
-  return `<div class="sticky-note" data-id="${escapeHTML(r.id)}">
+  return `<div class="sticky-note${activeClass}" data-id="${escapeHTML(r.id)}">
     <div class="sticky-note-body">
       ${dateStr ? `<div class="sticky-note-date">${dateStr}</div>` : ""}
       <span class="sticky-text">${escapeHTML(r.text)}</span>
@@ -197,17 +197,30 @@ function buildStickyNoteHTML(r) {
   </div>`;
 }
 
+let stickyCurrentIndex = 0;
+
 function buildReminderBoardHTML() {
   const reminders = getReminders();
-  const notesHTML = reminders.map(buildStickyNoteHTML).join("");
-  const counterHTML = reminders.length > 1
-    ? `<div class="sticky-counter" id="sticky-counter">1 / ${reminders.length}</div>`
+  // インデックスを範囲内に補正
+  if (stickyCurrentIndex >= reminders.length) stickyCurrentIndex = Math.max(0, reminders.length - 1);
+
+  const notesHTML = reminders.map((r, i) => {
+    const activeClass = i === stickyCurrentIndex ? " active" : "";
+    return buildStickyNoteHTML(r, activeClass);
+  }).join("");
+
+  const navHTML = reminders.length > 1
+    ? `<div class="sticky-nav">
+        <button class="sticky-nav-btn" id="sticky-prev" ${stickyCurrentIndex === 0 ? "disabled" : ""}>&#9664;</button>
+        <span class="sticky-counter" id="sticky-counter">${stickyCurrentIndex + 1} / ${reminders.length}</span>
+        <button class="sticky-nav-btn" id="sticky-next" ${stickyCurrentIndex === reminders.length - 1 ? "disabled" : ""}>&#9654;</button>
+      </div>`
     : "";
 
   return `
     <div class="card reminder-board-card" id="card-reminder-board">
       <div class="card-title">今日意識すること</div>
-      ${counterHTML}
+      ${navHTML}
       <div class="sticky-notes" id="sticky-notes">
         ${notesHTML || '<p class="sticky-empty">まだメモがありません。<br>下から追加してみましょう。</p>'}
       </div>
@@ -232,6 +245,7 @@ function attachReminderEvents() {
     const reminders = getReminders();
     reminders.push({ id: Date.now().toString(36), text, createdAt: Date.now() });
     saveReminders(reminders);
+    stickyCurrentIndex = reminders.length - 1; // 新規追加は最後に移動
     refreshStickyNotes();
     input.value = "";
     input.focus();
@@ -253,79 +267,111 @@ function attachReminderEvents() {
       const id = note.dataset.id;
       const reminders = getReminders().filter((r) => r.id !== id);
       saveReminders(reminders);
+      if (stickyCurrentIndex >= reminders.length) stickyCurrentIndex = Math.max(0, reminders.length - 1);
       refreshStickyNotes();
     });
   }
 
-  // 初期スクロールリスナー
-  attachStickyScrollListener();
+  // ◀ ▶ ボタン
+  attachStickyNavEvents();
+
+  // スワイプ対応
+  attachStickySwipeEvents();
+}
+
+function attachStickyNavEvents() {
+  const prevBtn = document.getElementById("sticky-prev");
+  const nextBtn = document.getElementById("sticky-next");
+  if (prevBtn) prevBtn.addEventListener("click", () => { navigateSticky(-1); });
+  if (nextBtn) nextBtn.addEventListener("click", () => { navigateSticky(1); });
+}
+
+function navigateSticky(delta) {
+  const reminders = getReminders();
+  const newIndex = stickyCurrentIndex + delta;
+  if (newIndex < 0 || newIndex >= reminders.length) return;
+  stickyCurrentIndex = newIndex;
+  showStickyAtIndex();
+}
+
+function showStickyAtIndex() {
+  const container = document.getElementById("sticky-notes");
+  if (!container) return;
+  const notes = container.querySelectorAll(".sticky-note");
+  notes.forEach((note, i) => {
+    note.classList.toggle("active", i === stickyCurrentIndex);
+  });
+
+  // カウンター更新
+  const counterEl = document.getElementById("sticky-counter");
+  if (counterEl) counterEl.textContent = `${stickyCurrentIndex + 1} / ${notes.length}`;
+
+  // ボタンの disabled 更新
+  const prevBtn = document.getElementById("sticky-prev");
+  const nextBtn = document.getElementById("sticky-next");
+  if (prevBtn) prevBtn.disabled = stickyCurrentIndex === 0;
+  if (nextBtn) nextBtn.disabled = stickyCurrentIndex === notes.length - 1;
 }
 
 function refreshStickyNotes() {
-  const container = document.getElementById("sticky-notes");
-  if (!container) return;
+  const board = document.getElementById("card-reminder-board");
+  if (!board) return;
   const reminders = getReminders();
 
-  // カウンター更新
-  let counterEl = document.getElementById("sticky-counter");
+  // インデックス補正
+  if (stickyCurrentIndex >= reminders.length) stickyCurrentIndex = Math.max(0, reminders.length - 1);
+
+  // ナビゲーション更新
+  const existingNav = board.querySelector(".sticky-nav");
   if (reminders.length > 1) {
-    if (!counterEl) {
-      counterEl = document.createElement("div");
-      counterEl.className = "sticky-counter";
-      counterEl.id = "sticky-counter";
-      container.parentNode.insertBefore(counterEl, container);
+    const navHTML = `<div class="sticky-nav">
+      <button class="sticky-nav-btn" id="sticky-prev" ${stickyCurrentIndex === 0 ? "disabled" : ""}>&#9664;</button>
+      <span class="sticky-counter" id="sticky-counter">${stickyCurrentIndex + 1} / ${reminders.length}</span>
+      <button class="sticky-nav-btn" id="sticky-next" ${stickyCurrentIndex === reminders.length - 1 ? "disabled" : ""}>&#9654;</button>
+    </div>`;
+    if (existingNav) {
+      existingNav.outerHTML = navHTML;
+    } else {
+      const title = board.querySelector(".card-title");
+      if (title) title.insertAdjacentHTML("afterend", navHTML);
     }
-    counterEl.textContent = `1 / ${reminders.length}`;
-    counterEl.style.display = "";
-  } else if (counterEl) {
-    counterEl.style.display = "none";
+    attachStickyNavEvents();
+  } else if (existingNav) {
+    existingNav.remove();
   }
 
+  // カード描画
+  const container = document.getElementById("sticky-notes");
+  if (!container) return;
   if (reminders.length === 0) {
     container.innerHTML = '<p class="sticky-empty">まだメモがありません。<br>下から追加してみましょう。</p>';
     return;
   }
-  container.innerHTML = reminders.map(buildStickyNoteHTML).join("");
+  container.innerHTML = reminders.map((r, i) => {
+    const activeClass = i === stickyCurrentIndex ? " active" : "";
+    return buildStickyNoteHTML(r, activeClass);
+  }).join("");
 
-  // 新規追加時は最後のカードにスクロール
-  const lastNote = container.querySelector(".sticky-note:last-child");
-  if (lastNote) {
-    container.scrollTop = lastNote.offsetTop;
-    setTimeout(updateStickyCounter, 50);
-  }
-
-  attachStickyScrollListener();
+  attachStickySwipeEvents();
 }
 
-function updateStickyCounter() {
+function attachStickySwipeEvents() {
   const container = document.getElementById("sticky-notes");
-  const counterEl = document.getElementById("sticky-counter");
-  if (!container || !counterEl) return;
-  const notes = container.querySelectorAll(".sticky-note");
-  if (notes.length <= 1) return;
+  if (!container || container._swipeAttached) return;
+  container._swipeAttached = true;
 
-  const containerRect = container.getBoundingClientRect();
-  let currentIndex = 0;
-  let minDist = Infinity;
-  notes.forEach((note, i) => {
-    const noteRect = note.getBoundingClientRect();
-    const dist = Math.abs(noteRect.top - containerRect.top);
-    if (dist < minDist) { minDist = dist; currentIndex = i; }
-  });
-  counterEl.textContent = `${currentIndex + 1} / ${notes.length}`;
-}
+  let startX = 0, startY = 0;
+  container.addEventListener("touchstart", (e) => {
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+  }, { passive: true });
 
-function attachStickyScrollListener() {
-  const container = document.getElementById("sticky-notes");
-  if (!container || container._scrollListenerAttached) return;
-  container._scrollListenerAttached = true;
-  let ticking = false;
-  container.addEventListener("scroll", () => {
-    if (!ticking) {
-      requestAnimationFrame(() => { updateStickyCounter(); ticking = false; });
-      ticking = true;
-    }
-  });
+  container.addEventListener("touchend", (e) => {
+    const dx = e.changedTouches[0].clientX - startX;
+    const dy = e.changedTouches[0].clientY - startY;
+    if (Math.abs(dx) < 40 || Math.abs(dx) < Math.abs(dy)) return; // 横スワイプのみ
+    navigateSticky(dx < 0 ? 1 : -1);
+  }, { passive: true });
 }
 
 /* ── おやすみモード ── */

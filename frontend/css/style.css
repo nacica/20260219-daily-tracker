@@ -2277,24 +2277,50 @@ textarea {
 }
 
 .sticky-notes {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-  height: 130px;
-  max-height: 130px;
-  overflow-y: auto;
-  scroll-snap-type: y mandatory;
+  position: relative;
   margin-bottom: 14px;
-  overscroll-behavior-y: contain;
+}
+
+.sticky-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.sticky-nav-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--bg-input);
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  cursor: pointer;
   padding: 0;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.sticky-nav-btn:hover {
+  border-color: var(--cyan-dim);
+  background: var(--bg-card);
+}
+
+.sticky-nav-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
 }
 
 .sticky-counter {
-  text-align: center;
   font-size: 0.75rem;
   color: var(--text-muted);
-  margin-bottom: 6px;
   font-family: 'Klee One', cursive;
+  min-width: 40px;
+  text-align: center;
 }
 
 .sticky-empty {
@@ -2305,11 +2331,10 @@ textarea {
   text-align: center;
   width: 100%;
   padding: 12px 0;
-  scroll-snap-align: start;
 }
 
 .sticky-note {
-  display: flex;
+  display: none;
   align-items: flex-start;
   gap: 8px;
   padding: 10px 12px;
@@ -2322,13 +2347,12 @@ textarea {
   line-height: 1.4;
   color: var(--text-primary);
   word-break: break-word;
-  scroll-snap-align: start;
-  scroll-snap-stop: always;
-  min-height: 130px;
-  height: 130px;
+  min-height: 100px;
   box-sizing: border-box;
-  flex: 0 0 130px;
-  transition: background 0.15s, box-shadow 0.15s;
+}
+
+.sticky-note.active {
+  display: flex;
 }
 
 .sticky-note-body {
@@ -2341,10 +2365,6 @@ textarea {
   font-weight: 400;
   color: #ffffff;
   margin-bottom: 4px;
-}
-
-.sticky-note:hover {
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
 }
 
 .sticky-delete {
