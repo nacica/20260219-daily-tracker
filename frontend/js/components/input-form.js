@@ -5,9 +5,9 @@
  * 朝のタスク整理（ソクラテス式問答）統合
  */
 
-import { recordsApi, analysisApi, morningDialogueApi } from "../api.js?v=20260311o";
-import { showToast } from "../app.js?v=20260311o";
-import { showTaskCompleteAnimation, buildTaskStatsCards } from "./task-stats.js?v=20260311o";
+import { recordsApi, analysisApi, morningDialogueApi } from "../api.js?v=20260311p";
+import { showToast } from "../app.js?v=20260311p";
+import { showTaskCompleteAnimation, buildTaskStatsCards } from "./task-stats.js?v=20260311p";
 
 /* ── カテゴリ管理 ── */
 
@@ -214,9 +214,9 @@ function buildReminderBoardHTML() {
 
   const navHTML = reminders.length > 1
     ? `<div class="sticky-nav">
-        <button class="sticky-nav-btn" id="sticky-prev" ${stickyCurrentIndex === 0 ? "disabled" : ""}>&#9664;</button>
+        <button class="sticky-nav-btn" id="sticky-prev">&#9664;</button>
         <span class="sticky-counter" id="sticky-counter">${stickyCurrentIndex + 1} / ${reminders.length}</span>
-        <button class="sticky-nav-btn" id="sticky-next" ${stickyCurrentIndex === reminders.length - 1 ? "disabled" : ""}>&#9654;</button>
+        <button class="sticky-nav-btn" id="sticky-next">&#9654;</button>
       </div>`
     : "";
 
@@ -337,9 +337,8 @@ function attachStickyNavEvents() {
 
 function navigateSticky(delta) {
   const reminders = getReminders();
-  const newIndex = stickyCurrentIndex + delta;
-  if (newIndex < 0 || newIndex >= reminders.length) return;
-  stickyCurrentIndex = newIndex;
+  const len = reminders.length;
+  stickyCurrentIndex = (stickyCurrentIndex + delta + len) % len;
   showStickyAtIndex();
 }
 
@@ -358,8 +357,8 @@ function showStickyAtIndex() {
   // ボタンの disabled 更新
   const prevBtn = document.getElementById("sticky-prev");
   const nextBtn = document.getElementById("sticky-next");
-  if (prevBtn) prevBtn.disabled = stickyCurrentIndex === 0;
-  if (nextBtn) nextBtn.disabled = stickyCurrentIndex === notes.length - 1;
+  if (prevBtn) prevBtn.disabled = false;
+  if (nextBtn) nextBtn.disabled = false;
 }
 
 function refreshStickyNotes() {
@@ -374,9 +373,9 @@ function refreshStickyNotes() {
   const existingNav = board.querySelector(".sticky-nav");
   if (reminders.length > 1) {
     const navHTML = `<div class="sticky-nav">
-      <button class="sticky-nav-btn" id="sticky-prev" ${stickyCurrentIndex === 0 ? "disabled" : ""}>&#9664;</button>
+      <button class="sticky-nav-btn" id="sticky-prev">&#9664;</button>
       <span class="sticky-counter" id="sticky-counter">${stickyCurrentIndex + 1} / ${reminders.length}</span>
-      <button class="sticky-nav-btn" id="sticky-next" ${stickyCurrentIndex === reminders.length - 1 ? "disabled" : ""}>&#9654;</button>
+      <button class="sticky-nav-btn" id="sticky-next">&#9654;</button>
     </div>`;
     if (existingNav) {
       existingNav.outerHTML = navHTML;
