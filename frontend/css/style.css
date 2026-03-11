@@ -433,6 +433,14 @@ body {
   flex-shrink: 0;
 }
 
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+.blink-colon {
+  animation: blink 1s step-end infinite;
+}
+
 @keyframes nav-pulse {
   0%, 100% { opacity: 1; transform: scale(1); box-shadow: 0 0 8px rgba(0, 212, 255, 0.8); }
   50%       { opacity: 0.45; transform: scale(0.75); box-shadow: 0 0 4px rgba(0, 212, 255, 0.3); }
