@@ -5,9 +5,9 @@
  * 朝のタスク整理（ソクラテス式問答）統合
  */
 
-import { recordsApi, analysisApi, morningDialogueApi } from "../api.js?v=20260311n";
-import { showToast } from "../app.js?v=20260311n";
-import { showTaskCompleteAnimation, buildTaskStatsCards } from "./task-stats.js?v=20260311n";
+import { recordsApi, analysisApi, morningDialogueApi } from "../api.js?v=20260311o";
+import { showToast } from "../app.js?v=20260311o";
+import { showTaskCompleteAnimation, buildTaskStatsCards } from "./task-stats.js?v=20260311o";
 
 /* ── カテゴリ管理 ── */
 
@@ -194,8 +194,8 @@ function buildStickyNoteHTML(r, activeClass = "") {
       <span class="sticky-text">${escapeHTML(r.text)}</span>
     </div>
     <div class="sticky-actions">
-      <button class="sticky-edit" title="編集">&#9998;</button>
       <button class="sticky-delete" title="削除">&times;</button>
+      <button class="sticky-edit" title="編集">&#9998;</button>
     </div>
   </div>`;
 }

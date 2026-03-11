@@ -2370,7 +2370,8 @@ textarea {
 .sticky-actions {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  justify-content: space-between;
+  align-self: stretch;
   flex-shrink: 0;
 }
 
@@ -2380,11 +2381,11 @@ textarea {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  width: 24px;
-  height: 24px;
+  width: 28px;
+  height: 28px;
   background: none;
   border: 1px solid var(--border);
-  font-size: 0.85rem;
+  font-size: 1.05rem;
   color: var(--text-muted);
   cursor: pointer;
   padding: 0;
