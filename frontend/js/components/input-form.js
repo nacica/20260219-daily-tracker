@@ -5,9 +5,9 @@
  * 朝のタスク整理（ソクラテス式問答）統合
  */
 
-import { recordsApi, analysisApi, morningDialogueApi } from "../api.js?v=20260311f";
-import { showToast } from "../app.js?v=20260311f";
-import { showTaskCompleteAnimation, buildTaskStatsCards } from "./task-stats.js?v=20260311f";
+import { recordsApi, analysisApi, morningDialogueApi } from "../api.js?v=20260311g";
+import { showToast } from "../app.js?v=20260311g";
+import { showTaskCompleteAnimation, buildTaskStatsCards } from "./task-stats.js?v=20260311g";
 
 /* ── カテゴリ管理 ── */
 
@@ -126,6 +126,24 @@ export async function renderInputForm(date) {
 
   const isEdit = !!existingRecord;
   const tasks = existingRecord?.tasks || { planned: [], completed: [], backlog: [] };
+
+  // 新規レコードかつ近日中タスクが空の場合、直近7日から自動引き継ぎ
+  if (!isEdit && tasks.backlog.length === 0) {
+    try {
+      const base = new Date(date + "T00:00:00");
+      for (let i = 1; i <= 7; i++) {
+        const d = new Date(base);
+        d.setDate(d.getDate() - i);
+        const prevDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+        const prev = await recordsApi.get(prevDate).catch(() => null);
+        const prevBacklog = prev?.tasks?.backlog || [];
+        if (prevBacklog.length > 0) {
+          tasks.backlog = [...prevBacklog];
+          break;
+        }
+      }
+    } catch { /* ignore */ }
+  }
 
   const isRestDay = existingRecord?.rest_day || false;
   const restReason = existingRecord?.rest_reason || "";
