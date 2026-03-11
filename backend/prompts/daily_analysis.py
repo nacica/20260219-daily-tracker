@@ -60,6 +60,10 @@ DAILY_ANALYSIS_SYSTEM_PROMPT = """
 - スクリーンタイムデータがある場合、アプリ別の使用時間を分析に含めること
 - 改善提案は優先度付きで3〜5個に絞ること
 - overall_score の基準: 70以上=良い日、40-69=普通、39以下=改善が必要
+- **活動可能時間が申告されている場合**: その時間を前提に生産性を評価すること。
+  例えば残業で帰宅が遅く可処分時間が2時間しかない日に1.5時間勉強できていれば、
+  絶対時間は短くても高評価（75%活用）とすること。フルに時間がある日と同じ基準で
+  減点してはならない。
 """.strip()
 
 
@@ -87,8 +91,13 @@ def build_daily_analysis_prompt(
     tasks_planned = tasks.get("planned", [])
     tasks_completed = tasks.get("completed", [])
 
-    prompt = f"""## 本日の行動記録（{date}）
+    available_hours = record.get("available_hours")
 
+    prompt = f"""## 本日の行動記録（{date}）
+{f"""
+### 活動可能時間
+{available_hours}時間（ユーザー申告。この時間を前提に生産性を評価してください）
+""" if available_hours is not None else ""}
 ### ユーザー入力
 {raw_input}
 

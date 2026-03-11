@@ -58,6 +58,7 @@ class RecordUpdate(BaseModel):
     tasks_backlog: Optional[list[str]] = None
     rest_day: Optional[bool] = None
     rest_reason: Optional[str] = None
+    available_hours: Optional[float] = None
 
 
 class RestDayRequest(BaseModel):
@@ -78,6 +79,7 @@ class DailyRecord(BaseModel):
     tasks: Tasks = Tasks()
     rest_day: bool = False
     rest_reason: str = ""
+    available_hours: Optional[float] = None
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
 

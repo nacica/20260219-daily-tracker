@@ -5,8 +5,8 @@
  * 朝のタスク整理（ソクラテス式問答）統合
  */
 
-import { recordsApi, analysisApi, morningDialogueApi } from "../api.js?v=20260310a";
-import { showToast } from "../app.js?v=20260310a";
+import { recordsApi, analysisApi, morningDialogueApi } from "../api.js?v=20260311a";
+import { showToast } from "../app.js?v=20260311a";
 
 /* ── カテゴリ管理 ── */
 
@@ -408,6 +408,19 @@ function buildFormHTML(date, record, tasks, isEdit, morningDialogue, isRestDay =
             placeholder=""
           >${rawInput}</textarea>
         </div>
+        <div class="available-hours-row">
+          <label for="available-hours">活動可能時間</label>
+          <div class="available-hours-input-group">
+            <div class="available-hours-presets" id="available-hours-presets">
+              ${[2, 4, 6, 8].map((h) => `<button class="preset-btn${record?.available_hours === h ? " active" : ""}" data-hours="${h}">${h}h</button>`).join("")}
+            </div>
+            <input type="number" id="available-hours" min="0" max="24" step="0.5"
+              value="${record?.available_hours != null ? record.available_hours : ""}"
+              placeholder="--" />
+            <span class="available-hours-unit">時間</span>
+          </div>
+          <p class="available-hours-hint">帰宅後の自由時間を入力。AI分析がこの時間を前提に評価します。</p>
+        </div>
       </div>`,
 
     "card-task-mgmt": `
@@ -788,15 +801,20 @@ function attachFormEvents(date, isEdit) {
       .filter(Boolean);
     const plannedTasks = [...incompleteTasks, ...completedTasks];
 
+    const availHoursEl = document.getElementById("available-hours");
+    const availHoursVal = availHoursEl?.value ? parseFloat(availHoursEl.value) : null;
+
     isSaving = true;
     try {
       if (isEdit) {
-        await recordsApi.update(date, {
+        const updateData = {
           raw_input: rawInput,
           tasks_planned: plannedTasks,
           tasks_completed: completedTasks,
           tasks_backlog: backlogTasks,
-        });
+        };
+        if (availHoursVal !== null) updateData.available_hours = availHoursVal;
+        await recordsApi.update(date, updateData);
       } else {
         await recordsApi.create(date, rawInput, plannedTasks, backlogTasks);
         isEdit = true;
@@ -821,6 +839,28 @@ function attachFormEvents(date, isEdit) {
     clearTimeout(rawInputTimer);
     rawInputTimer = setTimeout(saveDataQuietly, 1500);
   });
+
+  // 活動可能時間: プリセットボタン & 入力
+  const availHoursInput = document.getElementById("available-hours");
+  const presetsContainer = document.getElementById("available-hours-presets");
+  if (presetsContainer && availHoursInput) {
+    presetsContainer.addEventListener("click", (e) => {
+      const btn = e.target.closest(".preset-btn");
+      if (!btn) return;
+      const hours = parseFloat(btn.dataset.hours);
+      availHoursInput.value = hours;
+      presetsContainer.querySelectorAll(".preset-btn").forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+      saveDataQuietly();
+    });
+    availHoursInput.addEventListener("change", () => {
+      const val = parseFloat(availHoursInput.value);
+      presetsContainer.querySelectorAll(".preset-btn").forEach((b) => {
+        b.classList.toggle("active", parseFloat(b.dataset.hours) === val);
+      });
+      saveDataQuietly();
+    });
+  }
 
   // 昨日の未完了タスク引き継ぎ
   document.getElementById("btn-carry-over").addEventListener("click", async (e) => {
@@ -1427,6 +1467,8 @@ async function submitForm(date, isEdit, btn) {
     .filter(Boolean);
 
   const plannedTasks = [...incompleteTasks, ...completedTasks];
+  const availHoursEl = document.getElementById("available-hours");
+  const availHoursVal = availHoursEl?.value ? parseFloat(availHoursEl.value) : null;
 
   btn.disabled = true;
   const originalText = btn.textContent;
@@ -1434,12 +1476,14 @@ async function submitForm(date, isEdit, btn) {
 
   try {
     if (isEdit) {
-      await recordsApi.update(date, {
+      const updateData = {
         raw_input: rawInput,
         tasks_planned: plannedTasks,
         tasks_completed: completedTasks,
         tasks_backlog: backlogTasks,
-      });
+      };
+      if (availHoursVal !== null) updateData.available_hours = availHoursVal;
+      await recordsApi.update(date, updateData);
       showToast("記録を更新しました！", "success");
     } else {
       await recordsApi.create(date, rawInput, plannedTasks, backlogTasks);
