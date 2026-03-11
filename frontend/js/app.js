@@ -3,19 +3,19 @@
  * ルーティングの設定とホーム画面の表示を担当する
  */
 
-import { addRoute, navigate, updateNavActive } from "./router.js?v=20260311p";
-import { renderInputForm } from "./components/input-form.js?v=20260311p";
-import { renderAnalysisView } from "./components/analysis-view.js?v=20260311p";
-import { renderHistoryList } from "./components/history-list.js?v=20260311p";
-import { renderWeeklyReport } from "./components/weekly-report.js?v=20260311p";
-import { renderSuggestions } from "./components/suggestions.js?v=20260311p";
-import { renderCoachingChat } from "./components/coaching-chat.js?v=20260311p";
-import { renderKnowledgeGraph } from "./components/knowledge-graph.js?v=20260311p";
-import { renderMonthlyReport } from "./components/monthly-report.js?v=20260311p";
-import { renderJournal } from "./components/journal.js?v=20260311p";
-import { recordsApi, analysisApi } from "./api.js?v=20260311p";
-import { initSwipeNav } from "./swipe-nav.js?v=20260311p";
-import { buildTaskStatsCards, renderTaskStats } from "./components/task-stats.js?v=20260311p";
+import { addRoute, navigate, updateNavActive } from "./router.js?v=20260311q";
+import { renderInputForm } from "./components/input-form.js?v=20260311q";
+import { renderAnalysisView } from "./components/analysis-view.js?v=20260311q";
+import { renderHistoryList } from "./components/history-list.js?v=20260311q";
+import { renderWeeklyReport } from "./components/weekly-report.js?v=20260311q";
+import { renderSuggestions } from "./components/suggestions.js?v=20260311q";
+import { renderCoachingChat } from "./components/coaching-chat.js?v=20260311q";
+import { renderKnowledgeGraph } from "./components/knowledge-graph.js?v=20260311q";
+import { renderMonthlyReport } from "./components/monthly-report.js?v=20260311q";
+import { renderJournal } from "./components/journal.js?v=20260311q";
+import { recordsApi, analysisApi } from "./api.js?v=20260311q";
+import { initSwipeNav } from "./swipe-nav.js?v=20260311q";
+import { buildTaskStatsCards, renderTaskStats } from "./components/task-stats.js?v=20260311q";
 
 // ===== ユーティリティ =====
 
@@ -66,10 +66,20 @@ function updateDesktopHeader() {
   titleEl.textContent = route.title;
   breadcrumbEl.textContent = route.breadcrumb;
 
-  // 日付表示
-  const now = new Date();
-  const weekdays = ["日", "月", "火", "水", "木", "金", "土"];
-  dateEl.textContent = `${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日（${weekdays[now.getDay()]}）`;
+  // 日付+時刻表示
+  function updateDateTime() {
+    const now = new Date();
+    const weekdays = ["日", "月", "火", "水", "木", "金", "土"];
+    const h = String(now.getHours()).padStart(2, "0");
+    const m = String(now.getMinutes()).padStart(2, "0");
+    dateEl.textContent = `${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日（${weekdays[now.getDay()]}）${h}:${m}`;
+  }
+  updateDateTime();
+  // 毎分更新
+  if (!dateEl.dataset.timerInit) {
+    dateEl.dataset.timerInit = "1";
+    setInterval(updateDateTime, 60000);
+  }
 
   // カレンダーピッカーのイベント登録（初回のみ）
   if (!dateEl.dataset.calInit) {
