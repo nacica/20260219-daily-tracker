@@ -3,18 +3,19 @@
  * ルーティングの設定とホーム画面の表示を担当する
  */
 
-import { addRoute, navigate, updateNavActive } from "./router.js?v=20260311a";
-import { renderInputForm } from "./components/input-form.js?v=20260311a";
-import { renderAnalysisView } from "./components/analysis-view.js?v=20260311a";
-import { renderHistoryList } from "./components/history-list.js?v=20260311a";
-import { renderWeeklyReport } from "./components/weekly-report.js?v=20260311a";
-import { renderSuggestions } from "./components/suggestions.js?v=20260311a";
-import { renderCoachingChat } from "./components/coaching-chat.js?v=20260311a";
-import { renderKnowledgeGraph } from "./components/knowledge-graph.js?v=20260311a";
-import { renderMonthlyReport } from "./components/monthly-report.js?v=20260311a";
-import { renderJournal } from "./components/journal.js?v=20260311a";
-import { recordsApi, analysisApi } from "./api.js?v=20260311a";
-import { initSwipeNav } from "./swipe-nav.js?v=20260311a";
+import { addRoute, navigate, updateNavActive } from "./router.js?v=20260311b";
+import { renderInputForm } from "./components/input-form.js?v=20260311b";
+import { renderAnalysisView } from "./components/analysis-view.js?v=20260311b";
+import { renderHistoryList } from "./components/history-list.js?v=20260311b";
+import { renderWeeklyReport } from "./components/weekly-report.js?v=20260311b";
+import { renderSuggestions } from "./components/suggestions.js?v=20260311b";
+import { renderCoachingChat } from "./components/coaching-chat.js?v=20260311b";
+import { renderKnowledgeGraph } from "./components/knowledge-graph.js?v=20260311b";
+import { renderMonthlyReport } from "./components/monthly-report.js?v=20260311b";
+import { renderJournal } from "./components/journal.js?v=20260311b";
+import { recordsApi, analysisApi } from "./api.js?v=20260311b";
+import { initSwipeNav } from "./swipe-nav.js?v=20260311b";
+import { buildTaskStatsCards, renderTaskStats } from "./components/task-stats.js?v=20260311b";
 
 // ===== ユーティリティ =====
 
@@ -48,6 +49,7 @@ const ROUTE_TITLES = {
   "/knowledge": { title: "ナレッジグラフ", breadcrumb: "行動パターン" },
   "/monthly": { title: "月次レポート", breadcrumb: "月次サマリー" },
   "/journal": { title: "フリージャーナル", breadcrumb: "ジャーナル" },
+  "/task-stats": { title: "タスク実績", breadcrumb: "タスク実績" },
 };
 
 /** デスクトップヘッダーのタイトルと日付を更新 */
@@ -270,9 +272,13 @@ async function renderHome() {
     const isRestDay = hasRecord && record.value.rest_day;
     const restReason = hasRecord ? record.value.rest_reason || "" : "";
 
+    // タスク完了サマリーカードを非同期で取得
+    const taskStatsHTML = await buildTaskStatsCards();
+
     getMain().innerHTML = `
       <div class="home-date">${formatDateJP(todayStr)}</div>
       <h1 class="home-title">今日の行動分析</h1>
+      ${taskStatsHTML}
       ${isRestDay ? `
       <div class="card" style="border: 1px solid rgba(168, 85, 247, 0.3); background: rgba(168, 85, 247, 0.08); margin-bottom: var(--gap);">
         <div style="display: flex; align-items: center; gap: 10px;">
@@ -410,6 +416,7 @@ addRoute("/monthly", () => renderMonthlyReport(null));
 addRoute("/monthly/:yearMonth", ({ yearMonth }) => renderMonthlyReport(yearMonth));
 addRoute("/journal", () => renderJournal(today()));
 addRoute("/journal/:date", ({ date }) => renderJournal(date));
+addRoute("/task-stats", () => renderTaskStats());
 
 // ===== 初期化 =====
 
