@@ -5,9 +5,9 @@
  * 朝のタスク整理（ソクラテス式問答）統合
  */
 
-import { recordsApi, analysisApi, morningDialogueApi } from "../api.js?v=20260311b";
-import { showToast } from "../app.js?v=20260311b";
-import { showTaskCompleteAnimation } from "./task-stats.js?v=20260311b";
+import { recordsApi, analysisApi, morningDialogueApi } from "../api.js?v=20260311c";
+import { showToast } from "../app.js?v=20260311c";
+import { showTaskCompleteAnimation, buildTaskStatsCards } from "./task-stats.js?v=20260311c";
 
 /* ── カテゴリ管理 ── */
 
@@ -130,7 +130,10 @@ export async function renderInputForm(date) {
   const isRestDay = existingRecord?.rest_day || false;
   const restReason = existingRecord?.rest_reason || "";
 
-  main.innerHTML = buildFormHTML(date, existingRecord, tasks, isEdit, morningDialogue, isRestDay, restReason);
+  // タスク完了サマリーカードを非同期で取得
+  const taskStatsHTML = await buildTaskStatsCards();
+
+  main.innerHTML = taskStatsHTML + buildFormHTML(date, existingRecord, tasks, isEdit, morningDialogue, isRestDay, restReason);
   attachFormEvents(date, isEdit);
   attachMorningDialogueEvents(date, morningDialogue);
   attachReminderEvents();

@@ -3,19 +3,19 @@
  * ルーティングの設定とホーム画面の表示を担当する
  */
 
-import { addRoute, navigate, updateNavActive } from "./router.js?v=20260311b";
-import { renderInputForm } from "./components/input-form.js?v=20260311b";
-import { renderAnalysisView } from "./components/analysis-view.js?v=20260311b";
-import { renderHistoryList } from "./components/history-list.js?v=20260311b";
-import { renderWeeklyReport } from "./components/weekly-report.js?v=20260311b";
-import { renderSuggestions } from "./components/suggestions.js?v=20260311b";
-import { renderCoachingChat } from "./components/coaching-chat.js?v=20260311b";
-import { renderKnowledgeGraph } from "./components/knowledge-graph.js?v=20260311b";
-import { renderMonthlyReport } from "./components/monthly-report.js?v=20260311b";
-import { renderJournal } from "./components/journal.js?v=20260311b";
-import { recordsApi, analysisApi } from "./api.js?v=20260311b";
-import { initSwipeNav } from "./swipe-nav.js?v=20260311b";
-import { buildTaskStatsCards, renderTaskStats } from "./components/task-stats.js?v=20260311b";
+import { addRoute, navigate, updateNavActive } from "./router.js?v=20260311c";
+import { renderInputForm } from "./components/input-form.js?v=20260311c";
+import { renderAnalysisView } from "./components/analysis-view.js?v=20260311c";
+import { renderHistoryList } from "./components/history-list.js?v=20260311c";
+import { renderWeeklyReport } from "./components/weekly-report.js?v=20260311c";
+import { renderSuggestions } from "./components/suggestions.js?v=20260311c";
+import { renderCoachingChat } from "./components/coaching-chat.js?v=20260311c";
+import { renderKnowledgeGraph } from "./components/knowledge-graph.js?v=20260311c";
+import { renderMonthlyReport } from "./components/monthly-report.js?v=20260311c";
+import { renderJournal } from "./components/journal.js?v=20260311c";
+import { recordsApi, analysisApi } from "./api.js?v=20260311c";
+import { initSwipeNav } from "./swipe-nav.js?v=20260311c";
+import { buildTaskStatsCards, renderTaskStats } from "./components/task-stats.js?v=20260311c";
 
 // ===== ユーティリティ =====
 
@@ -272,13 +272,9 @@ async function renderHome() {
     const isRestDay = hasRecord && record.value.rest_day;
     const restReason = hasRecord ? record.value.rest_reason || "" : "";
 
-    // タスク完了サマリーカードを非同期で取得
-    const taskStatsHTML = await buildTaskStatsCards();
-
     getMain().innerHTML = `
       <div class="home-date">${formatDateJP(todayStr)}</div>
       <h1 class="home-title">今日の行動分析</h1>
-      ${taskStatsHTML}
       ${isRestDay ? `
       <div class="card" style="border: 1px solid rgba(168, 85, 247, 0.3); background: rgba(168, 85, 247, 0.08); margin-bottom: var(--gap);">
         <div style="display: flex; align-items: center; gap: 10px;">

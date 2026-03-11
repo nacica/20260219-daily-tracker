@@ -3,8 +3,8 @@
  * エンティティ・リレーションの一覧とグラフ表示
  */
 
-import { knowledgeApi } from "../api.js?v=20260311b";
-import { showToast } from "../app.js?v=20260311b";
+import { knowledgeApi } from "../api.js?v=20260311c";
+import { showToast } from "../app.js?v=20260311c";
 
 /** メインコンテンツエリアを返す */
 function getMain() {
