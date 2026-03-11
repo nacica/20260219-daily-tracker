@@ -2367,27 +2367,62 @@ textarea {
   margin-bottom: 4px;
 }
 
+.sticky-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.sticky-edit,
 .sticky-delete {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   background: none;
-  border: none;
-  font-size: 0.95rem;
+  border: 1px solid var(--border);
+  font-size: 0.85rem;
   color: var(--text-muted);
   cursor: pointer;
   padding: 0;
   line-height: 1;
-  border-radius: 50%;
-  transition: color 0.15s, background 0.15s;
+  border-radius: 6px;
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
+}
+
+.sticky-edit:hover {
+  color: var(--cyan-dim);
+  border-color: var(--cyan-dim);
+}
+
+.sticky-edit.sticky-save {
+  color: #4caf50;
+  border-color: #4caf50;
 }
 
 .sticky-delete:hover {
   color: #c62828;
+  border-color: #c62828;
   background: rgba(198, 40, 40, 0.1);
+}
+
+.sticky-edit-area {
+  width: 100%;
+  min-height: 60px;
+  padding: 6px 8px;
+  border: 1px solid var(--cyan-dim);
+  border-radius: var(--radius-sm);
+  background: var(--bg-input);
+  color: var(--text-primary);
+  font-size: 1.1rem;
+  font-weight: 700;
+  font-family: 'Klee One', cursive;
+  line-height: 1.4;
+  resize: vertical;
+  outline: none;
 }
 
 .sticky-add-area {

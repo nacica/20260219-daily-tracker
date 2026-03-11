@@ -5,9 +5,9 @@
  * 朝のタスク整理（ソクラテス式問答）統合
  */
 
-import { recordsApi, analysisApi, morningDialogueApi } from "../api.js?v=20260311m";
-import { showToast } from "../app.js?v=20260311m";
-import { showTaskCompleteAnimation, buildTaskStatsCards } from "./task-stats.js?v=20260311m";
+import { recordsApi, analysisApi, morningDialogueApi } from "../api.js?v=20260311n";
+import { showToast } from "../app.js?v=20260311n";
+import { showTaskCompleteAnimation, buildTaskStatsCards } from "./task-stats.js?v=20260311n";
 
 /* ── カテゴリ管理 ── */
 
@@ -193,7 +193,10 @@ function buildStickyNoteHTML(r, activeClass = "") {
       ${dateStr ? `<div class="sticky-note-date">${dateStr}</div>` : ""}
       <span class="sticky-text">${escapeHTML(r.text)}</span>
     </div>
-    <button class="sticky-delete" title="削除">&times;</button>
+    <div class="sticky-actions">
+      <button class="sticky-edit" title="編集">&#9998;</button>
+      <button class="sticky-delete" title="削除">&times;</button>
+    </div>
   </div>`;
 }
 
@@ -256,19 +259,65 @@ function attachReminderEvents() {
     if (e.key === "Enter") { e.preventDefault(); addSticky(); }
   });
 
-  // 削除（イベント委譲）
+  // 削除・編集（イベント委譲）
   const container = document.getElementById("sticky-notes");
   if (container) {
     container.addEventListener("click", (e) => {
+      // 削除
       const delBtn = e.target.closest(".sticky-delete");
-      if (!delBtn) return;
-      const note = delBtn.closest(".sticky-note");
-      if (!note) return;
-      const id = note.dataset.id;
-      const reminders = getReminders().filter((r) => r.id !== id);
-      saveReminders(reminders);
-      if (stickyCurrentIndex >= reminders.length) stickyCurrentIndex = Math.max(0, reminders.length - 1);
-      refreshStickyNotes();
+      if (delBtn) {
+        const note = delBtn.closest(".sticky-note");
+        if (!note) return;
+        const id = note.dataset.id;
+        const reminders = getReminders().filter((r) => r.id !== id);
+        saveReminders(reminders);
+        if (stickyCurrentIndex >= reminders.length) stickyCurrentIndex = Math.max(0, reminders.length - 1);
+        refreshStickyNotes();
+        return;
+      }
+
+      // 編集
+      const editBtn = e.target.closest(".sticky-edit");
+      if (editBtn) {
+        const note = editBtn.closest(".sticky-note");
+        if (!note) return;
+        const id = note.dataset.id;
+        const reminders = getReminders();
+        const target = reminders.find((r) => r.id === id);
+        if (!target) return;
+        const body = note.querySelector(".sticky-note-body");
+        const textEl = note.querySelector(".sticky-text");
+        if (!body || !textEl) return;
+
+        // テキストを編集用 textarea に差し替え
+        const textarea = document.createElement("textarea");
+        textarea.className = "sticky-edit-area";
+        textarea.value = target.text;
+        textEl.replaceWith(textarea);
+        textarea.focus();
+
+        // 編集ボタンを「保存」に変更
+        editBtn.innerHTML = "&#10003;";
+        editBtn.title = "保存";
+        editBtn.classList.add("sticky-save");
+
+        // 保存処理
+        function save() {
+          const newText = textarea.value.trim();
+          if (newText) {
+            target.text = newText;
+            saveReminders(reminders);
+          }
+          refreshStickyNotes();
+        }
+
+        editBtn.removeEventListener("click", save);
+        editBtn.addEventListener("click", (ev) => { ev.stopPropagation(); save(); }, { once: true });
+        textarea.addEventListener("keydown", (ev) => {
+          if (ev.key === "Enter" && !ev.shiftKey) { ev.preventDefault(); save(); }
+        });
+        return;
+      }
     });
   }
 
