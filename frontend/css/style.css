@@ -1281,8 +1281,8 @@ textarea {
 .task-stat-card:hover::before { opacity: 0.15; }
 
 .task-stat-number {
-  font-size: 2.2rem;
-  font-weight: 800;
+  font-size: 3.5rem;
+  font-weight: 900;
   color: var(--card-accent);
   font-feature-settings: "tnum";
   font-family: 'Courier New', 'Menlo', monospace;
@@ -1307,7 +1307,7 @@ textarea {
 }
 
 .task-stat-trend {
-  font-size: 0.72rem;
+  font-size: 1.5rem;
   font-weight: 700;
   margin-top: 6px;
   font-family: 'Courier New', monospace;
