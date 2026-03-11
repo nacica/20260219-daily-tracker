@@ -39,10 +39,10 @@ async function apiFetch(path, options = {}) {
 
 export const recordsApi = {
   /** 行動記録を作成 */
-  create: (date, rawInput, tasksPlanned = [], tasksBacklog = []) =>
+  create: (date, rawInput, tasksPlanned = [], tasksCompleted = [], tasksBacklog = []) =>
     apiFetch("/records", {
       method: "POST",
-      body: { date, raw_input: rawInput, tasks_planned: tasksPlanned, tasks_backlog: tasksBacklog },
+      body: { date, raw_input: rawInput, tasks_planned: tasksPlanned, tasks_completed: tasksCompleted, tasks_backlog: tasksBacklog },
     }),
 
   /** 行動記録一覧を取得 */

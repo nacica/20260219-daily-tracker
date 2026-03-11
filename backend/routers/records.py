@@ -38,7 +38,12 @@ async def create_record(body: RecordCreate):
         parsed_activities = []
 
     now = now_jst()
-    tasks = Tasks(planned=body.tasks_planned, backlog=body.tasks_backlog)
+    tasks = Tasks(
+        planned=body.tasks_planned,
+        completed=body.tasks_completed,
+        backlog=body.tasks_backlog,
+        completion_rate=len(body.tasks_completed) / len(body.tasks_planned) if body.tasks_planned else 0.0,
+    )
 
     record_data = {
         "id": date,
@@ -71,6 +76,13 @@ async def get_record(date: str):
     record = firestore_service.get_record(date)
     if not record:
         return Response(status_code=204)
+    # parsed_activities のデシリアライズ失敗に備え、不正なエントリを除外
+    if "parsed_activities" in record and isinstance(record["parsed_activities"], list):
+        safe_activities = []
+        for a in record["parsed_activities"]:
+            if isinstance(a, dict) and "activity" in a and "start_time" in a:
+                safe_activities.append(a)
+        record["parsed_activities"] = safe_activities
     return DailyRecord(**record)
 
 

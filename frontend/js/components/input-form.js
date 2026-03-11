@@ -5,9 +5,9 @@
  * 朝のタスク整理（ソクラテス式問答）統合
  */
 
-import { recordsApi, analysisApi, morningDialogueApi } from "../api.js?v=20260311e";
-import { showToast } from "../app.js?v=20260311e";
-import { showTaskCompleteAnimation, buildTaskStatsCards } from "./task-stats.js?v=20260311e";
+import { recordsApi, analysisApi, morningDialogueApi } from "../api.js?v=20260311f";
+import { showToast } from "../app.js?v=20260311f";
+import { showTaskCompleteAnimation, buildTaskStatsCards } from "./task-stats.js?v=20260311f";
 
 /* ── カテゴリ管理 ── */
 
@@ -792,8 +792,6 @@ function attachFormEvents(date, isEdit) {
     }
 
     const rawInput = document.getElementById("raw-input").value.trim();
-    if (!isEdit && !rawInput) return;
-
     const incompleteTasks = [...document.querySelectorAll("#planned-list .task-item .task-remove")]
       .map((el) => el.dataset.remove)
       .filter(Boolean);
@@ -804,6 +802,9 @@ function attachFormEvents(date, isEdit) {
       .map((el) => el.dataset.remove)
       .filter(Boolean);
     const plannedTasks = [...incompleteTasks, ...completedTasks];
+
+    // 何も入力されていなければ保存しない
+    if (!isEdit && !rawInput && plannedTasks.length === 0 && backlogTasks.length === 0) return;
 
     const availHoursEl = document.getElementById("available-hours");
     const availHoursVal = availHoursEl?.value ? parseFloat(availHoursEl.value) : null;
@@ -820,7 +821,23 @@ function attachFormEvents(date, isEdit) {
         if (availHoursVal !== null) updateData.available_hours = availHoursVal;
         await recordsApi.update(date, updateData);
       } else {
-        await recordsApi.create(date, rawInput, plannedTasks, backlogTasks);
+        try {
+          await recordsApi.create(date, rawInput, plannedTasks, completedTasks, backlogTasks);
+        } catch (createErr) {
+          // 409 (既に存在) の場合は update にフォールバック
+          if (createErr.message.includes("409") || createErr.message.includes("すでに存在")) {
+            const updateData = {
+              raw_input: rawInput,
+              tasks_planned: plannedTasks,
+              tasks_completed: completedTasks,
+              tasks_backlog: backlogTasks,
+            };
+            if (availHoursVal !== null) updateData.available_hours = availHoursVal;
+            await recordsApi.update(date, updateData);
+          } else {
+            throw createErr;
+          }
+        }
         isEdit = true;
         const btnSubmit = document.getElementById("btn-submit");
         if (btnSubmit) btnSubmit.textContent = "記録を更新する";
@@ -1491,7 +1508,22 @@ async function submitForm(date, isEdit, btn) {
       await recordsApi.update(date, updateData);
       showToast("記録を更新しました！", "success");
     } else {
-      await recordsApi.create(date, rawInput, plannedTasks, backlogTasks);
+      try {
+        await recordsApi.create(date, rawInput, plannedTasks, completedTasks, backlogTasks);
+      } catch (createErr) {
+        if (createErr.message.includes("409") || createErr.message.includes("すでに存在")) {
+          const updateData = {
+            raw_input: rawInput,
+            tasks_planned: plannedTasks,
+            tasks_completed: completedTasks,
+            tasks_backlog: backlogTasks,
+          };
+          if (availHoursVal !== null) updateData.available_hours = availHoursVal;
+          await recordsApi.update(date, updateData);
+        } else {
+          throw createErr;
+        }
+      }
       showToast("記録を保存しました！", "success");
     }
     window.location.hash = "/";

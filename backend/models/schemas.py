@@ -45,8 +45,9 @@ class Tasks(BaseModel):
 class RecordCreate(BaseModel):
     """行動記録作成リクエスト"""
     date: str = Field(..., description="日付 (YYYY-MM-DD)")
-    raw_input: str = Field(..., description="ユーザーが入力した生テキスト")
+    raw_input: str = Field(default="", description="ユーザーが入力した生テキスト")
     tasks_planned: list[str] = Field(default=[], description="予定タスク")
+    tasks_completed: list[str] = Field(default=[], description="完了タスク")
     tasks_backlog: list[str] = Field(default=[], description="近日中タスク")
 
 
