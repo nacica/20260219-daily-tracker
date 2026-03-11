@@ -2284,7 +2284,7 @@ textarea {
   overflow-y: auto;
   scroll-snap-type: y mandatory;
   margin-bottom: 14px;
-  scroll-behavior: smooth;
+  overscroll-behavior-y: contain;
 }
 
 .sticky-counter {
@@ -2321,7 +2321,9 @@ textarea {
   color: var(--text-primary);
   word-break: break-word;
   scroll-snap-align: start;
+  scroll-snap-stop: always;
   min-height: 120px;
+  height: 120px;
   box-sizing: border-box;
   flex-shrink: 0;
   transition: background 0.15s, box-shadow 0.15s;
@@ -2333,9 +2335,9 @@ textarea {
 }
 
 .sticky-note-date {
-  font-size: 0.72rem;
+  font-size: 0.9rem;
   font-weight: 400;
-  color: var(--text-muted);
+  color: #ffffff;
   margin-bottom: 4px;
 }
 

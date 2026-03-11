@@ -5,9 +5,9 @@
  * 朝のタスク整理（ソクラテス式問答）統合
  */
 
-import { recordsApi, analysisApi, morningDialogueApi } from "../api.js?v=20260311j";
-import { showToast } from "../app.js?v=20260311j";
-import { showTaskCompleteAnimation, buildTaskStatsCards } from "./task-stats.js?v=20260311j";
+import { recordsApi, analysisApi, morningDialogueApi } from "../api.js?v=20260311k";
+import { showToast } from "../app.js?v=20260311k";
+import { showTaskCompleteAnimation, buildTaskStatsCards } from "./task-stats.js?v=20260311k";
 
 /* ── カテゴリ管理 ── */
 
@@ -290,8 +290,8 @@ function refreshStickyNotes() {
   // 新規追加時は最後のカードにスクロール
   const lastNote = container.querySelector(".sticky-note:last-child");
   if (lastNote) {
-    lastNote.scrollIntoView({ behavior: "smooth", block: "nearest" });
-    updateStickyCounter();
+    container.scrollTop = lastNote.offsetTop;
+    setTimeout(updateStickyCounter, 50);
   }
 
   attachStickyScrollListener();
