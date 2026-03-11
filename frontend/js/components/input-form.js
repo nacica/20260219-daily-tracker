@@ -5,9 +5,9 @@
  * 朝のタスク整理（ソクラテス式問答）統合
  */
 
-import { recordsApi, analysisApi, morningDialogueApi } from "../api.js?v=20260311h";
-import { showToast } from "../app.js?v=20260311h";
-import { showTaskCompleteAnimation, buildTaskStatsCards } from "./task-stats.js?v=20260311h";
+import { recordsApi, analysisApi, morningDialogueApi } from "../api.js?v=20260311i";
+import { showToast } from "../app.js?v=20260311i";
+import { showTaskCompleteAnimation, buildTaskStatsCards } from "./task-stats.js?v=20260311i";
 
 /* ── カテゴリ管理 ── */
 
@@ -544,7 +544,13 @@ function buildFormHTML(date, record, tasks, isEdit, morningDialogue, isRestDay =
   ).join("");
 
   return `
-    <h2 style="margin-bottom: 4px; font-size: 1.2rem;">${isEdit ? "記録を編集" : "行動を記録"}</h2>
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
+      <h2 style="margin: 0; font-size: 1.2rem;">${isEdit ? "記録を編集" : "行動を記録"}</h2>
+      ${isRestDay ? `` : `
+      <button class="btn btn-outline btn-sm rest-day-btn" id="btn-rest-day" style="white-space: nowrap;">
+        🌙 今日はおやすみ
+      </button>`}
+    </div>
     <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: var(--gap);">${dateLabel}</p>
 
     ${isRestDay ? `
@@ -559,12 +565,7 @@ function buildFormHTML(date, record, tasks, isEdit, morningDialogue, isRestDay =
         </div>
         <button class="btn btn-outline btn-sm" id="btn-cancel-rest">解除する</button>
       </div>
-    </div>` : `
-    <div style="margin-bottom: var(--gap);">
-      <button class="btn btn-outline btn-sm rest-day-btn" id="btn-rest-day">
-        🌙 今日はおやすみ
-      </button>
-    </div>`}
+    </div>` : ``}
 
     <div id="rest-day-modal" class="rest-day-modal" style="display:none;">
       <div class="rest-day-modal-content card">
