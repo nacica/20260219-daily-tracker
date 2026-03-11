@@ -5,9 +5,9 @@
  * 朝のタスク整理（ソクラテス式問答）統合
  */
 
-import { recordsApi, analysisApi, morningDialogueApi } from "../api.js?v=20260311g";
-import { showToast } from "../app.js?v=20260311g";
-import { showTaskCompleteAnimation, buildTaskStatsCards } from "./task-stats.js?v=20260311g";
+import { recordsApi, analysisApi, morningDialogueApi } from "../api.js?v=20260311h";
+import { showToast } from "../app.js?v=20260311h";
+import { showTaskCompleteAnimation, buildTaskStatsCards } from "./task-stats.js?v=20260311h";
 
 /* ── カテゴリ管理 ── */
 
@@ -127,8 +127,8 @@ export async function renderInputForm(date) {
   const isEdit = !!existingRecord;
   const tasks = existingRecord?.tasks || { planned: [], completed: [], backlog: [] };
 
-  // 新規レコードかつ近日中タスクが空の場合、直近7日から自動引き継ぎ
-  if (!isEdit && tasks.backlog.length === 0) {
+  // 近日中タスクが空の場合、直近7日から自動引き継ぎ
+  if (tasks.backlog.length === 0) {
     try {
       const base = new Date(date + "T00:00:00");
       for (let i = 1; i <= 7; i++) {
