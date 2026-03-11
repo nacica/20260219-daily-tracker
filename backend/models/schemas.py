@@ -152,7 +152,7 @@ class AnalysisDialogue(BaseModel):
 
 class DialogueReplyRequest(BaseModel):
     """対話返信リクエスト"""
-    message: str = Field(..., min_length=1, max_length=2000)
+    message: str = Field(..., min_length=1, max_length=10000)
 
 
 # ---- 朝のタスク整理 ----

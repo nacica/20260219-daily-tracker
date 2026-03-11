@@ -26,7 +26,14 @@ async function apiFetch(path, options = {}) {
     let message = `HTTP ${res.status}`;
     try {
       const data = await res.json();
-      message = data.detail || message;
+      const detail = data.detail;
+      if (typeof detail === "string") {
+        message = detail;
+      } else if (Array.isArray(detail)) {
+        message = detail.map(e => e.msg || JSON.stringify(e)).join("; ");
+      } else if (detail) {
+        message = JSON.stringify(detail);
+      }
     } catch {}
     throw new Error(message);
   }
