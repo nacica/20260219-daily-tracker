@@ -492,7 +492,7 @@ def analyze_journal_entry(
     response = _call_claude_with_retry(
         client,
         model=model,
-        max_tokens=2048,
+        max_tokens=4096,
         system=JOURNAL_ANALYSIS_SYSTEM_PROMPT,
         messages=[{"role": "user", "content": user_prompt}],
     )

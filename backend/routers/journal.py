@@ -182,12 +182,18 @@ async def analyze_journal(date: str):
     daily_analysis = firestore_service.get_analysis(date)
 
     # AI 分析実行
-    analysis_result = claude_service.analyze_journal_entry(
-        content=journal["content"],
-        date=date,
-        daily_record=daily_record,
-        daily_analysis=daily_analysis,
-    )
+    try:
+        analysis_result = claude_service.analyze_journal_entry(
+            content=journal["content"],
+            date=date,
+            daily_record=daily_record,
+            daily_analysis=daily_analysis,
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=502,
+            detail=f"AI分析でエラーが発生しました: {str(e)[:200]}",
+        )
 
     # 結果を保存
     update_data = {
