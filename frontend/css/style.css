@@ -2163,6 +2163,32 @@ textarea {
   color: var(--neon-red);
 }
 
+.timeline-end-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.timeline-toggle-end {
+  padding: 2px 8px;
+  border-radius: 4px;
+  border: 1px dashed var(--border);
+  background: transparent;
+  color: var(--cyan-dim);
+  font-size: 0.72rem;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: all 0.15s;
+}
+
+.timeline-toggle-end:hover {
+  border-color: var(--cyan);
+  color: var(--cyan);
+  background: rgba(0, 212, 255, 0.06);
+}
+
 .timeline-add-btn {
   width: 100%;
   margin-top: 4px;
@@ -2173,11 +2199,16 @@ textarea {
 @media (max-width: 480px) {
   .timeline-row {
     flex-wrap: wrap;
+    position: relative;
+    padding-right: 34px;
   }
 
-  .timeline-start,
-  .timeline-end {
-    width: calc(50% - 20px);
+  .timeline-start {
+    width: 90px;
+  }
+
+  .timeline-end-group {
+    flex-shrink: 0;
   }
 
   .timeline-activity {
@@ -2190,11 +2221,6 @@ textarea {
     position: absolute;
     right: 4px;
     top: 4px;
-  }
-
-  .timeline-row {
-    position: relative;
-    padding-right: 34px;
   }
 }
 

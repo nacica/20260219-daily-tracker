@@ -5,9 +5,9 @@
  * 朝のタスク整理（ソクラテス式問答）統合
  */
 
-import { recordsApi, analysisApi, morningDialogueApi } from "../api.js?v=20260312b";
-import { showToast } from "../app.js?v=20260312b";
-import { showTaskCompleteAnimation, buildTaskStatsCards } from "./task-stats.js?v=20260312b";
+import { recordsApi, analysisApi, morningDialogueApi } from "../api.js?v=20260312c";
+import { showToast } from "../app.js?v=20260312c";
+import { showTaskCompleteAnimation, buildTaskStatsCards } from "./task-stats.js?v=20260312c";
 
 /* ── カテゴリ管理 ── */
 
@@ -606,11 +606,15 @@ function padTime(t) {
 }
 
 function buildTimelineRowHTML(start = "", end = "", activity = "") {
+  const hasEnd = !!end;
   return `
-    <div class="timeline-row">
-      <input type="time" class="timeline-start" value="${start}" placeholder="開始" />
-      <span class="timeline-separator">～</span>
-      <input type="time" class="timeline-end" value="${end}" placeholder="終了" />
+    <div class="timeline-row${hasEnd ? " has-end" : ""}">
+      <input type="time" class="timeline-start" value="${start}" />
+      <span class="timeline-end-group"${hasEnd ? "" : ' style="display:none"'}>
+        <span class="timeline-separator">～</span>
+        <input type="time" class="timeline-end" value="${end}" />
+      </span>
+      <button class="timeline-toggle-end"${hasEnd ? ' style="display:none"' : ""}>${hasEnd ? "" : "+終了"}</button>
       <input type="text" class="timeline-activity" value="${escapeHTMLAttr(activity)}" placeholder="何をした？" />
       <button class="timeline-row-remove" title="削除">✕</button>
     </div>`;
@@ -1164,8 +1168,20 @@ function attachFormEvents(date, isEdit) {
   if (timelineRows) {
     timelineRows.addEventListener("input", debounceTimelineSave);
 
-    // 削除ボタン
+    // 削除ボタン & +終了トグル
     timelineRows.addEventListener("click", (e) => {
+      // +終了トグル
+      const toggleEnd = e.target.closest(".timeline-toggle-end");
+      if (toggleEnd) {
+        const row = toggleEnd.closest(".timeline-row");
+        const endGroup = row.querySelector(".timeline-end-group");
+        endGroup.style.display = "";
+        toggleEnd.style.display = "none";
+        row.classList.add("has-end");
+        row.querySelector(".timeline-end").focus();
+        return;
+      }
+
       const removeBtn = e.target.closest(".timeline-row-remove");
       if (!removeBtn) return;
       const row = removeBtn.closest(".timeline-row");
@@ -1175,6 +1191,11 @@ function attachFormEvents(date, isEdit) {
         row.querySelector(".timeline-start").value = "";
         row.querySelector(".timeline-end").value = "";
         row.querySelector(".timeline-activity").value = "";
+        // 終了時刻を再び非表示に
+        row.querySelector(".timeline-end-group").style.display = "none";
+        row.querySelector(".timeline-toggle-end").style.display = "";
+        row.querySelector(".timeline-toggle-end").textContent = "+終了";
+        row.classList.remove("has-end");
       } else {
         row.remove();
       }
