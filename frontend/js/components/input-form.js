@@ -5,9 +5,9 @@
  * 朝のタスク整理（ソクラテス式問答）統合
  */
 
-import { recordsApi, analysisApi, morningDialogueApi } from "../api.js?v=20260312a";
-import { showToast } from "../app.js?v=20260312a";
-import { showTaskCompleteAnimation, buildTaskStatsCards } from "./task-stats.js?v=20260312a";
+import { recordsApi, analysisApi, morningDialogueApi } from "../api.js?v=20260312b";
+import { showToast } from "../app.js?v=20260312b";
+import { showTaskCompleteAnimation, buildTaskStatsCards } from "./task-stats.js?v=20260312b";
 
 /* ── カテゴリ管理 ── */
 
@@ -573,6 +573,86 @@ function buildMorningDialogueHTML(morningDialogue) {
     </div>`;
 }
 
+/* ── タイムライン入力 ── */
+
+/**
+ * raw_input テキストをタイムライン行にパース
+ * 対応形式: "HH:MM-HH:MM 内容", "HH:MM 内容", "HH:MM～HH:MM 内容"
+ */
+function parseRawInputToTimeline(rawInput) {
+  if (!rawInput || !rawInput.trim()) return [];
+  const lines = rawInput.split("\n").filter((l) => l.trim());
+  const rows = [];
+  for (const line of lines) {
+    const m = line.match(/^(\d{1,2}:\d{2})\s*[-~～ー]\s*(\d{1,2}:\d{2})\s+(.+)$/);
+    if (m) {
+      rows.push({ start: padTime(m[1]), end: padTime(m[2]), activity: m[3].trim() });
+      continue;
+    }
+    const m2 = line.match(/^(\d{1,2}:\d{2})\s+(.+)$/);
+    if (m2) {
+      rows.push({ start: padTime(m2[1]), end: "", activity: m2[2].trim() });
+      continue;
+    }
+    // パースできない行はそのまま活動名に
+    rows.push({ start: "", end: "", activity: line.trim() });
+  }
+  return rows;
+}
+
+function padTime(t) {
+  const [h, m] = t.split(":");
+  return `${h.padStart(2, "0")}:${m}`;
+}
+
+function buildTimelineRowHTML(start = "", end = "", activity = "") {
+  return `
+    <div class="timeline-row">
+      <input type="time" class="timeline-start" value="${start}" placeholder="開始" />
+      <span class="timeline-separator">～</span>
+      <input type="time" class="timeline-end" value="${end}" placeholder="終了" />
+      <input type="text" class="timeline-activity" value="${escapeHTMLAttr(activity)}" placeholder="何をした？" />
+      <button class="timeline-row-remove" title="削除">✕</button>
+    </div>`;
+}
+
+function buildTimelineRowsFromRawInput(rawInput) {
+  const rows = parseRawInputToTimeline(rawInput);
+  if (rows.length === 0) {
+    // デフォルトで空の行を1つ表示
+    return buildTimelineRowHTML();
+  }
+  return rows.map((r) => buildTimelineRowHTML(r.start, r.end, r.activity)).join("");
+}
+
+/**
+ * タイムライン行のデータを raw_input テキストに変換
+ */
+function timelineToRawInput() {
+  const rows = document.querySelectorAll("#timeline-rows .timeline-row");
+  const lines = [];
+  for (const row of rows) {
+    const start = row.querySelector(".timeline-start").value;
+    const end = row.querySelector(".timeline-end").value;
+    const activity = row.querySelector(".timeline-activity").value.trim();
+    if (!activity && !start && !end) continue;
+    if (start && end) {
+      lines.push(`${start}-${end} ${activity}`);
+    } else if (start) {
+      lines.push(`${start} ${activity}`);
+    } else {
+      lines.push(activity);
+    }
+  }
+  return lines.join("\n");
+}
+
+function escapeHTMLAttr(str) {
+  return str.replace(/[&<>"']/g, (c) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+  })[c]);
+}
+
 /* ── HTML 生成 ── */
 
 function buildFormHTML(date, record, tasks, isEdit, morningDialogue, isRestDay = false, restReason = "") {
@@ -594,11 +674,25 @@ function buildFormHTML(date, record, tasks, isEdit, morningDialogue, isRestDay =
         <div class="card-drag-handle" title="ドラッグで移動">⠿</div>
         <div class="card-title">行動ログ</div>
         <div class="form-group">
-          <label for="raw-input">今日の行動を自由に入力してください</label>
-          <textarea
-            id="raw-input"
-            placeholder=""
-          >${rawInput}</textarea>
+          <div class="activity-log-mode-toggle">
+            <button class="mode-toggle-btn active" id="btn-mode-timeline" data-mode="timeline">タイムライン</button>
+            <button class="mode-toggle-btn" id="btn-mode-freeform" data-mode="freeform">自由入力</button>
+          </div>
+          <div id="timeline-mode">
+            <div class="timeline-rows" id="timeline-rows">
+              ${buildTimelineRowsFromRawInput(rawInput)}
+            </div>
+            <button class="btn btn-outline btn-sm timeline-add-btn" id="btn-add-timeline-row">
+              ＋ 行動を追加
+            </button>
+          </div>
+          <div id="freeform-mode" style="display: none;">
+            <label for="raw-input">今日の行動を自由に入力してください</label>
+            <textarea
+              id="raw-input"
+              placeholder=""
+            >${rawInput}</textarea>
+          </div>
         </div>
         <div class="available-hours-row">
           <label for="available-hours">活動可能時間</label>
@@ -980,6 +1074,8 @@ function attachFormEvents(date, isEdit) {
       return;
     }
 
+    // タイムラインモードの場合は textarea を同期
+    syncTimelineToTextarea();
     const rawInput = document.getElementById("raw-input").value.trim();
     const incompleteTasks = [...document.querySelectorAll("#planned-list .task-item .task-remove")]
       .map((el) => el.dataset.remove)
@@ -1049,6 +1145,96 @@ function attachFormEvents(date, isEdit) {
     clearTimeout(rawInputTimer);
     rawInputTimer = setTimeout(saveDataQuietly, 1500);
   });
+
+  // ── タイムラインモード イベント ──
+  function syncTimelineToTextarea() {
+    const timelineMode = document.getElementById("timeline-mode");
+    if (timelineMode && timelineMode.style.display !== "none") {
+      document.getElementById("raw-input").value = timelineToRawInput();
+    }
+  }
+
+  function debounceTimelineSave() {
+    clearTimeout(rawInputTimer);
+    rawInputTimer = setTimeout(saveDataQuietly, 1500);
+  }
+
+  // タイムライン行の入力変更（イベント委任）
+  const timelineRows = document.getElementById("timeline-rows");
+  if (timelineRows) {
+    timelineRows.addEventListener("input", debounceTimelineSave);
+
+    // 削除ボタン
+    timelineRows.addEventListener("click", (e) => {
+      const removeBtn = e.target.closest(".timeline-row-remove");
+      if (!removeBtn) return;
+      const row = removeBtn.closest(".timeline-row");
+      const allRows = timelineRows.querySelectorAll(".timeline-row");
+      if (allRows.length <= 1) {
+        // 最後の1行は消さずにクリア
+        row.querySelector(".timeline-start").value = "";
+        row.querySelector(".timeline-end").value = "";
+        row.querySelector(".timeline-activity").value = "";
+      } else {
+        row.remove();
+      }
+      debounceTimelineSave();
+    });
+
+    // 終了時刻の自動補完: 次の行の開始時刻にコピー
+    timelineRows.addEventListener("change", (e) => {
+      if (!e.target.classList.contains("timeline-end")) return;
+      const currentRow = e.target.closest(".timeline-row");
+      const nextRow = currentRow?.nextElementSibling;
+      if (nextRow && !nextRow.querySelector(".timeline-start").value) {
+        nextRow.querySelector(".timeline-start").value = e.target.value;
+      }
+    });
+  }
+
+  // 行動追加ボタン
+  const addRowBtn = document.getElementById("btn-add-timeline-row");
+  if (addRowBtn) {
+    addRowBtn.addEventListener("click", () => {
+      const rows = timelineRows.querySelectorAll(".timeline-row");
+      const lastRow = rows[rows.length - 1];
+      const lastEnd = lastRow?.querySelector(".timeline-end")?.value || "";
+      timelineRows.insertAdjacentHTML("beforeend", buildTimelineRowHTML(lastEnd, "", ""));
+      // 新しい行の活動入力にフォーカス
+      const newRow = timelineRows.lastElementChild;
+      newRow.querySelector(".timeline-activity").focus();
+    });
+  }
+
+  // モード切替
+  const btnTimeline = document.getElementById("btn-mode-timeline");
+  const btnFreeform = document.getElementById("btn-mode-freeform");
+  const timelineMode = document.getElementById("timeline-mode");
+  const freeformMode = document.getElementById("freeform-mode");
+
+  if (btnTimeline && btnFreeform) {
+    btnTimeline.addEventListener("click", () => {
+      btnTimeline.classList.add("active");
+      btnFreeform.classList.remove("active");
+      // 自由入力の内容をタイムラインに反映
+      const textarea = document.getElementById("raw-input");
+      const parsed = parseRawInputToTimeline(textarea.value);
+      timelineRows.innerHTML = parsed.length > 0
+        ? parsed.map((r) => buildTimelineRowHTML(r.start, r.end, r.activity)).join("")
+        : buildTimelineRowHTML();
+      timelineMode.style.display = "";
+      freeformMode.style.display = "none";
+    });
+
+    btnFreeform.addEventListener("click", () => {
+      btnFreeform.classList.add("active");
+      btnTimeline.classList.remove("active");
+      // タイムラインの内容をテキストに反映
+      syncTimelineToTextarea();
+      freeformMode.style.display = "";
+      timelineMode.style.display = "none";
+    });
+  }
 
   // 活動可能時間: プリセットボタン & 入力
   const availHoursInput = document.getElementById("available-hours");
@@ -1659,6 +1845,11 @@ function persistCurrentLayout(columns) {
 /* ── フォーム送信 ── */
 
 async function submitForm(date, isEdit, btn) {
+  // タイムラインモードの場合は textarea を同期
+  const timelineModeEl = document.getElementById("timeline-mode");
+  if (timelineModeEl && timelineModeEl.style.display !== "none") {
+    document.getElementById("raw-input").value = timelineToRawInput();
+  }
   const rawInput = document.getElementById("raw-input").value.trim();
   if (!rawInput) {
     showToast("行動ログを入力してください", "error");
