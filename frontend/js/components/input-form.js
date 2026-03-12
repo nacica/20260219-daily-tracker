@@ -5,9 +5,9 @@
  * 朝のタスク整理（ソクラテス式問答）統合
  */
 
-import { recordsApi, analysisApi, morningDialogueApi } from "../api.js?v=20260312d";
-import { showToast } from "../app.js?v=20260312d";
-import { showTaskCompleteAnimation, buildTaskStatsCards } from "./task-stats.js?v=20260312d";
+import { recordsApi, analysisApi, morningDialogueApi } from "../api.js?v=20260312e";
+import { showToast } from "../app.js?v=20260312e";
+import { showTaskCompleteAnimation, buildTaskStatsCards } from "./task-stats.js?v=20260312e";
 
 /* ── カテゴリ管理 ── */
 
@@ -1167,6 +1167,13 @@ function attachFormEvents(date, isEdit) {
   const timelineRows = document.getElementById("timeline-rows");
   if (timelineRows) {
     timelineRows.addEventListener("input", debounceTimelineSave);
+
+    // 時間入力のスクロールで値が飛びすぎるのを防止
+    timelineRows.addEventListener("wheel", (e) => {
+      if (e.target.matches('input[type="time"]')) {
+        e.preventDefault();
+      }
+    }, { passive: false });
 
     // 削除ボタン & +終了トグル
     timelineRows.addEventListener("click", (e) => {
