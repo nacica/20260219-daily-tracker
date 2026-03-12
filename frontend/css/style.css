@@ -2109,7 +2109,6 @@ textarea {
   font-family: var(--font);
   font-size: 0.9rem;
   text-align: center;
-  -webkit-appearance: none;
 }
 
 .timeline-start:focus,
