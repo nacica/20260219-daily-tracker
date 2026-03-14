@@ -5,9 +5,9 @@
  * 朝のタスク整理（ソクラテス式問答）統合
  */
 
-import { recordsApi, analysisApi, morningDialogueApi } from "../api.js?v=20260314a";
-import { showToast } from "../app.js?v=20260314a";
-import { showTaskCompleteAnimation, buildTaskStatsCards } from "./task-stats.js?v=20260314a";
+import { recordsApi, analysisApi, morningDialogueApi } from "../api.js?v=20260314b";
+import { showToast } from "../app.js?v=20260314b";
+import { showTaskCompleteAnimation, buildTaskStatsCards } from "./task-stats.js?v=20260314b";
 
 /* ── カテゴリ管理 ── */
 
@@ -1233,6 +1233,22 @@ function attachFormEvents(date, isEdit) {
       if (nextRow && !nextRow.querySelector(".timeline-start").value) {
         nextRow.querySelector(".timeline-start").value = e.target.value;
       }
+    });
+
+    // Enterキーで次の行を追加
+    timelineRows.addEventListener("keydown", (e) => {
+      if (e.key !== "Enter") return;
+      if (!e.target.classList.contains("timeline-activity")) return;
+      e.preventDefault();
+      const currentRow = e.target.closest(".timeline-row");
+      const currentEnd = currentRow?.querySelector(".timeline-end")?.value || "";
+      timelineRows.insertAdjacentHTML(
+        "beforeend",
+        buildTimelineRowHTML(currentEnd, "", "")
+      );
+      const newRow = timelineRows.lastElementChild;
+      newRow.querySelector(".timeline-activity").focus();
+      debounceTimelineSave();
     });
   }
 
