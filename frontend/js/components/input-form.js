@@ -5,9 +5,9 @@
  * 朝のタスク整理（ソクラテス式問答）統合
  */
 
-import { recordsApi, analysisApi, morningDialogueApi } from "../api.js?v=20260314f";
-import { showToast } from "../app.js?v=20260314f";
-import { showTaskCompleteAnimation, buildTaskStatsCards } from "./task-stats.js?v=20260314f";
+import { recordsApi, analysisApi, morningDialogueApi } from "../api.js?v=20260314g";
+import { showToast } from "../app.js?v=20260314g";
+import { showTaskCompleteAnimation, buildTaskStatsCards } from "./task-stats.js?v=20260314g";
 
 /* ── カテゴリ管理 ── */
 
