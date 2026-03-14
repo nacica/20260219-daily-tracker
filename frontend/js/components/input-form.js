@@ -5,9 +5,9 @@
  * 朝のタスク整理（ソクラテス式問答）統合
  */
 
-import { recordsApi, analysisApi, morningDialogueApi } from "../api.js?v=20260314b";
-import { showToast } from "../app.js?v=20260314b";
-import { showTaskCompleteAnimation, buildTaskStatsCards } from "./task-stats.js?v=20260314b";
+import { recordsApi, analysisApi, morningDialogueApi } from "../api.js?v=20260314c";
+import { showToast } from "../app.js?v=20260314c";
+import { showTaskCompleteAnimation, buildTaskStatsCards } from "./task-stats.js?v=20260314c";
 
 /* ── カテゴリ管理 ── */
 
@@ -74,11 +74,11 @@ function refreshCategoryDropdowns() {
 /* ── レイアウト永続化 ── */
 
 const DEFAULT_LAYOUT = {
-  "card-activity-log": { column: 0, order: 0 },
-  "card-task-mgmt":    { column: 1, order: 0 },
-  "card-backlog":      { column: 1, order: 1 },
-  "card-actions":      { column: 1, order: 2 },
-  "card-completed":    { column: 1, order: 3 },
+  "card-activity-log": { order: 0 },
+  "card-task-mgmt":    { order: 1 },
+  "card-backlog":      { order: 2 },
+  "card-actions":      { order: 3 },
+  "card-completed":    { order: 4 },
 };
 
 const CARD_IDS = Object.keys(DEFAULT_LAYOUT);
@@ -90,7 +90,20 @@ function getLayoutPreference() {
       const parsed = JSON.parse(saved);
       // すべてのカードIDが存在するか検証
       for (const id of CARD_IDS) {
-        if (!parsed[id] || typeof parsed[id].column !== "number") return DEFAULT_LAYOUT;
+        if (!parsed[id] || typeof parsed[id].order !== "number") return DEFAULT_LAYOUT;
+      }
+      // 旧フォーマット（column付き）を順序ベースに変換
+      const hasColumn = Object.values(parsed).some((v) => "column" in v);
+      if (hasColumn) {
+        const sorted = CARD_IDS.slice().sort((a, b) => {
+          const pa = parsed[a], pb = parsed[b];
+          if (pa.column !== pb.column) return (pa.column || 0) - (pb.column || 0);
+          return (pa.order || 0) - (pb.order || 0);
+        });
+        const migrated = {};
+        sorted.forEach((id, i) => { migrated[id] = { order: i }; });
+        saveLayoutPreference(migrated);
+        return migrated;
       }
       return parsed;
     }
@@ -805,19 +818,17 @@ function buildFormHTML(date, record, tasks, isEdit, morningDialogue, isRestDay =
       </div>`,
   };
 
-  // localStorage のレイアウトに従ってカードを列に振り分け
+  // localStorage のレイアウトに従ってカードを順序でソート
   const layout = getLayoutPreference();
-  const columns = [[], []];
+  const sortedCards = Object.entries(cards)
+    .map(([cardId, cardHTML]) => ({
+      cardId,
+      cardHTML,
+      order: layout[cardId]?.order ?? DEFAULT_LAYOUT[cardId].order,
+    }))
+    .sort((a, b) => a.order - b.order);
 
-  for (const [cardId, cardHTML] of Object.entries(cards)) {
-    const col = layout[cardId]?.column ?? DEFAULT_LAYOUT[cardId].column;
-    const order = layout[cardId]?.order ?? DEFAULT_LAYOUT[cardId].order;
-    columns[col].push({ cardId, cardHTML, order });
-  }
-
-  columns.forEach((col) => col.sort((a, b) => a.order - b.order));
-
-  // 朝問答 + 付箋リマインダーを各列の先頭に組み込み
+  // 朝問答 + 付箋リマインダー
   const morningHTML = buildMorningDialogueHTML(morningDialogue);
   const reminderHTML = buildReminderBoardHTML();
 
@@ -869,14 +880,9 @@ function buildFormHTML(date, record, tasks, isEdit, morningDialogue, isRestDay =
     </div>
 
     <div class="input-grid" id="input-grid">
-      <div class="input-column" id="input-column-0" data-column="0">
-        <div class="morning-col">${morningHTML}</div>
-        ${columns[0].map((c) => c.cardHTML).join("")}
-      </div>
-      <div class="input-column" id="input-column-1" data-column="1">
-        <div class="reminder-col">${reminderHTML}</div>
-        ${columns[1].map((c) => c.cardHTML).join("")}
-      </div>
+      <div class="morning-col">${morningHTML}</div>
+      <div class="reminder-col">${reminderHTML}</div>
+      ${sortedCards.map((c) => c.cardHTML).join("")}
     </div>
   `;
 }
@@ -1775,7 +1781,6 @@ function attachDragDropEvents() {
   const grid = document.getElementById("input-grid");
   if (!grid) return;
 
-  const columns = grid.querySelectorAll(".input-column");
   let draggedCard = null;
 
   // ハンドルの mousedown で一時的に draggable を有効化（textarea の選択と干渉しない）
@@ -1816,73 +1821,66 @@ function attachDragDropEvents() {
       card.setAttribute("draggable", "false");
     }
     draggedCard = null;
-    columns.forEach((col) => col.classList.remove("drag-over"));
     grid.querySelectorAll(".drop-indicator").forEach((el) => el.remove());
   });
 
-  // 各カラムにドロップゾーンを設定
-  columns.forEach((column) => {
-    column.addEventListener("dragover", (e) => {
-      e.preventDefault();
-      e.dataTransfer.dropEffect = "move";
-      if (!draggedCard) return;
+  // グリッド全体をドロップゾーンとして設定
+  grid.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    if (!draggedCard) return;
 
-      column.classList.add("drag-over");
+    const visibleCards = [...grid.querySelectorAll(".draggable-card:not(.dragging)")].filter(
+      (c) => c.style.display !== "none"
+    );
+    const afterCard = getInsertAfterCard(grid, e.clientY, visibleCards);
 
-      const visibleCards = [...column.querySelectorAll(".draggable-card:not(.dragging)")].filter(
-        (c) => c.style.display !== "none"
-      );
-      const afterCard = getInsertAfterCard(column, e.clientY, visibleCards);
+    grid.querySelectorAll(".drop-indicator").forEach((el) => el.remove());
+    const indicator = document.createElement("div");
+    indicator.className = "drop-indicator";
 
+    if (afterCard) {
+      grid.insertBefore(indicator, afterCard);
+    } else {
+      grid.appendChild(indicator);
+    }
+  });
+
+  grid.addEventListener("dragleave", (e) => {
+    if (!grid.contains(e.relatedTarget)) {
       grid.querySelectorAll(".drop-indicator").forEach((el) => el.remove());
-      const indicator = document.createElement("div");
-      indicator.className = "drop-indicator";
+    }
+  });
 
-      if (afterCard) {
-        column.insertBefore(indicator, afterCard);
-      } else {
-        column.appendChild(indicator);
-      }
-    });
+  grid.addEventListener("drop", (e) => {
+    e.preventDefault();
+    grid.querySelectorAll(".drop-indicator").forEach((el) => el.remove());
 
-    column.addEventListener("dragleave", (e) => {
-      if (!column.contains(e.relatedTarget)) {
-        column.classList.remove("drag-over");
-        column.querySelectorAll(".drop-indicator").forEach((el) => el.remove());
-      }
-    });
+    if (!draggedCard) return;
 
-    column.addEventListener("drop", (e) => {
-      e.preventDefault();
-      column.classList.remove("drag-over");
-      grid.querySelectorAll(".drop-indicator").forEach((el) => el.remove());
+    const visibleCards = [...grid.querySelectorAll(".draggable-card:not(.dragging)")].filter(
+      (c) => c.style.display !== "none"
+    );
+    const afterCard = getInsertAfterCard(grid, e.clientY, visibleCards);
 
-      if (!draggedCard) return;
+    if (afterCard) {
+      grid.insertBefore(draggedCard, afterCard);
+    } else {
+      grid.appendChild(draggedCard);
+    }
 
-      const visibleCards = [...column.querySelectorAll(".draggable-card:not(.dragging)")].filter(
-        (c) => c.style.display !== "none"
-      );
-      const afterCard = getInsertAfterCard(column, e.clientY, visibleCards);
-
-      if (afterCard) {
-        column.insertBefore(draggedCard, afterCard);
-      } else {
-        column.appendChild(draggedCard);
-      }
-
-      persistCurrentLayout(columns);
-    });
+    persistCurrentLayout(grid);
   });
 
   // ビューポート変更への対応
-  mql.addEventListener("change", (e) => {
+  mql.addEventListener("change", () => {
     grid.querySelectorAll(".draggable-card").forEach((card) => {
       card.setAttribute("draggable", "false");
     });
   });
 }
 
-function getInsertAfterCard(column, mouseY, cards) {
+function getInsertAfterCard(container, mouseY, cards) {
   for (const card of cards) {
     const rect = card.getBoundingClientRect();
     const midY = rect.top + rect.height / 2;
@@ -1891,13 +1889,11 @@ function getInsertAfterCard(column, mouseY, cards) {
   return null;
 }
 
-function persistCurrentLayout(columns) {
+function persistCurrentLayout(grid) {
   const layout = {};
-  columns.forEach((column, colIndex) => {
-    const cards = column.querySelectorAll(".draggable-card");
-    cards.forEach((card, orderIndex) => {
-      layout[card.id] = { column: colIndex, order: orderIndex };
-    });
+  const cards = grid.querySelectorAll(".draggable-card");
+  cards.forEach((card, orderIndex) => {
+    layout[card.id] = { order: orderIndex };
   });
   saveLayoutPreference(layout);
 }

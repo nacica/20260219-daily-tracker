@@ -3283,26 +3283,24 @@ textarea {
     gap: 12px;
   }
 
-  /* ── Input Form 2-Column Grid ── */
+  /* ── Input Form Auto-fill Grid ── */
   .input-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
     gap: 20px;
     align-items: start;
   }
 
   .input-column {
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
-    min-height: 200px;
-    position: relative;
-    border-radius: var(--radius);
-    transition: background 0.2s, border-color 0.2s;
-    border: 2px solid transparent;
+    display: contents;
   }
 
-  .input-column > .card {
+  .input-grid > .card,
+  .input-grid > .draggable-card,
+  .input-column > .card,
+  .input-column > .draggable-card,
+  .input-column > .morning-col,
+  .input-column > .reminder-col {
     margin-bottom: 0;
   }
 
@@ -3345,12 +3343,6 @@ textarea {
     box-shadow: none;
   }
 
-  .input-column.drag-over {
-    background: rgba(0, 212, 255, 0.03);
-    border-color: rgba(0, 212, 255, 0.2);
-    border-style: dashed;
-  }
-
   .drop-indicator {
     height: 3px;
     background: linear-gradient(90deg, transparent, var(--cyan), transparent);
@@ -3359,7 +3351,7 @@ textarea {
     box-shadow: 0 0 10px rgba(0, 212, 255, 0.4);
     pointer-events: none;
     animation: drop-pulse 1s ease-in-out infinite;
-    flex-shrink: 0;
+    grid-column: 1 / -1;
   }
 
   @keyframes drop-pulse {
