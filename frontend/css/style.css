@@ -2507,6 +2507,17 @@ textarea {
   cursor: default;
 }
 
+.sticky-random-btn {
+  font-size: 14px;
+  margin-left: 4px;
+}
+
+.sticky-random-btn.active {
+  background: var(--cyan-dim);
+  border-color: var(--cyan);
+  color: var(--text-primary);
+}
+
 .sticky-counter {
   font-size: 0.75rem;
   color: var(--text-muted);

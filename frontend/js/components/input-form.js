@@ -5,9 +5,9 @@
  * 朝のタスク整理（ソクラテス式問答）統合
  */
 
-import { recordsApi, analysisApi, morningDialogueApi } from "../api.js?v=20260312e";
-import { showToast } from "../app.js?v=20260312e";
-import { showTaskCompleteAnimation, buildTaskStatsCards } from "./task-stats.js?v=20260312e";
+import { recordsApi, analysisApi, morningDialogueApi } from "../api.js?v=20260314a";
+import { showToast } from "../app.js?v=20260314a";
+import { showTaskCompleteAnimation, buildTaskStatsCards } from "./task-stats.js?v=20260314a";
 
 /* ── カテゴリ管理 ── */
 
@@ -201,6 +201,7 @@ function buildStickyNoteHTML(r, activeClass = "") {
 }
 
 let stickyCurrentIndex = 0;
+let stickyRandomMode = false;
 
 function buildReminderBoardHTML() {
   const reminders = getReminders();
@@ -212,11 +213,13 @@ function buildReminderBoardHTML() {
     return buildStickyNoteHTML(r, activeClass);
   }).join("");
 
+  const randomActiveClass = stickyRandomMode ? " active" : "";
   const navHTML = reminders.length > 1
     ? `<div class="sticky-nav">
         <button class="sticky-nav-btn" id="sticky-prev">&#9664;</button>
         <span class="sticky-counter" id="sticky-counter">${stickyCurrentIndex + 1} / ${reminders.length}</span>
         <button class="sticky-nav-btn" id="sticky-next">&#9654;</button>
+        <button class="sticky-nav-btn sticky-random-btn${randomActiveClass}" id="sticky-random" title="ランダム">&#x1f500;</button>
       </div>`
     : "";
 
@@ -331,14 +334,25 @@ function attachReminderEvents() {
 function attachStickyNavEvents() {
   const prevBtn = document.getElementById("sticky-prev");
   const nextBtn = document.getElementById("sticky-next");
+  const randomBtn = document.getElementById("sticky-random");
   if (prevBtn) prevBtn.addEventListener("click", () => { navigateSticky(-1); });
   if (nextBtn) nextBtn.addEventListener("click", () => { navigateSticky(1); });
+  if (randomBtn) randomBtn.addEventListener("click", () => {
+    stickyRandomMode = !stickyRandomMode;
+    randomBtn.classList.toggle("active", stickyRandomMode);
+  });
 }
 
 function navigateSticky(delta) {
   const reminders = getReminders();
   const len = reminders.length;
-  stickyCurrentIndex = (stickyCurrentIndex + delta + len) % len;
+  if (stickyRandomMode && len > 1) {
+    let next;
+    do { next = Math.floor(Math.random() * len); } while (next === stickyCurrentIndex);
+    stickyCurrentIndex = next;
+  } else {
+    stickyCurrentIndex = (stickyCurrentIndex + delta + len) % len;
+  }
   showStickyAtIndex();
 }
 
@@ -372,10 +386,12 @@ function refreshStickyNotes() {
   // ナビゲーション更新
   const existingNav = board.querySelector(".sticky-nav");
   if (reminders.length > 1) {
+    const randomActiveClass = stickyRandomMode ? " active" : "";
     const navHTML = `<div class="sticky-nav">
       <button class="sticky-nav-btn" id="sticky-prev">&#9664;</button>
       <span class="sticky-counter" id="sticky-counter">${stickyCurrentIndex + 1} / ${reminders.length}</span>
       <button class="sticky-nav-btn" id="sticky-next">&#9654;</button>
+      <button class="sticky-nav-btn sticky-random-btn${randomActiveClass}" id="sticky-random" title="ランダム">&#x1f500;</button>
     </div>`;
     if (existingNav) {
       existingNav.outerHTML = navHTML;
