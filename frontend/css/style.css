@@ -3285,6 +3285,7 @@ textarea {
 
   /* ── Input Form Masonry Columns ── */
   .input-grid {
+    display: block;
     columns: 350px auto;
     column-gap: 20px;
   }
