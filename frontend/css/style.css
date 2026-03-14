@@ -3283,25 +3283,15 @@ textarea {
     gap: 12px;
   }
 
-  /* ── Input Form Auto-fill Grid ── */
+  /* ── Input Form Masonry Columns ── */
   .input-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-    gap: 20px;
-    align-items: start;
+    columns: 350px auto;
+    column-gap: 20px;
   }
 
-  .input-column {
-    display: contents;
-  }
-
-  .input-grid > .card,
-  .input-grid > .draggable-card,
-  .input-column > .card,
-  .input-column > .draggable-card,
-  .input-column > .morning-col,
-  .input-column > .reminder-col {
-    margin-bottom: 0;
+  .input-grid > * {
+    break-inside: avoid;
+    margin-bottom: 20px;
   }
 
   /* Drag handle */
@@ -3351,7 +3341,7 @@ textarea {
     box-shadow: 0 0 10px rgba(0, 212, 255, 0.4);
     pointer-events: none;
     animation: drop-pulse 1s ease-in-out infinite;
-    grid-column: 1 / -1;
+    break-inside: avoid;
   }
 
   @keyframes drop-pulse {
