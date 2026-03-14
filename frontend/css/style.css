@@ -3283,6 +3283,11 @@ textarea {
     gap: 12px;
   }
 
+  /* 記録タブ表示時は main の幅制限を解除して5列表示を可能に */
+  main:has(.input-grid) {
+    max-width: none;
+  }
+
   /* ── Input Form Masonry Columns ── */
   .input-grid {
     display: block;
