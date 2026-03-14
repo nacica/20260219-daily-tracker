@@ -5,9 +5,9 @@
  * 朝のタスク整理（ソクラテス式問答）統合
  */
 
-import { recordsApi, analysisApi, morningDialogueApi } from "../api.js?v=20260314e";
-import { showToast } from "../app.js?v=20260314e";
-import { showTaskCompleteAnimation, buildTaskStatsCards } from "./task-stats.js?v=20260314e";
+import { recordsApi, analysisApi, morningDialogueApi } from "../api.js?v=20260314f";
+import { showToast } from "../app.js?v=20260314f";
+import { showTaskCompleteAnimation, buildTaskStatsCards } from "./task-stats.js?v=20260314f";
 
 /* ── カテゴリ管理 ── */
 
@@ -74,11 +74,13 @@ function refreshCategoryDropdowns() {
 /* ── レイアウト永続化 ── */
 
 const DEFAULT_LAYOUT = {
-  "card-activity-log": { order: 0 },
-  "card-task-mgmt":    { order: 1 },
-  "card-backlog":      { order: 2 },
-  "card-actions":      { order: 3 },
-  "card-completed":    { order: 4 },
+  "card-morning-dialogue": { order: 0 },
+  "card-reminder-board":   { order: 1 },
+  "card-activity-log":     { order: 2 },
+  "card-task-mgmt":        { order: 3 },
+  "card-backlog":          { order: 4 },
+  "card-actions":          { order: 5 },
+  "card-completed":        { order: 6 },
 };
 
 const CARD_IDS = Object.keys(DEFAULT_LAYOUT);
@@ -237,7 +239,8 @@ function buildReminderBoardHTML() {
     : "";
 
   return `
-    <div class="card reminder-board-card" id="card-reminder-board">
+    <div class="card draggable-card reminder-board-card" id="card-reminder-board" draggable="false">
+      <div class="card-drag-handle" title="ドラッグで移動">⠿</div>
       <div class="card-title">今日意識すること</div>
       ${navHTML}
       <div class="sticky-notes" id="sticky-notes">
@@ -521,7 +524,8 @@ function buildMorningDialogueHTML(morningDialogue) {
     const messages = morningDialogue.messages || [];
 
     return `
-      <div class="card morning-dialogue-card morning-completed" id="card-morning-dialogue">
+      <div class="card draggable-card morning-dialogue-card morning-completed" id="card-morning-dialogue" draggable="false">
+        <div class="card-drag-handle" title="ドラッグで移動">⠿</div>
         <div class="card-title">朝のタスク整理</div>
         <div class="morning-result" id="morning-result">
           ${focusMessage ? `<div class="morning-focus-message">${escapeHTML(focusMessage)}</div>` : ""}
@@ -549,7 +553,8 @@ function buildMorningDialogueHTML(morningDialogue) {
     const isMaxed = turnCount >= maxTurns;
 
     return `
-      <div class="card morning-dialogue-card" id="card-morning-dialogue">
+      <div class="card draggable-card morning-dialogue-card" id="card-morning-dialogue" draggable="false">
+        <div class="card-drag-handle" title="ドラッグで移動">⠿</div>
         <div class="card-title">朝のタスク整理</div>
         <div id="morning-dialogue">
           <div class="dialogue-header">
@@ -589,7 +594,8 @@ function buildMorningDialogueHTML(morningDialogue) {
 
   // 未開始: 開始ボタンを表示
   return `
-    <div class="card morning-dialogue-card" id="card-morning-dialogue">
+    <div class="card draggable-card morning-dialogue-card" id="card-morning-dialogue" draggable="false">
+      <div class="card-drag-handle" title="ドラッグで移動">⠿</div>
       <div class="card-title">朝のタスク整理</div>
       <div id="morning-start">
         <p class="morning-description">
@@ -818,19 +824,19 @@ function buildFormHTML(date, record, tasks, isEdit, morningDialogue, isRestDay =
       </div>`,
   };
 
+  // 朝問答 + 付箋リマインダーもカードマップに統合
+  cards["card-morning-dialogue"] = buildMorningDialogueHTML(morningDialogue);
+  cards["card-reminder-board"] = buildReminderBoardHTML();
+
   // localStorage のレイアウトに従ってカードを順序でソート
   const layout = getLayoutPreference();
   const sortedCards = Object.entries(cards)
     .map(([cardId, cardHTML]) => ({
       cardId,
       cardHTML,
-      order: layout[cardId]?.order ?? DEFAULT_LAYOUT[cardId].order,
+      order: layout[cardId]?.order ?? DEFAULT_LAYOUT[cardId]?.order ?? 99,
     }))
     .sort((a, b) => a.order - b.order);
-
-  // 朝問答 + 付箋リマインダー
-  const morningHTML = buildMorningDialogueHTML(morningDialogue);
-  const reminderHTML = buildReminderBoardHTML();
 
   // おやすみモード理由選択肢
   const REST_REASONS = ["残業", "体調不良", "出張", "予定あり", "その他"];
@@ -880,8 +886,6 @@ function buildFormHTML(date, record, tasks, isEdit, morningDialogue, isRestDay =
     </div>
 
     <div class="input-grid" id="input-grid">
-      <div class="morning-col">${morningHTML}</div>
-      <div class="reminder-col">${reminderHTML}</div>
       ${sortedCards.map((c) => c.cardHTML).join("")}
     </div>
   `;
