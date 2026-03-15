@@ -378,12 +378,19 @@ def save_coaching_summary(year_month: str, data: dict, user_id: str = DEFAULT_US
 
 # ---- journal_entries ----
 
-def get_journal(date: str) -> Optional[dict]:
-    """指定日のジャーナルを取得"""
+def _ensure_entry_number(data: dict) -> dict:
+    """entry_number が無い旧データにデフォルト値を補完する"""
+    if data and "entry_number" not in data:
+        data["entry_number"] = 1
+    return data
+
+
+def get_journal(entry_id: str) -> Optional[dict]:
+    """指定IDのジャーナルを取得（entry_id は 'YYYY-MM-DD' or 'YYYY-MM-DD#N'）"""
     db = get_db()
-    doc = db.collection("journal_entries").document(date).get()
+    doc = db.collection("journal_entries").document(entry_id).get()
     if doc.exists:
-        return doc.to_dict()
+        return _ensure_entry_number(doc.to_dict())
     return None
 
 
@@ -397,30 +404,56 @@ def list_journals(start_date: Optional[str] = None, end_date: Optional[str] = No
     if end_date:
         query = query.where(filter=FieldFilter("date", "<=", end_date))
 
-    return [doc.to_dict() for doc in query.stream()]
+    return [_ensure_entry_number(doc.to_dict()) for doc in query.stream()]
 
 
-def create_journal(date: str, data: dict) -> dict:
+def list_journals_for_date(date: str) -> list[dict]:
+    """指定日の全ジャーナルエントリを取得（entry_number 昇順）"""
+    db = get_db()
+    query = (
+        db.collection("journal_entries")
+        .where(filter=FieldFilter("date", "==", date))
+        .order_by("entry_number")
+    )
+    results = [_ensure_entry_number(doc.to_dict()) for doc in query.stream()]
+    # 旧形式（ID が YYYY-MM-DD）のドキュメントも含まれるようにする
+    if not results:
+        legacy = get_journal(date)
+        if legacy:
+            results = [legacy]
+    return results
+
+
+def get_next_entry_number(date: str) -> int:
+    """指定日の次のエントリ番号を返す"""
+    entries = list_journals_for_date(date)
+    if not entries:
+        return 1
+    max_num = max(e.get("entry_number", 1) for e in entries)
+    return max_num + 1
+
+
+def create_journal(entry_id: str, data: dict) -> dict:
     """ジャーナルを作成"""
     db = get_db()
-    db.collection("journal_entries").document(date).set(data)
+    db.collection("journal_entries").document(entry_id).set(data)
     return data
 
 
-def update_journal(date: str, data: dict) -> Optional[dict]:
+def update_journal(entry_id: str, data: dict) -> Optional[dict]:
     """ジャーナルを更新"""
     db = get_db()
-    ref = db.collection("journal_entries").document(date)
+    ref = db.collection("journal_entries").document(entry_id)
     if not ref.get().exists:
         return None
     ref.update(data)
-    return ref.get().to_dict()
+    return _ensure_entry_number(ref.get().to_dict())
 
 
-def delete_journal(date: str) -> bool:
+def delete_journal(entry_id: str) -> bool:
     """ジャーナルを削除"""
     db = get_db()
-    ref = db.collection("journal_entries").document(date)
+    ref = db.collection("journal_entries").document(entry_id)
     if not ref.get().exists:
         return False
     ref.delete()

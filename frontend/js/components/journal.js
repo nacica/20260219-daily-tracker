@@ -1,19 +1,17 @@
 /**
  * フリージャーナル コンポーネント
- * 自由記述の日記 + AI自動分析（感情タグ、ブロッカー検出、トレンド）
+ * 1日に複数エントリ作成可能。各エントリに独立した分析・MD要約。
  */
 
-import { journalApi, diaryDialogueApi } from "../api.js?v=20260311e";
-import { showToast } from "../app.js?v=20260311e";
+import { journalApi, diaryDialogueApi } from "../api.js?v=20260315e";
+import { showToast } from "../app.js?v=20260315e";
 
 // ===== ユーティリティ =====
 
-/** マークダウン文字列をHTMLに変換する */
 function renderMd(text) {
   if (!text || typeof text !== "string") return "";
   const m = window.marked;
   if (m) {
-    // CDN版: marked.parse() or marked.marked.parse()
     if (typeof m.parse === "function") return m.parse(text);
     if (m.marked && typeof m.marked.parse === "function") return m.marked.parse(text);
     if (typeof m === "function") return m(text);
@@ -21,33 +19,28 @@ function renderMd(text) {
   return text.replace(/\n/g, "<br>");
 }
 
-/** 日付を日本語表記にフォーマット */
 function formatDateJP(dateStr) {
   const d = new Date(dateStr + "T00:00:00");
   const weekdays = ["日", "月", "火", "水", "木", "金", "土"];
   return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日（${weekdays[d.getDay()]}）`;
 }
 
-/** 今日の日付 YYYY-MM-DD */
 function today() {
   return new Date().toLocaleDateString("sv-SE");
 }
 
-/** 前日 */
 function prevDate(dateStr) {
   const d = new Date(dateStr + "T00:00:00");
   d.setDate(d.getDate() - 1);
   return d.toLocaleDateString("sv-SE");
 }
 
-/** 翌日 */
 function nextDate(dateStr) {
   const d = new Date(dateStr + "T00:00:00");
   d.setDate(d.getDate() + 1);
   return d.toLocaleDateString("sv-SE");
 }
 
-/** ISO 週番号を取得 (YYYY-Www) */
 function getWeekId(dateStr) {
   const d = new Date(dateStr + "T00:00:00");
   d.setHours(0, 0, 0, 0);
@@ -57,14 +50,12 @@ function getWeekId(dateStr) {
   return `${d.getFullYear()}-W${String(weekNum).padStart(2, "0")}`;
 }
 
-/** HTML エスケープ */
 function escapeHTML(str) {
   const div = document.createElement("div");
   div.appendChild(document.createTextNode(str));
   return div.innerHTML;
 }
 
-/** 感情の正負を判定 */
 function emotionValence(tag) {
   const positive = ["充実感", "やる気", "達成感", "感謝", "楽しさ", "安心", "集中"];
   const negative = ["焦り", "不安", "イライラ", "悲しみ", "孤独感"];
@@ -73,19 +64,25 @@ function emotionValence(tag) {
   return "neutral";
 }
 
-/** mood_score のランク */
 function moodRank(score) {
   if (score >= 65) return "good";
   if (score >= 40) return "mid";
   return "bad";
 }
 
+function getMonthStart(dateStr) {
+  return dateStr.slice(0, 8) + "01";
+}
+
+/** エントリIDから時刻ラベルを生成 */
+function entryLabel(entry) {
+  const n = entry.entry_number || 1;
+  const time = entry.created_at ? entry.created_at.slice(11, 16) : "";
+  return time ? `#${n}（${time}）` : `#${n}`;
+}
+
 // ===== メインレンダー =====
 
-/**
- * ジャーナル画面をレンダリング
- * @param {string} date - 対象日 (YYYY-MM-DD)
- */
 export async function renderJournal(date) {
   const main = document.querySelector("main");
   main.innerHTML = `
@@ -94,33 +91,27 @@ export async function renderJournal(date) {
       <p>読み込み中...</p>
     </div>`;
 
-  // 並列でデータ取得
-  const [journalResult, recentResult, diaryDialogueResult] = await Promise.allSettled([
-    journalApi.get(date),
+  const [entriesResult, recentResult, diaryDialogueResult] = await Promise.allSettled([
+    journalApi.listByDate(date),
     journalApi.list(getMonthStart(date), date),
     diaryDialogueApi.get(date),
   ]);
 
-  const journal = journalResult.status === "fulfilled" ? journalResult.value : null;
+  const entries = entriesResult.status === "fulfilled" ? (entriesResult.value || []) : [];
   const recentEntries = recentResult.status === "fulfilled" ? recentResult.value : [];
   const diaryDialogue = diaryDialogueResult.status === "fulfilled" ? diaryDialogueResult.value : null;
 
-  // 月間ブロッカー集計
+  // エントリ番号順にソート
+  entries.sort((a, b) => (a.entry_number || 1) - (b.entry_number || 1));
+
   const monthlyBlockers = aggregateBlockers(recentEntries);
-  // 直近7日のエントリ（トレンド用）
   const last7 = recentEntries.filter((e) => e.is_analyzed).slice(0, 7).reverse();
 
-  main.innerHTML = buildJournalHTML(date, journal, last7, monthlyBlockers, recentEntries, diaryDialogue);
-  attachJournalEvents(date, journal);
+  main.innerHTML = buildJournalHTML(date, entries, last7, monthlyBlockers, recentEntries, diaryDialogue);
+  attachJournalEvents(date, entries);
   attachDiaryDialogueEvents(date);
 }
 
-/** 月初日を返す */
-function getMonthStart(dateStr) {
-  return dateStr.slice(0, 8) + "01";
-}
-
-/** ブロッカー集計 */
 function aggregateBlockers(entries) {
   const map = {};
   for (const e of entries) {
@@ -149,19 +140,17 @@ function modeSeverity(arr) {
 
 // ===== HTML ビルダー =====
 
-function buildJournalHTML(date, journal, last7, monthlyBlockers, recentEntries, diaryDialogue) {
+function buildJournalHTML(date, entries, last7, monthlyBlockers, recentEntries, diaryDialogue) {
   const dateJP = formatDateJP(date);
   const isToday = date === today();
   const isFuture = date > today();
-  const content = journal?.content || "";
-  const analysis = journal?.ai_analysis;
-  const isAnalyzed = journal?.is_analyzed;
-  const mdSummary = journal?.md_summary || "";
 
-  // 入力モード判定
   const savedMode = localStorage.getItem("journal-input-mode") || "free";
   const hasDiaryInProgress = diaryDialogue && diaryDialogue.status === "in_progress";
   const activeMode = hasDiaryInProgress ? "socratic" : savedMode;
+
+  // 全エントリの分析結果を集約（トレンド用）
+  const analyzedEntries = entries.filter((e) => e.is_analyzed && e.ai_analysis);
 
   return `
     <div class="journal-page">
@@ -177,9 +166,14 @@ function buildJournalHTML(date, journal, last7, monthlyBlockers, recentEntries, 
         </div>
       </div>
 
-      <!-- 書き込みエリア -->
+      <!-- 既存エントリ一覧 -->
+      ${entries.length > 0 ? buildEntryListHTML(entries, isFuture) : ""}
+
+      <!-- 新規エントリ入力エリア -->
       <div class="card">
-        <div class="card-title">最近の気持ち・出来事</div>
+        <div class="card-title">
+          ${entries.length > 0 ? "新しいエントリを追加" : "最近の気持ち・出来事"}
+        </div>
         <div class="diary-mode-toggle">
           <button class="diary-mode-btn ${activeMode === "free" ? "active" : ""}" data-mode="free">フリー入力</button>
           <button class="diary-mode-btn ${activeMode === "socratic" ? "active" : ""}" data-mode="socratic">問答で記録</button>
@@ -190,28 +184,11 @@ function buildJournalHTML(date, journal, last7, monthlyBlockers, recentEntries, 
             id="journal-content"
             placeholder="最近感じたこと、起きたこと、考えていることなど、自由に書いてください..."
             ${isFuture ? "disabled" : ""}
-          >${content}</textarea>
+          ></textarea>
           <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
             <button class="btn btn-primary" id="journal-save" ${isFuture ? "disabled" : ""}>
-              ${journal ? "更新する" : "保存する"}
+              保存する
             </button>
-            <button class="btn btn-secondary" id="journal-analyze" ${isFuture ? "disabled" : ""}>
-              ${isAnalyzed ? "再分析する" : "分析・アドバイス"}
-            </button>
-            <button class="btn btn-secondary" id="journal-md-summary" ${isFuture ? "disabled" : ""}>
-              MD要約
-            </button>
-            ${journal ? `
-              <button class="btn btn-ghost btn-sm" id="journal-delete" style="margin-left:auto;color:var(--neon-red)">削除</button>
-            ` : ""}
-          </div>
-          <div id="journal-md-wrapper" style="${mdSummary ? "" : "display:none;"}margin-top:12px">
-            <div id="journal-md-fontctl" style="display:none;text-align:right;margin-bottom:6px">
-              <button class="btn btn-ghost btn-sm" id="md-font-down" style="font-size:0.85rem;padding:2px 10px">A-</button>
-              <span id="md-font-label" style="font-size:0.8rem;color:var(--text-secondary);margin:0 4px">16px</span>
-              <button class="btn btn-ghost btn-sm" id="md-font-up" style="font-size:0.85rem;padding:2px 10px">A+</button>
-            </div>
-            <div id="journal-md-output" style="padding:20px 24px;background:var(--card-bg, #f8f9fa);border-radius:10px;border:1px solid rgba(128,128,128,0.15);line-height:1.8;overflow-wrap:break-word">${mdSummary ? renderMd(mdSummary) : ""}</div>
           </div>
         </div>
         <div id="journal-socratic-mode" style="${activeMode === "socratic" ? "" : "display:none"}">
@@ -219,13 +196,80 @@ function buildJournalHTML(date, journal, last7, monthlyBlockers, recentEntries, 
         </div>
       </div>
 
-      ${isAnalyzed && analysis ? buildAnalysisSection(analysis) : ""}
       ${last7.length >= 2 ? buildTrendSection(last7) : ""}
       ${monthlyBlockers.length > 0 ? buildBlockerSummary(monthlyBlockers) : ""}
       ${buildWeeklyDigestSection(date)}
       ${buildRecentList(recentEntries, date)}
     </div>
   `;
+}
+
+// ===== エントリ一覧 =====
+
+function buildEntryListHTML(entries, isFuture) {
+  return entries.map((entry) => {
+    const entryId = entry.id;
+    const label = entryLabel(entry);
+    const analysis = entry.ai_analysis;
+    const isAnalyzed = entry.is_analyzed;
+    const mdSummary = entry.md_summary || "";
+    const mood = analysis?.mood_score;
+    const rank = mood != null ? moodRank(mood) : "";
+
+    return `
+      <div class="card journal-entry-card" data-entry-id="${escapeHTML(entryId)}">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span class="badge" style="background:var(--bg-secondary);color:var(--text-primary);font-weight:600">${label}</span>
+            ${mood != null ? `<div class="mood-score ${rank}" style="width:32px;height:32px;font-size:0.8rem">${mood}</div>` : ""}
+          </div>
+          <div style="display:flex;gap:4px">
+            <button class="btn btn-ghost btn-sm entry-toggle-btn" data-entry-id="${escapeHTML(entryId)}" title="展開/折りたたみ">
+              &#9660;
+            </button>
+          </div>
+        </div>
+
+        <!-- プレビュー行 -->
+        <div class="entry-preview" data-entry-id="${escapeHTML(entryId)}" style="font-size:0.85rem;color:var(--text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer">
+          ${escapeHTML(entry.content.slice(0, 80))}${entry.content.length > 80 ? "..." : ""}
+        </div>
+
+        <!-- 展開コンテンツ -->
+        <div class="entry-detail" data-entry-id="${escapeHTML(entryId)}" style="display:none">
+          <textarea
+            class="journal-textarea entry-textarea"
+            data-entry-id="${escapeHTML(entryId)}"
+            ${isFuture ? "disabled" : ""}
+          >${escapeHTML(entry.content)}</textarea>
+          <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+            <button class="btn btn-secondary btn-sm entry-update-btn" data-entry-id="${escapeHTML(entryId)}" ${isFuture ? "disabled" : ""}>
+              更新
+            </button>
+            <button class="btn btn-secondary btn-sm entry-analyze-btn" data-entry-id="${escapeHTML(entryId)}" ${isFuture ? "disabled" : ""}>
+              ${isAnalyzed ? "再分析" : "分析"}
+            </button>
+            <button class="btn btn-secondary btn-sm entry-md-btn" data-entry-id="${escapeHTML(entryId)}" ${isFuture ? "disabled" : ""}>
+              MD要約
+            </button>
+            <button class="btn btn-ghost btn-sm entry-delete-btn" data-entry-id="${escapeHTML(entryId)}" style="margin-left:auto;color:var(--neon-red)">
+              削除
+            </button>
+          </div>
+
+          <!-- MD要約表示 -->
+          <div class="entry-md-wrapper" data-entry-id="${escapeHTML(entryId)}" style="${mdSummary ? "" : "display:none;"}margin-top:12px">
+            <div class="entry-md-output" data-entry-id="${escapeHTML(entryId)}" style="padding:20px 24px;background:var(--card-bg, #f8f9fa);border-radius:10px;border:1px solid rgba(128,128,128,0.15);line-height:1.8;overflow-wrap:break-word">
+              ${mdSummary ? renderMd(mdSummary) : ""}
+            </div>
+          </div>
+
+          <!-- 分析結果 -->
+          ${isAnalyzed && analysis ? buildAnalysisSection(analysis) : ""}
+        </div>
+      </div>
+    `;
+  }).join("");
 }
 
 // ===== 日記入力対話 HTML =====
@@ -307,7 +351,6 @@ function buildDiaryDialogueHTML(diaryDialogue) {
 // ===== 日記入力対話イベント =====
 
 function attachDiaryDialogueEvents(date) {
-  // モード切り替え
   const modeButtons = document.querySelectorAll(".diary-mode-btn");
   for (const btn of modeButtons) {
     btn.addEventListener("click", () => {
@@ -321,7 +364,6 @@ function attachDiaryDialogueEvents(date) {
     });
   }
 
-  // 開始
   const btnStart = document.getElementById("btn-start-diary-dialogue");
   if (btnStart) {
     btnStart.addEventListener("click", async () => {
@@ -338,7 +380,6 @@ function attachDiaryDialogueEvents(date) {
     });
   }
 
-  // 送信
   const btnSend = document.getElementById("btn-diary-dialogue-send");
   if (btnSend) {
     const input = document.getElementById("diary-dialogue-input");
@@ -370,7 +411,7 @@ function attachDiaryDialogueEvents(date) {
     input.focus();
   }
 
-  // まとめる
+  // まとめる → 新規エントリとして自動保存
   const btnSynthesize = document.getElementById("btn-diary-dialogue-synthesize");
   if (btnSynthesize) {
     btnSynthesize.addEventListener("click", async () => {
@@ -380,16 +421,18 @@ function attachDiaryDialogueEvents(date) {
         const result = await diaryDialogueApi.synthesize(date);
         const text = result.raw_input || "";
 
-        // フリー入力モードに切り替え、テキストを反映
-        localStorage.setItem("journal-input-mode", "free");
-        await renderJournal(date);
-        // テキストエリアに反映
-        const textarea = document.getElementById("journal-content");
-        if (textarea && text) {
-          const existing = textarea.value.trim();
-          textarea.value = existing ? existing + "\n\n" + text : text;
+        if (text) {
+          // フリー入力に切り替え、テキストエリアに反映
+          localStorage.setItem("journal-input-mode", "free");
+          await renderJournal(date);
+          const textarea = document.getElementById("journal-content");
+          if (textarea) {
+            textarea.value = text;
+          }
+          showToast("日記テキストを生成しました。保存ボタンで新規エントリとして保存できます。", "success");
+        } else {
+          await renderJournal(date);
         }
-        showToast("日記テキストを生成しました！", "success");
       } catch (err) {
         showToast("まとめに失敗しました: " + err.message, "error");
         btnSynthesize.disabled = false;
@@ -398,7 +441,6 @@ function attachDiaryDialogueEvents(date) {
     });
   }
 
-  // キャンセル
   const btnCancel = document.getElementById("btn-diary-dialogue-cancel");
   if (btnCancel) {
     btnCancel.addEventListener("click", async () => {
@@ -414,7 +456,6 @@ function attachDiaryDialogueEvents(date) {
     });
   }
 
-  // 完了済み対話トグル
   const btnToggle = document.getElementById("btn-diary-dialogue-toggle");
   if (btnToggle) {
     btnToggle.addEventListener("click", () => {
@@ -427,7 +468,6 @@ function attachDiaryDialogueEvents(date) {
     });
   }
 
-  // リセット
   const btnReset = document.getElementById("btn-diary-dialogue-reset");
   if (btnReset) {
     btnReset.addEventListener("click", async () => {
@@ -450,33 +490,28 @@ function buildAnalysisSection(a) {
 
   return `
     ${a.encouragement ? `
-      <!-- 励まし -->
-      <div class="card journal-encouragement">
+      <div class="journal-encouragement" style="margin-top:12px;padding:12px;border-radius:8px;background:var(--bg-secondary)">
         <p style="font-size:0.95rem;line-height:1.7;margin:0">${a.encouragement}</p>
       </div>
     ` : ""}
 
     ${(a.advice?.length) ? `
-      <!-- アドバイス -->
-      <div class="card">
-        <div class="card-title">アドバイス</div>
+      <div style="margin-top:12px">
+        <div style="font-size:0.8rem;font-weight:600;color:var(--cyan);margin-bottom:6px">アドバイス</div>
         <ul class="analysis-list tip">
           ${a.advice.map((adv) => `<li>${adv}</li>`).join("")}
         </ul>
       </div>
     ` : ""}
 
-    <!-- 感情分析 -->
-    <div class="card">
-      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
-        <div class="card-title" style="margin:0">感情分析</div>
-        <div style="display:flex;align-items:center;gap:12px">
-          <span style="font-size:0.8rem;color:var(--text-secondary)">エネルギー: ${energyLabel}</span>
-          <div class="mood-score ${rank}">${a.mood_score}</div>
-        </div>
+    <div style="margin-top:12px">
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <span style="font-size:0.8rem;font-weight:600;color:var(--text-secondary)">感情分析</span>
+        <span style="font-size:0.8rem;color:var(--text-secondary)">エネルギー: ${energyLabel}</span>
+        <div class="mood-score ${rank}" style="width:32px;height:32px;font-size:0.8rem">${a.mood_score}</div>
       </div>
       ${a.emotions.length > 0 ? `
-        <div class="emotion-pills">
+        <div class="emotion-pills" style="margin-top:6px">
           ${a.emotions.map((e) => `
             <span class="emotion-pill ${emotionValence(e.tag)}">
               ${e.tag} <span class="emotion-intensity">${e.intensity.toFixed(1)}</span>
@@ -488,26 +523,23 @@ function buildAnalysisSection(a) {
     </div>
 
     ${a.blockers.length > 0 ? `
-      <!-- ブロッカー -->
-      <div class="card">
-        <div class="card-title">行動ブロッカー</div>
+      <div style="margin-top:12px">
+        <div style="font-size:0.8rem;font-weight:600;color:var(--neon-red);margin-bottom:6px">行動ブロッカー</div>
         ${a.blockers.map((b) => `
-          <div class="blocker-item ${b.severity}">
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
-              <strong style="font-size:0.9rem">${b.blocker}</strong>
+          <div class="blocker-item ${b.severity}" style="margin-bottom:6px">
+            <div style="display:flex;align-items:center;gap:8px">
+              <strong style="font-size:0.85rem">${b.blocker}</strong>
               <span class="badge badge-${b.severity}">${b.severity}</span>
               <span style="font-size:0.75rem;color:var(--text-muted)">${b.category}</span>
             </div>
-            ${b.affected_tasks.length > 0 ? `<div style="font-size:0.8rem;color:var(--text-secondary)">影響タスク: ${b.affected_tasks.join(", ")}</div>` : ""}
           </div>
         `).join("")}
       </div>
     ` : ""}
 
     ${a.insights.length > 0 ? `
-      <!-- 洞察 -->
-      <div class="card">
-        <div class="card-title">洞察</div>
+      <div style="margin-top:12px">
+        <div style="font-size:0.8rem;font-weight:600;color:var(--violet);margin-bottom:6px">洞察</div>
         <ul class="analysis-list tip">
           ${a.insights.map((i) => `<li>${i}</li>`).join("")}
         </ul>
@@ -515,8 +547,7 @@ function buildAnalysisSection(a) {
     ` : ""}
 
     ${a.key_themes.length > 0 ? `
-      <div class="card">
-        <div class="card-title">キーテーマ</div>
+      <div style="margin-top:8px">
         <div class="emotion-pills">
           ${a.key_themes.map((t) => `<span class="emotion-pill neutral">${t}</span>`).join("")}
         </div>
@@ -524,8 +555,8 @@ function buildAnalysisSection(a) {
     ` : ""}
 
     ${a.gratitude.length > 0 ? `
-      <div class="card">
-        <div class="card-title">感謝・ポジティブ</div>
+      <div style="margin-top:12px">
+        <div style="font-size:0.8rem;font-weight:600;color:var(--neon-green);margin-bottom:6px">感謝</div>
         <ul class="analysis-list good">
           ${a.gratitude.map((g) => `<li>${g}</li>`).join("")}
         </ul>
@@ -535,17 +566,15 @@ function buildAnalysisSection(a) {
 }
 
 function buildTrendSection(entries) {
-  // 全感情タグを収集
   const allEmotions = new Set();
   entries.forEach((e) => {
     (e.ai_analysis?.emotions || []).forEach((em) => allEmotions.add(em.tag));
   });
   if (allEmotions.size === 0) return "";
 
-  // データ準備（JSON埋め込み）
   const trendData = JSON.stringify(
     entries.map((e) => ({
-      date: e.date.slice(5), // MM-DD
+      date: e.date.slice(5),
       mood: e.ai_analysis?.mood_score || 0,
       emotions: Object.fromEntries(
         (e.ai_analysis?.emotions || []).map((em) => [em.tag, em.intensity]),
@@ -598,26 +627,38 @@ function buildWeeklyDigestSection(date) {
 }
 
 function buildRecentList(entries, currentDate) {
-  const others = entries.filter((e) => e.date !== currentDate).slice(0, 10);
-  if (others.length === 0) return "";
+  // 日付でグループ化（同日の複数エントリをまとめる）
+  const byDate = {};
+  for (const e of entries) {
+    if (!byDate[e.date]) byDate[e.date] = [];
+    byDate[e.date].push(e);
+  }
+
+  const otherDates = Object.keys(byDate).filter((d) => d !== currentDate).slice(0, 10);
+  if (otherDates.length === 0) return "";
 
   return `
     <div class="card">
       <div class="card-title">過去のジャーナル</div>
-      ${others.map((e) => {
-        const a = e.ai_analysis;
+      ${otherDates.map((d) => {
+        const dateEntries = byDate[d];
+        const count = dateEntries.length;
+        const first = dateEntries[0];
+        const a = first.ai_analysis;
         const emotions = (a?.emotions || []).slice(0, 3).map((em) => em.tag).join(", ");
         const mood = a?.mood_score;
         const rank = mood != null ? moodRank(mood) : "";
         return `
-          <a href="#/journal/${e.date}" class="journal-entry-item">
-            <div style="flex:0 0 70px;font-size:0.85rem;color:var(--text-secondary)">${e.date.slice(5)}</div>
+          <a href="#/journal/${d}" class="journal-entry-item">
+            <div style="flex:0 0 70px;font-size:0.85rem;color:var(--text-secondary)">${d.slice(5)}</div>
             ${mood != null ? `<div class="mood-score ${rank}" style="width:36px;height:36px;font-size:0.85rem;margin-right:12px">${mood}</div>` : ""}
             <div style="flex:1;min-width:0">
               <div style="font-size:0.85rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text-primary)">
-                ${e.content.slice(0, 50)}${e.content.length > 50 ? "..." : ""}
+                ${escapeHTML(first.content.slice(0, 50))}${first.content.length > 50 ? "..." : ""}
               </div>
-              ${emotions ? `<div style="font-size:0.75rem;color:var(--text-muted)">${emotions}</div>` : ""}
+              <div style="font-size:0.75rem;color:var(--text-muted)">
+                ${count > 1 ? `${count}件のエントリ` : ""}${count > 1 && emotions ? " / " : ""}${emotions}
+              </div>
             </div>
           </a>
         `;
@@ -628,7 +669,7 @@ function buildRecentList(entries, currentDate) {
 
 // ===== イベント =====
 
-function attachJournalEvents(date, journal) {
+function attachJournalEvents(date, entries) {
   // 日付ナビ
   document.getElementById("journal-prev")?.addEventListener("click", () => {
     window.location.hash = `#/journal/${prevDate(date)}`;
@@ -638,7 +679,7 @@ function attachJournalEvents(date, journal) {
     if (next <= today()) window.location.hash = `#/journal/${next}`;
   });
 
-  // 保存
+  // 新規エントリ保存
   document.getElementById("journal-save")?.addEventListener("click", async () => {
     const content = document.getElementById("journal-content")?.value?.trim();
     if (!content) {
@@ -651,133 +692,140 @@ function attachJournalEvents(date, journal) {
     btn.textContent = "保存中...";
 
     try {
-      if (journal) {
-        await journalApi.update(date, content);
+      await journalApi.create(date, content);
+      showToast("保存しました", "success");
+      renderJournal(date);
+    } catch (err) {
+      showToast(err.message, "error");
+      btn.disabled = false;
+      btn.textContent = "保存する";
+    }
+  });
+
+  // エントリカードの展開/折りたたみ
+  document.querySelectorAll(".entry-toggle-btn, .entry-preview").forEach((el) => {
+    el.addEventListener("click", () => {
+      const entryId = el.dataset.entryId;
+      const detail = document.querySelector(`.entry-detail[data-entry-id="${entryId}"]`);
+      const preview = document.querySelector(`.entry-preview[data-entry-id="${entryId}"]`);
+      const toggleBtn = document.querySelector(`.entry-toggle-btn[data-entry-id="${entryId}"]`);
+      if (detail) {
+        const isHidden = detail.style.display === "none";
+        detail.style.display = isHidden ? "" : "none";
+        if (preview) preview.style.display = isHidden ? "none" : "";
+        if (toggleBtn) toggleBtn.innerHTML = isHidden ? "&#9650;" : "&#9660;";
+      }
+    });
+  });
+
+  // エントリ更新
+  document.querySelectorAll(".entry-update-btn").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const entryId = btn.dataset.entryId;
+      const textarea = document.querySelector(`.entry-textarea[data-entry-id="${entryId}"]`);
+      const content = textarea?.value?.trim();
+      if (!content) {
+        showToast("内容を入力してください", "error");
+        return;
+      }
+      btn.disabled = true;
+      btn.textContent = "更新中...";
+      try {
+        await journalApi.update(entryId, content);
         showToast("更新しました", "success");
-      } else {
-        await journalApi.create(date, content);
-        showToast("保存しました", "success");
+        renderJournal(date);
+      } catch (err) {
+        showToast(err.message, "error");
+        btn.disabled = false;
+        btn.textContent = "更新";
       }
-      renderJournal(date);
-    } catch (err) {
-      showToast(err.message, "error");
-      btn.disabled = false;
-      btn.textContent = journal ? "更新する" : "保存する";
-    }
+    });
   });
 
-  // AI分析（未保存の場合は先に保存してから分析）
-  document.getElementById("journal-analyze")?.addEventListener("click", async () => {
-    const content = document.getElementById("journal-content")?.value?.trim();
-    if (!content) {
-      showToast("内容を入力してください", "error");
-      return;
-    }
+  // エントリ分析
+  document.querySelectorAll(".entry-analyze-btn").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const entryId = btn.dataset.entryId;
+      const textarea = document.querySelector(`.entry-textarea[data-entry-id="${entryId}"]`);
+      const content = textarea?.value?.trim();
 
-    const btn = document.getElementById("journal-analyze");
-    btn.disabled = true;
+      btn.disabled = true;
 
-    try {
-      // 未保存 or 内容変更時は先に保存
-      if (!journal) {
-        btn.textContent = "保存中...";
-        await journalApi.create(date, content);
-      } else if (content !== journal.content) {
-        btn.textContent = "更新中...";
-        await journalApi.update(date, content);
+      try {
+        // テキストエリアの内容が変わっていたら先に更新
+        const entry = entries.find((e) => e.id === entryId);
+        if (entry && content && content !== entry.content) {
+          btn.textContent = "更新中...";
+          await journalApi.update(entryId, content);
+        }
+
+        btn.textContent = "分析中...";
+        await journalApi.analyze(entryId);
+        showToast("分析が完了しました", "success");
+        renderJournal(date);
+      } catch (err) {
+        showToast(err.message, "error");
+        btn.disabled = false;
+        btn.textContent = "分析";
       }
-
-      btn.textContent = "分析中...";
-      await journalApi.analyze(date);
-      showToast("分析が完了しました", "success");
-      renderJournal(date);
-    } catch (err) {
-      showToast(err.message, "error");
-      btn.disabled = false;
-      btn.textContent = "分析・アドバイス";
-    }
+    });
   });
 
-  // MD要約: フォントサイズ制御 (スマホのみ表示)
-  const mdWrapper = document.getElementById("journal-md-wrapper");
-  const mdOutput = document.getElementById("journal-md-output");
-  const mdFontCtl = document.getElementById("journal-md-fontctl");
-  const MD_FONT_KEY = "md-summary-font-size";
-  const MD_FONT_MIN = 12;
-  const MD_FONT_MAX = 28;
-  let mdFontSize = parseInt(localStorage.getItem(MD_FONT_KEY)) || 16;
+  // MD要約
+  document.querySelectorAll(".entry-md-btn").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const entryId = btn.dataset.entryId;
+      const wrapper = document.querySelector(`.entry-md-wrapper[data-entry-id="${entryId}"]`);
+      const output = document.querySelector(`.entry-md-output[data-entry-id="${entryId}"]`);
+      const textarea = document.querySelector(`.entry-textarea[data-entry-id="${entryId}"]`);
+      const content = textarea?.value?.trim();
 
-  function applyMdFontSize() {
-    if (mdOutput) mdOutput.style.fontSize = mdFontSize + "px";
-    const label = document.getElementById("md-font-label");
-    if (label) label.textContent = mdFontSize + "px";
-    localStorage.setItem(MD_FONT_KEY, mdFontSize);
-  }
-
-  // スマホ判定でフォントコントロール表示
-  if (mdFontCtl && window.innerWidth <= 768) {
-    mdFontCtl.style.display = "block";
-    applyMdFontSize();
-  }
-
-  document.getElementById("md-font-down")?.addEventListener("click", () => {
-    if (mdFontSize > MD_FONT_MIN) { mdFontSize -= 2; applyMdFontSize(); }
-  });
-  document.getElementById("md-font-up")?.addEventListener("click", () => {
-    if (mdFontSize < MD_FONT_MAX) { mdFontSize += 2; applyMdFontSize(); }
-  });
-
-  // MD要約表示
-  document.getElementById("journal-md-summary")?.addEventListener("click", async () => {
-    const content = document.getElementById("journal-content")?.value?.trim();
-    if (!content) {
-      showToast("内容を入力してください", "error");
-      return;
-    }
-    if (mdWrapper.style.display !== "none" && mdOutput.dataset.generated) {
-      mdWrapper.style.display = "none";
-      return;
-    }
-
-    const btn = document.getElementById("journal-md-summary");
-    btn.disabled = true;
-
-    try {
-      // 未保存の場合は先に保存
-      if (!journal) {
-        btn.textContent = "保存中...";
-        await journalApi.create(date, content);
-      } else if (content !== journal.content) {
-        btn.textContent = "更新中...";
-        await journalApi.update(date, content);
+      // トグル: 既に表示中なら閉じる
+      if (wrapper && wrapper.style.display !== "none" && output?.dataset.generated) {
+        wrapper.style.display = "none";
+        return;
       }
 
-      btn.textContent = "要約中...";
-      const result = await journalApi.summarize(date);
-      const md = result.md_summary || "";
-      mdOutput.innerHTML = renderMd(md);
-      mdOutput.dataset.generated = "true";
-      mdWrapper.style.display = "block";
-      applyMdFontSize();
-      btn.textContent = "MD要約";
-      btn.disabled = false;
-    } catch (err) {
-      showToast(err.message, "error");
-      btn.textContent = "MD要約";
-      btn.disabled = false;
-    }
+      btn.disabled = true;
+
+      try {
+        const entry = entries.find((e) => e.id === entryId);
+        if (entry && content && content !== entry.content) {
+          btn.textContent = "更新中...";
+          await journalApi.update(entryId, content);
+        }
+
+        btn.textContent = "要約中...";
+        const result = await journalApi.summarize(entryId);
+        const md = result.md_summary || "";
+        if (output) {
+          output.innerHTML = renderMd(md);
+          output.dataset.generated = "true";
+        }
+        if (wrapper) wrapper.style.display = "";
+        btn.textContent = "MD要約";
+        btn.disabled = false;
+      } catch (err) {
+        showToast(err.message, "error");
+        btn.textContent = "MD要約";
+        btn.disabled = false;
+      }
+    });
   });
 
-  // 削除
-  document.getElementById("journal-delete")?.addEventListener("click", async () => {
-    if (!confirm("このジャーナルを削除しますか？")) return;
-    try {
-      await journalApi.delete(date);
-      showToast("削除しました", "success");
-      renderJournal(date);
-    } catch (err) {
-      showToast(err.message, "error");
-    }
+  // エントリ削除
+  document.querySelectorAll(".entry-delete-btn").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      if (!confirm("このエントリを削除しますか？")) return;
+      const entryId = btn.dataset.entryId;
+      try {
+        await journalApi.delete(entryId);
+        showToast("削除しました", "success");
+        renderJournal(date);
+      } catch (err) {
+        showToast(err.message, "error");
+      }
+    });
   });
 
   // 週次ダイジェスト
@@ -799,12 +847,10 @@ async function loadWeeklyDigest(date) {
   container.innerHTML = `<div class="loading"><div class="spinner"></div><p>読み込み中...</p></div>`;
 
   try {
-    // まず既存を取得
     let digest;
     try {
       digest = await journalApi.getDigest(weekId);
     } catch {
-      // 無い場合は生成
       container.innerHTML = `<div class="loading"><div class="spinner"></div><p>ダイジェストを生成中...</p></div>`;
       digest = await journalApi.generateDigest(weekId);
     }
@@ -819,7 +865,6 @@ async function loadWeeklyDigest(date) {
 function buildDigestHTML(d) {
   let html = "";
 
-  // 気分の軌跡
   const mt = d.mood_trajectory;
   if (mt) {
     const trendLabel = { improving: "改善傾向", stable: "安定", declining: "低下傾向" }[mt.trend] || mt.trend;
@@ -832,7 +877,6 @@ function buildDigestHTML(d) {
     </div>`;
   }
 
-  // 隠れたパターン
   if (d.hidden_patterns?.length) {
     html += `<div style="margin-bottom:16px">
       <div style="font-size:0.8rem;font-weight:600;color:var(--violet);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px">隠れたパターン</div>
@@ -840,7 +884,6 @@ function buildDigestHTML(d) {
     </div>`;
   }
 
-  // インサイト
   if (d.weekly_insights?.length) {
     html += `<div style="margin-bottom:16px">
       <div style="font-size:0.8rem;font-weight:600;color:var(--cyan);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px">インサイト</div>
@@ -848,7 +891,6 @@ function buildDigestHTML(d) {
     </div>`;
   }
 
-  // トップブロッカー
   if (d.top_blockers?.length) {
     html += `<div style="margin-bottom:16px">
       <div style="font-size:0.8rem;font-weight:600;color:var(--neon-red);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px">トップブロッカー</div>
@@ -861,7 +903,6 @@ function buildDigestHTML(d) {
     </div>`;
   }
 
-  // 行動推奨
   if (d.action_recommendations?.length) {
     html += `<div>
       <div style="font-size:0.8rem;font-weight:600;color:var(--neon-green);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px">来週のアクション</div>
@@ -895,15 +936,12 @@ function drawTrendChart() {
   const chartW = W - pad.left - pad.right;
   const chartH = H - pad.top - pad.bottom;
 
-  // 背景
   ctx.clearRect(0, 0, W, H);
 
-  // テーマ検出
   const isDark = document.documentElement.getAttribute("data-theme") !== "light";
   const textColor = isDark ? "rgba(220,232,255,0.5)" : "rgba(17,24,39,0.5)";
   const gridColor = isDark ? "rgba(220,232,255,0.07)" : "rgba(17,24,39,0.08)";
 
-  // グリッド線
   ctx.strokeStyle = gridColor;
   ctx.lineWidth = 1;
   for (let i = 0; i <= 4; i++) {
@@ -914,7 +952,6 @@ function drawTrendChart() {
     ctx.stroke();
   }
 
-  // Y軸ラベル
   ctx.fillStyle = textColor;
   ctx.font = "10px system-ui";
   ctx.textAlign = "right";
@@ -923,14 +960,12 @@ function drawTrendChart() {
     ctx.fillText(String(100 - i * 25), pad.left - 6, y + 3);
   }
 
-  // X軸ラベル
   ctx.textAlign = "center";
   data.forEach((d, i) => {
     const x = pad.left + (chartW / (data.length - 1)) * i;
     ctx.fillText(d.date, x, H - 8);
   });
 
-  // mood_score 線
   ctx.strokeStyle = isDark ? "#00d4ff" : "#0284c7";
   ctx.lineWidth = 2;
   ctx.beginPath();
@@ -942,7 +977,6 @@ function drawTrendChart() {
   });
   ctx.stroke();
 
-  // mood ドット
   data.forEach((d, i) => {
     const x = pad.left + (chartW / (data.length - 1)) * i;
     const y = pad.top + chartH * (1 - d.mood / 100);
@@ -952,7 +986,6 @@ function drawTrendChart() {
     ctx.fill();
   });
 
-  // 凡例
   ctx.fillStyle = isDark ? "#00d4ff" : "#0284c7";
   ctx.font = "11px system-ui";
   ctx.textAlign = "left";

@@ -1,13 +1,20 @@
 """
 ジャーナル（フリー日記）CRUD + AI 分析エンドポイント
-POST   /api/v1/journal                           - ジャーナル作成
-GET    /api/v1/journal                           - ジャーナル一覧
-GET    /api/v1/journal/{date}                    - 指定日のジャーナル取得
-PUT    /api/v1/journal/{date}                    - ジャーナル更新
-DELETE /api/v1/journal/{date}                    - ジャーナル削除
-POST   /api/v1/journal/{date}/analyze            - AI分析を実行
-GET    /api/v1/journal/digest/{week_id}          - 週次ダイジェスト取得
-POST   /api/v1/journal/digest/{week_id}/generate - 週次ダイジェスト生成
+1日に複数エントリを作成可能（entry_id = YYYY-MM-DD#N）
+
+POST   /api/v1/journal                               - ジャーナル作成（自動採番）
+GET    /api/v1/journal                               - ジャーナル一覧
+GET    /api/v1/journal/by-date/{date}                - 指定日の全エントリ取得
+GET    /api/v1/journal/entry/{entry_id}              - 単一エントリ取得
+PUT    /api/v1/journal/entry/{entry_id}              - エントリ更新
+DELETE /api/v1/journal/entry/{entry_id}              - エントリ削除
+POST   /api/v1/journal/entry/{entry_id}/analyze      - AI分析を実行
+POST   /api/v1/journal/entry/{entry_id}/summarize    - MD要約を生成
+GET    /api/v1/journal/digest/{week_id}              - 週次ダイジェスト取得
+POST   /api/v1/journal/digest/{week_id}/generate     - 週次ダイジェスト生成
+
+後方互換:
+GET    /api/v1/journal/{date}                        - 旧API互換（by-date と同等）
 """
 
 from datetime import datetime, timedelta
@@ -28,28 +35,38 @@ router = APIRouter()
 
 @router.post("/journal", response_model=JournalEntry, status_code=201)
 async def create_journal(body: JournalCreate):
-    """ジャーナルを作成する"""
+    """ジャーナルを作成する（1日に複数作成可能）"""
     date = body.date
 
-    existing = firestore_service.get_journal(date)
+    # エントリ番号の決定
+    entry_number = body.entry_number
+    if entry_number is None:
+        entry_number = firestore_service.get_next_entry_number(date)
+
+    entry_id = f"{date}#{entry_number}"
+
+    # 同一IDが既に存在する場合は409
+    existing = firestore_service.get_journal(entry_id)
     if existing:
         raise HTTPException(
             status_code=409,
-            detail=f"{date} のジャーナルはすでに存在します。PUT で更新してください。",
+            detail=f"{entry_id} のジャーナルはすでに存在します。",
         )
 
     now = now_jst()
     data = {
-        "id": date,
+        "id": entry_id,
         "date": date,
+        "entry_number": entry_number,
         "content": body.content,
         "ai_analysis": None,
         "is_analyzed": False,
+        "md_summary": None,
         "created_at": now,
         "updated_at": now,
     }
 
-    saved = firestore_service.create_journal(date, data)
+    saved = firestore_service.create_journal(entry_id, data)
     return JournalEntry(**saved)
 
 
@@ -62,6 +79,8 @@ async def list_journals(
     journals = firestore_service.list_journals(start_date=start_date, end_date=end_date)
     return [JournalEntry(**j) for j in journals]
 
+
+# ---- 週次ダイジェスト（/journal/digest/* は /journal/{date} より先に定義） ----
 
 @router.get("/journal/digest/{week_id}", response_model=WeeklyJournalDigest)
 async def get_journal_digest(week_id: str):
@@ -78,11 +97,9 @@ async def get_journal_digest(week_id: str):
 @router.post("/journal/digest/{week_id}/generate", response_model=WeeklyJournalDigest)
 async def generate_journal_digest(week_id: str):
     """週次ジャーナルダイジェストを生成する"""
-    # week_id (YYYY-Www) から日付範囲を計算
     try:
         year = int(week_id[:4])
         week_num = int(week_id[6:])
-        # ISO 週の月曜日を取得
         monday = datetime.strptime(f"{year}-W{week_num:02d}-1", "%Y-W%W-%w")
         if week_num == 1 and monday.month == 12:
             monday = datetime(year, 1, 1)
@@ -91,7 +108,6 @@ async def generate_journal_digest(week_id: str):
     except (ValueError, IndexError):
         raise HTTPException(status_code=400, detail="week_id は YYYY-Www 形式で指定してください")
 
-    # ジャーナルエントリを取得
     journal_entries = firestore_service.list_journals(
         start_date=week_start, end_date=week_end,
     )
@@ -101,12 +117,10 @@ async def generate_journal_digest(week_id: str):
             detail=f"{week_id} にジャーナルエントリがありません",
         )
 
-    # 日次分析を取得（参考データ）
     daily_analyses = firestore_service.list_analyses(
         start_date=week_start, end_date=week_end,
     )
 
-    # AI ダイジェスト生成
     digest_data = claude_service.generate_weekly_journal_digest(
         week_id=week_id,
         journal_entries=journal_entries,
@@ -132,56 +146,65 @@ async def generate_journal_digest(week_id: str):
     return WeeklyJournalDigest(**saved)
 
 
-@router.get("/journal/{date}", response_model=JournalEntry)
-async def get_journal(date: str):
-    """指定日のジャーナルを取得する"""
-    journal = firestore_service.get_journal(date)
+# ---- 日付指定で全エントリ取得 ----
+
+@router.get("/journal/by-date/{date}", response_model=list[JournalEntry])
+async def get_journals_by_date(date: str):
+    """指定日の全ジャーナルエントリを取得する"""
+    entries = firestore_service.list_journals_for_date(date)
+    return [JournalEntry(**e) for e in entries]
+
+
+# ---- 単一エントリ操作（entry_id ベース） ----
+
+@router.get("/journal/entry/{entry_id:path}", response_model=JournalEntry)
+async def get_journal_entry(entry_id: str):
+    """単一ジャーナルエントリを取得する"""
+    journal = firestore_service.get_journal(entry_id)
     if not journal:
         return Response(status_code=204)
     return JournalEntry(**journal)
 
 
-@router.put("/journal/{date}", response_model=JournalEntry)
-async def update_journal(date: str, body: JournalUpdate):
-    """ジャーナルを更新する"""
-    existing = firestore_service.get_journal(date)
+@router.put("/journal/entry/{entry_id:path}", response_model=JournalEntry)
+async def update_journal_entry(entry_id: str, body: JournalUpdate):
+    """ジャーナルエントリを更新する"""
+    existing = firestore_service.get_journal(entry_id)
     if not existing:
-        raise HTTPException(status_code=404, detail=f"{date} のジャーナルが見つかりません")
+        raise HTTPException(status_code=404, detail=f"{entry_id} のジャーナルが見つかりません")
 
     update_data: dict = {"updated_at": now_jst()}
 
     if body.content is not None:
         update_data["content"] = body.content
-        # 内容が変更された場合は分析・要約をリセット
         if body.content != existing.get("content", ""):
             update_data["is_analyzed"] = False
             update_data["ai_analysis"] = None
             update_data["md_summary"] = None
 
-    updated = firestore_service.update_journal(date, update_data)
+    updated = firestore_service.update_journal(entry_id, update_data)
     return JournalEntry(**updated)
 
 
-@router.delete("/journal/{date}", status_code=204)
-async def delete_journal(date: str):
-    """ジャーナルを削除する"""
-    deleted = firestore_service.delete_journal(date)
+@router.delete("/journal/entry/{entry_id:path}", status_code=204)
+async def delete_journal_entry(entry_id: str):
+    """ジャーナルエントリを削除する"""
+    deleted = firestore_service.delete_journal(entry_id)
     if not deleted:
-        raise HTTPException(status_code=404, detail=f"{date} のジャーナルが見つかりません")
+        raise HTTPException(status_code=404, detail=f"{entry_id} のジャーナルが見つかりません")
 
 
-@router.post("/journal/{date}/analyze", response_model=JournalEntry)
-async def analyze_journal(date: str):
-    """ジャーナルのAI分析を実行する"""
-    journal = firestore_service.get_journal(date)
+@router.post("/journal/entry/{entry_id:path}/analyze", response_model=JournalEntry)
+async def analyze_journal_entry(entry_id: str):
+    """ジャーナルエントリのAI分析を実行する"""
+    journal = firestore_service.get_journal(entry_id)
     if not journal:
-        raise HTTPException(status_code=404, detail=f"{date} のジャーナルが見つかりません")
+        raise HTTPException(status_code=404, detail=f"{entry_id} のジャーナルが見つかりません")
 
-    # 同日の行動記録・分析を参考データとして取得
+    date = journal["date"]
     daily_record = firestore_service.get_record(date)
     daily_analysis = firestore_service.get_analysis(date)
 
-    # AI 分析実行
     try:
         analysis_result = claude_service.analyze_journal_entry(
             content=journal["content"],
@@ -195,23 +218,22 @@ async def analyze_journal(date: str):
             detail=f"AI分析でエラーが発生しました: {str(e)[:200]}",
         )
 
-    # 結果を保存
     update_data = {
         "ai_analysis": analysis_result,
         "is_analyzed": True,
         "updated_at": now_jst(),
     }
 
-    updated = firestore_service.update_journal(date, update_data)
+    updated = firestore_service.update_journal(entry_id, update_data)
     return JournalEntry(**updated)
 
 
-@router.post("/journal/{date}/summarize", response_model=JournalEntry)
-async def summarize_journal(date: str):
-    """ジャーナルをマークダウン形式で要約し保存する"""
-    journal = firestore_service.get_journal(date)
+@router.post("/journal/entry/{entry_id:path}/summarize", response_model=JournalEntry)
+async def summarize_journal_entry(entry_id: str):
+    """ジャーナルエントリをマークダウン形式で要約し保存する"""
+    journal = firestore_service.get_journal(entry_id)
     if not journal:
-        raise HTTPException(status_code=404, detail=f"{date} のジャーナルが見つかりません")
+        raise HTTPException(status_code=404, detail=f"{entry_id} のジャーナルが見つかりません")
 
     markdown = claude_service.summarize_journal_as_markdown(journal["content"])
 
@@ -219,5 +241,16 @@ async def summarize_journal(date: str):
         "md_summary": markdown,
         "updated_at": now_jst(),
     }
-    updated = firestore_service.update_journal(date, update_data)
+    updated = firestore_service.update_journal(entry_id, update_data)
     return JournalEntry(**updated)
+
+
+# ---- 後方互換: GET /journal/{date} → 日付の全エントリをリストで返す ----
+
+@router.get("/journal/{date}", response_model=list[JournalEntry])
+async def get_journal_legacy(date: str):
+    """指定日のジャーナルを取得する（後方互換 - リストを返す）"""
+    entries = firestore_service.list_journals_for_date(date)
+    if not entries:
+        return Response(status_code=204)
+    return [JournalEntry(**e) for e in entries]

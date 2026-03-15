@@ -43,6 +43,7 @@ class JournalCreate(BaseModel):
     """ジャーナル作成リクエスト"""
     date: str = Field(..., description="日付 (YYYY-MM-DD)")
     content: str = Field(..., min_length=1, max_length=10000, description="ジャーナル本文")
+    entry_number: Optional[int] = Field(None, description="エントリ番号（省略時は自動採番）")
 
 
 class JournalUpdate(BaseModel):
@@ -56,6 +57,7 @@ class JournalEntry(BaseModel):
     """ジャーナルエントリ"""
     id: str
     date: str
+    entry_number: int = 1
     content: str
     ai_analysis: Optional[JournalAnalysis] = None
     is_analyzed: bool = False

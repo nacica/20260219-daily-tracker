@@ -219,14 +219,14 @@ export const knowledgeApi = {
 // ---- フリージャーナル ----
 
 export const journalApi = {
-  /** ジャーナル作成 */
+  /** ジャーナル作成（1日に複数作成可能。entry_number は自動採番） */
   create: (date, content) =>
     apiFetch("/journal", {
       method: "POST",
       body: { date, content },
     }),
 
-  /** ジャーナル一覧 */
+  /** ジャーナル一覧（日付範囲） */
   list: (startDate, endDate) => {
     const params = new URLSearchParams();
     if (startDate) params.set("start_date", startDate);
@@ -234,23 +234,27 @@ export const journalApi = {
     return apiFetch(`/journal?${params}`);
   },
 
-  /** 指定日のジャーナル取得 */
-  get: (date) => apiFetch(`/journal/${date}`),
+  /** 指定日の全エントリ取得（配列で返る） */
+  listByDate: (date) => apiFetch(`/journal/by-date/${date}`),
 
-  /** ジャーナル更新 */
-  update: (date, content) =>
-    apiFetch(`/journal/${date}`, { method: "PUT", body: { content } }),
+  /** 単一エントリ取得（entry_id: 'YYYY-MM-DD#N'） */
+  getEntry: (entryId) => apiFetch(`/journal/entry/${entryId}`),
 
-  /** ジャーナル削除 */
-  delete: (date) => apiFetch(`/journal/${date}`, { method: "DELETE" }),
+  /** エントリ更新 */
+  update: (entryId, content) =>
+    apiFetch(`/journal/entry/${entryId}`, { method: "PUT", body: { content } }),
+
+  /** エントリ削除 */
+  delete: (entryId) =>
+    apiFetch(`/journal/entry/${entryId}`, { method: "DELETE" }),
 
   /** AI分析を実行 */
-  analyze: (date) =>
-    apiFetch(`/journal/${date}/analyze`, { method: "POST" }),
+  analyze: (entryId) =>
+    apiFetch(`/journal/entry/${entryId}/analyze`, { method: "POST" }),
 
   /** マークダウン要約を生成 */
-  summarize: (date) =>
-    apiFetch(`/journal/${date}/summarize`, { method: "POST" }),
+  summarize: (entryId) =>
+    apiFetch(`/journal/entry/${entryId}/summarize`, { method: "POST" }),
 
   /** 週次ダイジェスト取得 */
   getDigest: (weekId) => apiFetch(`/journal/digest/${weekId}`),
