@@ -5,9 +5,9 @@
  * 朝のタスク整理（ソクラテス式問答）統合
  */
 
-import { recordsApi, analysisApi, morningDialogueApi } from "../api.js?v=20260315c";
-import { showToast } from "../app.js?v=20260315c";
-import { showTaskCompleteAnimation, buildTaskStatsCards } from "./task-stats.js?v=20260315c";
+import { recordsApi, analysisApi, morningDialogueApi } from "../api.js?v=20260315d";
+import { showToast } from "../app.js?v=20260315d";
+import { showTaskCompleteAnimation, buildTaskStatsCards } from "./task-stats.js?v=20260315d";
 
 /* ── カテゴリ管理 ── */
 
@@ -338,9 +338,9 @@ function attachReminderEvents() {
         return;
       }
 
-      // カード本体クリックで次のカードへ
-      const noteBody = e.target.closest(".sticky-note-body");
-      if (noteBody && getReminders().length > 1) {
+      // カード本体クリックで次のカードへ（削除・編集ボタン以外）
+      const note = e.target.closest(".sticky-note");
+      if (note && getReminders().length > 1) {
         navigateSticky(1);
         return;
       }

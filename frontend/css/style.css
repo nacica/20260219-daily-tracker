@@ -2556,12 +2556,12 @@ textarea {
 
 .sticky-note.active {
   display: flex;
+  cursor: pointer;
 }
 
 .sticky-note-body {
   flex: 1;
   min-width: 0;
-  cursor: pointer;
 }
 
 .sticky-note-date {
