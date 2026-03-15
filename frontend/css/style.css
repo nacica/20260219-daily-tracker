@@ -2571,6 +2571,10 @@ textarea {
   margin-bottom: 4px;
 }
 
+[data-theme="light"] .sticky-note-date {
+  color: #6b7280;
+}
+
 .sticky-actions {
   display: flex;
   flex-direction: column;
