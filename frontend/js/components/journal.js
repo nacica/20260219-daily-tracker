@@ -3,8 +3,8 @@
  * 1日に複数エントリ作成可能。各エントリに独立した分析・MD要約。
  */
 
-import { journalApi, diaryDialogueApi } from "../api.js?v=20260316a";
-import { showToast } from "../app.js?v=20260316a";
+import { journalApi, diaryDialogueApi } from "../api.js?v=20260316b";
+import { showToast } from "../app.js?v=20260316b";
 
 // ===== ユーティリティ =====
 
@@ -259,7 +259,7 @@ function buildEntryListHTML(entries, isFuture) {
 
           <!-- MD要約表示 -->
           <div class="entry-md-wrapper" data-entry-id="${escapeHTML(entryId)}" style="${mdSummary ? "" : "display:none;"}margin-top:12px">
-            <div class="entry-md-output" data-entry-id="${escapeHTML(entryId)}" style="padding:20px 24px;background:var(--card-bg, #f8f9fa);border-radius:10px;border:1px solid rgba(128,128,128,0.15);line-height:1.8;overflow-wrap:break-word">
+            <div class="entry-md-output md-output" data-entry-id="${escapeHTML(entryId)}" style="padding:20px 24px;background:var(--card-bg, #f8f9fa);border-radius:10px;border:1px solid rgba(128,128,128,0.15);line-height:1.8;overflow-wrap:break-word">
               ${mdSummary ? renderMd(mdSummary) : ""}
             </div>
           </div>

@@ -4572,17 +4572,17 @@ main.swipe-enter-right {
 }
 
 /* ===== MD要約 マークダウン出力エリア ===== */
-#journal-md-output {
+.md-output {
   font-size: 0.95rem;
   color: var(--text-primary);
 }
 
-#journal-md-output h1,
-#journal-md-output h2,
-#journal-md-output h3,
-#journal-md-output h4,
-#journal-md-output h5,
-#journal-md-output h6 {
+.md-output h1,
+.md-output h2,
+.md-output h3,
+.md-output h4,
+.md-output h5,
+.md-output h6 {
   margin-top: 1.4em;
   margin-bottom: 0.6em;
   font-weight: 700;
@@ -4590,43 +4590,43 @@ main.swipe-enter-right {
   color: var(--text-primary);
 }
 
-#journal-md-output h1 { font-size: 1.5em; }
-#journal-md-output h2 {
+.md-output h1 { font-size: 1.5em; }
+.md-output h2 {
   font-size: 1.3em;
   padding-bottom: 0.3em;
   border-bottom: 1px solid rgba(128, 128, 128, 0.2);
 }
-#journal-md-output h3 { font-size: 1.15em; }
-#journal-md-output h4 { font-size: 1.05em; }
+.md-output h3 { font-size: 1.15em; }
+.md-output h4 { font-size: 1.05em; }
 
-#journal-md-output h1:first-child,
-#journal-md-output h2:first-child,
-#journal-md-output h3:first-child {
+.md-output h1:first-child,
+.md-output h2:first-child,
+.md-output h3:first-child {
   margin-top: 0;
 }
 
-#journal-md-output p {
+.md-output p {
   margin: 0.7em 0;
   line-height: 1.8;
 }
 
-#journal-md-output ul,
-#journal-md-output ol {
+.md-output ul,
+.md-output ol {
   margin: 0.6em 0;
   padding-left: 1.8em;
 }
 
-#journal-md-output li {
+.md-output li {
   margin: 0.4em 0;
   line-height: 1.7;
 }
 
-#journal-md-output li > ul,
-#journal-md-output li > ol {
+.md-output li > ul,
+.md-output li > ol {
   margin: 0.2em 0;
 }
 
-#journal-md-output blockquote {
+.md-output blockquote {
   margin: 0.8em 0;
   padding: 0.5em 1em;
   border-left: 4px solid var(--neon-blue, #00d4ff);
@@ -4635,29 +4635,29 @@ main.swipe-enter-right {
   color: var(--text-secondary);
 }
 
-#journal-md-output blockquote p {
+.md-output blockquote p {
   margin: 0.3em 0;
 }
 
-#journal-md-output strong {
+.md-output strong {
   font-weight: 700;
   color: var(--text-primary);
 }
 
-#journal-md-output hr {
+.md-output hr {
   border: none;
   border-top: 1px solid rgba(128, 128, 128, 0.2);
   margin: 1.2em 0;
 }
 
-#journal-md-output code {
+.md-output code {
   background: rgba(128, 128, 128, 0.12);
   padding: 0.15em 0.4em;
   border-radius: 4px;
   font-size: 0.9em;
 }
 
-#journal-md-output pre {
+.md-output pre {
   background: rgba(0, 0, 0, 0.15);
   padding: 1em;
   border-radius: 6px;
@@ -4665,21 +4665,21 @@ main.swipe-enter-right {
   margin: 0.8em 0;
 }
 
-#journal-md-output pre code {
+.md-output pre code {
   background: none;
   padding: 0;
 }
 
 /* ライトテーマ用 MD出力 */
-[data-theme="light"] #journal-md-output blockquote {
+[data-theme="light"] .md-output blockquote {
   background: rgba(0, 120, 212, 0.04);
   border-left-color: #0078d4;
 }
 
-[data-theme="light"] #journal-md-output code {
+[data-theme="light"] .md-output code {
   background: rgba(0, 0, 0, 0.06);
 }
 
-[data-theme="light"] #journal-md-output pre {
+[data-theme="light"] .md-output pre {
   background: rgba(0, 0, 0, 0.04);
 }
