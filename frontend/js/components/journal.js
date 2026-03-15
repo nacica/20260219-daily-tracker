@@ -211,7 +211,7 @@ function buildJournalHTML(date, journal, last7, monthlyBlockers, recentEntries, 
               <span id="md-font-label" style="font-size:0.8rem;color:var(--text-secondary);margin:0 4px">16px</span>
               <button class="btn btn-ghost btn-sm" id="md-font-up" style="font-size:0.85rem;padding:2px 10px">A+</button>
             </div>
-            <div id="journal-md-output" style="padding:16px;background:#f8f9fa;border-radius:8px;border:1px solid #e0e0e0;line-height:1.7;overflow-wrap:break-word">${mdSummary ? renderMd(mdSummary) : ""}</div>
+            <div id="journal-md-output" style="padding:20px 24px;background:var(--card-bg, #f8f9fa);border-radius:10px;border:1px solid rgba(128,128,128,0.15);line-height:1.8;overflow-wrap:break-word">${mdSummary ? renderMd(mdSummary) : ""}</div>
           </div>
         </div>
         <div id="journal-socratic-mode" style="${activeMode === "socratic" ? "" : "display:none"}">
