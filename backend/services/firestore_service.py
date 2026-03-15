@@ -410,17 +410,15 @@ def list_journals(start_date: Optional[str] = None, end_date: Optional[str] = No
 def list_journals_for_date(date: str) -> list[dict]:
     """指定日の全ジャーナルエントリを取得（entry_number 昇順）"""
     db = get_db()
-    query = (
-        db.collection("journal_entries")
-        .where(filter=FieldFilter("date", "==", date))
-        .order_by("entry_number")
-    )
+    query = db.collection("journal_entries").where(filter=FieldFilter("date", "==", date))
     results = [_ensure_entry_number(doc.to_dict()) for doc in query.stream()]
     # 旧形式（ID が YYYY-MM-DD）のドキュメントも含まれるようにする
     if not results:
         legacy = get_journal(date)
         if legacy:
             results = [legacy]
+    # entry_number でソート
+    results.sort(key=lambda e: e.get("entry_number", 1))
     return results
 
 
