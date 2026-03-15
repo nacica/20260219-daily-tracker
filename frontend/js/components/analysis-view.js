@@ -292,8 +292,8 @@ function buildAnalysisHTML(analysis, dialogueData) {
           <div class="stat-label">YouTube</div>
         </div>
         <div class="stat-item">
-          <div class="stat-value">${Math.round(summary.task_completion_rate * 100)}<small style="font-size:0.7rem">%</small></div>
-          <div class="stat-label">タスク完了</div>
+          <div class="stat-value">${summary.tasks_completed_count ?? Math.round(summary.task_completion_rate * 100)}<small style="font-size:0.7rem">${summary.tasks_completed_count != null ? '個' : '%'}</small></div>
+          <div class="stat-label">完了タスク</div>
         </div>
       </div>
     </div>

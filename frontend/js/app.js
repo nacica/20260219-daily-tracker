@@ -3,19 +3,19 @@
  * ルーティングの設定とホーム画面の表示を担当する
  */
 
-import { addRoute, navigate, updateNavActive } from "./router.js?v=20260314i";
-import { renderInputForm } from "./components/input-form.js?v=20260314i";
-import { renderAnalysisView } from "./components/analysis-view.js?v=20260314i";
-import { renderHistoryList } from "./components/history-list.js?v=20260314i";
-import { renderWeeklyReport } from "./components/weekly-report.js?v=20260314i";
-import { renderSuggestions } from "./components/suggestions.js?v=20260314i";
-import { renderCoachingChat } from "./components/coaching-chat.js?v=20260314i";
-import { renderKnowledgeGraph } from "./components/knowledge-graph.js?v=20260314i";
-import { renderMonthlyReport } from "./components/monthly-report.js?v=20260314i";
-import { renderJournal } from "./components/journal.js?v=20260314i";
-import { recordsApi, analysisApi } from "./api.js?v=20260314i";
-import { initSwipeNav } from "./swipe-nav.js?v=20260314i";
-import { buildTaskStatsCards, renderTaskStats } from "./components/task-stats.js?v=20260314i";
+import { addRoute, navigate, updateNavActive } from "./router.js?v=20260315a";
+import { renderInputForm } from "./components/input-form.js?v=20260315a";
+import { renderAnalysisView } from "./components/analysis-view.js?v=20260315a";
+import { renderHistoryList } from "./components/history-list.js?v=20260315a";
+import { renderWeeklyReport } from "./components/weekly-report.js?v=20260315a";
+import { renderSuggestions } from "./components/suggestions.js?v=20260315a";
+import { renderCoachingChat } from "./components/coaching-chat.js?v=20260315a";
+import { renderKnowledgeGraph } from "./components/knowledge-graph.js?v=20260315a";
+import { renderMonthlyReport } from "./components/monthly-report.js?v=20260315a";
+import { renderJournal } from "./components/journal.js?v=20260315a";
+import { recordsApi, analysisApi } from "./api.js?v=20260315a";
+import { initSwipeNav } from "./swipe-nav.js?v=20260315a";
+import { buildTaskStatsCards, renderTaskStats } from "./components/task-stats.js?v=20260315a";
 
 // ===== ユーティリティ =====
 
@@ -332,8 +332,8 @@ function buildHomeSummary(analysis) {
           <div class="stat-label">無駄（h）</div>
         </div>
         <div class="stat-item">
-          <div class="stat-value">${Math.round(analysis.summary.task_completion_rate * 100)}%</div>
-          <div class="stat-label">タスク完了率</div>
+          <div class="stat-value">${analysis.summary.tasks_completed_count ?? Math.round(analysis.summary.task_completion_rate * 100)}${analysis.summary.tasks_completed_count != null ? '個' : '%'}</div>
+          <div class="stat-label">完了タスク</div>
         </div>
       </div>
       <button class="btn btn-outline btn-sm" onclick="window.location.hash='/analysis/${analysis.date}'">
