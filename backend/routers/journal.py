@@ -157,7 +157,7 @@ async def get_journals_by_date(date: str):
 
 # ---- 単一エントリ操作（entry_id ベース） ----
 
-@router.get("/journal/entry/{entry_id:path}", response_model=JournalEntry)
+@router.get("/journal/entry/{entry_id}", response_model=JournalEntry)
 async def get_journal_entry(entry_id: str):
     """単一ジャーナルエントリを取得する"""
     journal = firestore_service.get_journal(entry_id)
@@ -166,7 +166,7 @@ async def get_journal_entry(entry_id: str):
     return JournalEntry(**journal)
 
 
-@router.put("/journal/entry/{entry_id:path}", response_model=JournalEntry)
+@router.put("/journal/entry/{entry_id}", response_model=JournalEntry)
 async def update_journal_entry(entry_id: str, body: JournalUpdate):
     """ジャーナルエントリを更新する"""
     existing = firestore_service.get_journal(entry_id)
@@ -186,7 +186,7 @@ async def update_journal_entry(entry_id: str, body: JournalUpdate):
     return JournalEntry(**updated)
 
 
-@router.delete("/journal/entry/{entry_id:path}", status_code=204)
+@router.delete("/journal/entry/{entry_id}", status_code=204)
 async def delete_journal_entry(entry_id: str):
     """ジャーナルエントリを削除する"""
     deleted = firestore_service.delete_journal(entry_id)
@@ -194,7 +194,7 @@ async def delete_journal_entry(entry_id: str):
         raise HTTPException(status_code=404, detail=f"{entry_id} のジャーナルが見つかりません")
 
 
-@router.post("/journal/entry/{entry_id:path}/analyze", response_model=JournalEntry)
+@router.post("/journal/entry/{entry_id}/analyze", response_model=JournalEntry)
 async def analyze_journal_entry(entry_id: str):
     """ジャーナルエントリのAI分析を実行する"""
     journal = firestore_service.get_journal(entry_id)
@@ -228,7 +228,7 @@ async def analyze_journal_entry(entry_id: str):
     return JournalEntry(**updated)
 
 
-@router.post("/journal/entry/{entry_id:path}/summarize", response_model=JournalEntry)
+@router.post("/journal/entry/{entry_id}/summarize", response_model=JournalEntry)
 async def summarize_journal_entry(entry_id: str):
     """ジャーナルエントリをマークダウン形式で要約し保存する"""
     journal = firestore_service.get_journal(entry_id)

@@ -238,23 +238,23 @@ export const journalApi = {
   listByDate: (date) => apiFetch(`/journal/by-date/${date}`),
 
   /** 単一エントリ取得（entry_id: 'YYYY-MM-DD#N'） */
-  getEntry: (entryId) => apiFetch(`/journal/entry/${entryId}`),
+  getEntry: (entryId) => apiFetch(`/journal/entry/${encodeURIComponent(entryId)}`),
 
   /** エントリ更新 */
   update: (entryId, content) =>
-    apiFetch(`/journal/entry/${entryId}`, { method: "PUT", body: { content } }),
+    apiFetch(`/journal/entry/${encodeURIComponent(entryId)}`, { method: "PUT", body: { content } }),
 
   /** エントリ削除 */
   delete: (entryId) =>
-    apiFetch(`/journal/entry/${entryId}`, { method: "DELETE" }),
+    apiFetch(`/journal/entry/${encodeURIComponent(entryId)}`, { method: "DELETE" }),
 
   /** AI分析を実行 */
   analyze: (entryId) =>
-    apiFetch(`/journal/entry/${entryId}/analyze`, { method: "POST" }),
+    apiFetch(`/journal/entry/${encodeURIComponent(entryId)}/analyze`, { method: "POST" }),
 
   /** マークダウン要約を生成 */
   summarize: (entryId) =>
-    apiFetch(`/journal/entry/${entryId}/summarize`, { method: "POST" }),
+    apiFetch(`/journal/entry/${encodeURIComponent(entryId)}/summarize`, { method: "POST" }),
 
   /** 週次ダイジェスト取得 */
   getDigest: (weekId) => apiFetch(`/journal/digest/${weekId}`),
