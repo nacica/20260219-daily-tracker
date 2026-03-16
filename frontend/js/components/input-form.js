@@ -5,9 +5,9 @@
  * 朝のタスク整理（ソクラテス式問答）統合
  */
 
-import { recordsApi, analysisApi, morningDialogueApi } from "../api.js?v=20260316h";
-import { showToast } from "../app.js?v=20260316h";
-import { showTaskCompleteAnimation, buildTaskStatsCards } from "./task-stats.js?v=20260316h";
+import { recordsApi, analysisApi, morningDialogueApi } from "../api.js?v=20260316i";
+import { showToast } from "../app.js?v=20260316i";
+import { showTaskCompleteAnimation, buildTaskStatsCards } from "./task-stats.js?v=20260316i";
 
 /* ── カテゴリ管理 ── */
 
@@ -92,6 +92,63 @@ function applyColumnCount(count) {
   document.querySelectorAll(".col-toggle-btn").forEach((btn) => {
     btn.classList.toggle("active", parseInt(btn.dataset.cols, 10) === count);
   });
+  distributeMasonry();
+}
+
+/**
+ * JS Masonry: カードをN本のflex列に振り分けて確実にN列レイアウトを実現する。
+ * CSS multi-column では4列が効かない問題を根本解決。
+ */
+function distributeMasonry() {
+  const grid = document.getElementById("input-grid");
+  if (!grid) return;
+
+  const isDesktop = window.matchMedia("(min-width: 1024px)").matches;
+
+  // モバイルではフラット表示に戻す
+  if (!isDesktop) {
+    flattenMasonry(grid);
+    return;
+  }
+
+  const colCount = getColumnCount();
+
+  // 全カードを収集（.masonry-col内にいても直下にいても取得）
+  const cards = [...grid.querySelectorAll(":scope > .draggable-card, .masonry-col > .draggable-card")];
+
+  // 既存の列ラッパーを削除
+  grid.querySelectorAll(".masonry-col").forEach((col) => col.remove());
+
+  // カードも一旦グリッドから外す
+  cards.forEach((card) => card.remove());
+
+  grid.classList.remove("masonry-flat");
+
+  // N本の列ラッパーを作成
+  const columns = [];
+  for (let i = 0; i < colCount; i++) {
+    const col = document.createElement("div");
+    col.className = "masonry-col";
+    grid.appendChild(col);
+    columns.push(col);
+  }
+
+  // カードをラウンドロビンで振り分け
+  cards.forEach((card, i) => {
+    columns[i % colCount].appendChild(card);
+  });
+}
+
+/**
+ * masonry列ラッパーを解除してカードをフラットに戻す
+ */
+function flattenMasonry(grid) {
+  const cols = grid.querySelectorAll(".masonry-col");
+  if (cols.length === 0) return;
+
+  const cards = [...grid.querySelectorAll(".masonry-col > .draggable-card")];
+  cols.forEach((col) => col.remove());
+  cards.forEach((card) => grid.appendChild(card));
 }
 
 /* ── レイアウト永続化 ── */
@@ -1135,6 +1192,8 @@ function attachColumnToggleEvents() {
     saveColumnCount(cols);
     applyColumnCount(cols);
   });
+  // 初回レンダリング時にmasonry適用
+  distributeMasonry();
 }
 
 function attachFormEvents(date, isEdit) {
@@ -1852,10 +1911,14 @@ function attachDragDropEvents() {
     });
   });
 
-  // dragstart
+  // dragstart — masonry列をフラットに戻してからドラッグ
   grid.addEventListener("dragstart", (e) => {
     const card = e.target.closest(".draggable-card");
     if (!card) { e.preventDefault(); return; }
+
+    // masonry列を解除してフラットにする
+    flattenMasonry(grid);
+    grid.classList.add("masonry-flat");
 
     draggedCard = card;
     card.classList.add("dragging");
@@ -1867,7 +1930,7 @@ function attachDragDropEvents() {
     });
   });
 
-  // dragend
+  // dragend — masonry列を再構成
   grid.addEventListener("dragend", (e) => {
     const card = e.target.closest(".draggable-card");
     if (card) {
@@ -1877,6 +1940,8 @@ function attachDragDropEvents() {
     }
     draggedCard = null;
     grid.querySelectorAll(".drop-indicator").forEach((el) => el.remove());
+    // masonry列を再構成
+    distributeMasonry();
   });
 
   // グリッド全体をドロップゾーンとして設定

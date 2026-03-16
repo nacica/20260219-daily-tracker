@@ -3339,19 +3339,27 @@ textarea {
     border-color: var(--accent);
   }
 
-  /* ── Input Form Masonry Columns ── */
+  /* ── Input Form Masonry Columns (JS masonry via flex columns) ── */
   .input-grid {
-    display: block;
-    column-gap: 16px;
-    column-width: 1px;
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
   }
 
-  .input-grid[data-columns="2"] { column-count: 2; }
-  .input-grid[data-columns="3"] { column-count: 3; }
-  .input-grid[data-columns="4"] { column-count: 4; }
+  .masonry-col {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
 
-  .input-grid > * {
-    break-inside: avoid;
+  /* フラット状態（ドラッグ中）のフォールバック */
+  .input-grid.masonry-flat {
+    display: block;
+    column-gap: 16px;
+  }
+  .input-grid.masonry-flat > .draggable-card {
     margin-bottom: 16px;
   }
 
