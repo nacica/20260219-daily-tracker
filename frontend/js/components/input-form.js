@@ -5,9 +5,9 @@
  * 朝のタスク整理（ソクラテス式問答）統合
  */
 
-import { recordsApi, analysisApi, morningDialogueApi } from "../api.js?v=20260316j";
-import { showToast } from "../app.js?v=20260316j";
-import { showTaskCompleteAnimation, buildTaskStatsCards } from "./task-stats.js?v=20260316j";
+import { recordsApi, analysisApi, morningDialogueApi } from "../api.js?v=20260316k";
+import { showToast } from "../app.js?v=20260316k";
+import { showTaskCompleteAnimation, buildTaskStatsCards } from "./task-stats.js?v=20260316k";
 
 /* ── カテゴリ管理 ── */
 
@@ -95,9 +95,33 @@ function applyColumnCount(count) {
   distributeMasonry();
 }
 
+/* ── Masonry列配置の永続化 ── */
+
+function getMasonryLayoutKey(colCount) {
+  return "masonry-layout-" + colCount;
+}
+
+function getSavedMasonryLayout(colCount) {
+  try {
+    return JSON.parse(localStorage.getItem(getMasonryLayoutKey(colCount))) || null;
+  } catch { return null; }
+}
+
+function saveMasonryLayout(grid) {
+  const colCount = getColumnCount();
+  const cols = grid.querySelectorAll(".masonry-col");
+  const layout = {};
+  cols.forEach((col, ci) => {
+    col.querySelectorAll(".draggable-card").forEach((card, pos) => {
+      layout[card.id] = { col: ci, pos };
+    });
+  });
+  localStorage.setItem(getMasonryLayoutKey(colCount), JSON.stringify(layout));
+}
+
 /**
- * JS Masonry: カードをN本のflex列に振り分けて確実にN列レイアウトを実現する。
- * CSS multi-column では4列が効かない問題を根本解決。
+ * JS Masonry: カードをN本のflex列に振り分ける。
+ * 保存済みの列配置があればそれを復元し、なければラウンドロビンで初期配置する。
  */
 function distributeMasonry() {
   const grid = document.getElementById("input-grid");
@@ -118,11 +142,7 @@ function distributeMasonry() {
 
   // 既存の列ラッパーを削除
   grid.querySelectorAll(".masonry-col").forEach((col) => col.remove());
-
-  // カードも一旦グリッドから外す
   cards.forEach((card) => card.remove());
-
-  grid.classList.remove("masonry-flat");
 
   // N本の列ラッパーを作成
   const columns = [];
@@ -133,10 +153,41 @@ function distributeMasonry() {
     columns.push(col);
   }
 
-  // カードをラウンドロビンで振り分け
-  cards.forEach((card, i) => {
-    columns[i % colCount].appendChild(card);
-  });
+  // 保存済み配置を復元、なければラウンドロビン
+  const saved = getSavedMasonryLayout(colCount);
+
+  if (saved) {
+    const assigned = [];
+    const unassigned = [];
+
+    cards.forEach((card) => {
+      const info = saved[card.id];
+      if (info && info.col < colCount) {
+        assigned.push({ card, col: info.col, pos: info.pos });
+      } else {
+        unassigned.push(card);
+      }
+    });
+
+    // 列・位置順でソートして配置
+    assigned.sort((a, b) => a.col - b.col || a.pos - b.pos);
+    assigned.forEach(({ card, col }) => columns[col].appendChild(card));
+
+    // 未割当カードは最も少ない列へ
+    unassigned.forEach((card) => {
+      const shortest = columns.reduce((a, b) =>
+        a.children.length <= b.children.length ? a : b
+      );
+      shortest.appendChild(card);
+    });
+  } else {
+    // 初回: ラウンドロビン
+    cards.forEach((card, i) => {
+      columns[i % colCount].appendChild(card);
+    });
+  }
+
+  saveMasonryLayout(grid);
 }
 
 /**
@@ -1938,26 +1989,28 @@ function attachDragDropEvents() {
     grid.querySelectorAll(".drop-indicator").forEach((el) => el.remove());
   });
 
-  // dragover — masonry-col内のカードも検索対象にする
+  // dragover — マウス位置からターゲット列と挿入位置を判定
   grid.addEventListener("dragover", (e) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = "move";
     if (!draggedCard) return;
 
-    const visibleCards = [...grid.querySelectorAll(".draggable-card:not(.dragging)")].filter(
+    const targetCol = findTargetColumn(grid, e.clientX);
+    if (!targetCol) return;
+
+    const colCards = [...targetCol.querySelectorAll(".draggable-card:not(.dragging)")].filter(
       (c) => c.style.display !== "none"
     );
-    const afterCard = getInsertAfterCard(grid, e.clientY, visibleCards);
+    const afterCard = getInsertAfterCard(targetCol, e.clientY, colCards);
 
     grid.querySelectorAll(".drop-indicator").forEach((el) => el.remove());
     const indicator = document.createElement("div");
     indicator.className = "drop-indicator";
 
     if (afterCard) {
-      afterCard.parentNode.insertBefore(indicator, afterCard);
+      targetCol.insertBefore(indicator, afterCard);
     } else {
-      const lastCol = grid.querySelector(".masonry-col:last-child") || grid;
-      lastCol.appendChild(indicator);
+      targetCol.appendChild(indicator);
     }
   });
 
@@ -1967,29 +2020,28 @@ function attachDragDropEvents() {
     }
   });
 
+  // drop — 対象カードだけをターゲット列に移動（他のカードは動かさない）
   grid.addEventListener("drop", (e) => {
     e.preventDefault();
     grid.querySelectorAll(".drop-indicator").forEach((el) => el.remove());
 
     if (!draggedCard) return;
 
-    // 一旦フラットに戻してから挿入位置を決定
-    flattenMasonry(grid);
+    const targetCol = findTargetColumn(grid, e.clientX);
+    if (!targetCol) return;
 
-    const visibleCards = [...grid.querySelectorAll(".draggable-card:not(.dragging)")].filter(
+    const colCards = [...targetCol.querySelectorAll(".draggable-card:not(.dragging)")].filter(
       (c) => c.style.display !== "none"
     );
-    const afterCard = getInsertAfterCard(grid, e.clientY, visibleCards);
+    const afterCard = getInsertAfterCard(targetCol, e.clientY, colCards);
 
     if (afterCard) {
-      grid.insertBefore(draggedCard, afterCard);
+      targetCol.insertBefore(draggedCard, afterCard);
     } else {
-      grid.appendChild(draggedCard);
+      targetCol.appendChild(draggedCard);
     }
 
-    persistCurrentLayout(grid);
-    // masonry列を再構成
-    distributeMasonry();
+    saveMasonryLayout(grid);
   });
 
   // ビューポート変更への対応
@@ -1998,6 +2050,14 @@ function attachDragDropEvents() {
       card.setAttribute("draggable", "false");
     });
   });
+}
+
+function findTargetColumn(grid, clientX) {
+  const cols = [...grid.querySelectorAll(".masonry-col")];
+  return cols.find((col) => {
+    const rect = col.getBoundingClientRect();
+    return clientX >= rect.left && clientX <= rect.right;
+  }) || cols[cols.length - 1] || null;
 }
 
 function getInsertAfterCard(container, mouseY, cards) {
