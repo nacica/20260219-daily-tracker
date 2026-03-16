@@ -219,9 +219,13 @@ export function showTaskCompleteAnimation(anchorEl) {
     ring.addEventListener("animationend", () => ring.remove());
   }
 
-  // --- 3. 画面シェイク ---
-  document.body.classList.add("screen-shake");
-  setTimeout(() => document.body.classList.remove("screen-shake"), 400);
+  // --- 3. 画面シェイク（bodyではなくmainに適用。bodyにtransformを付けると
+  //         position:fixedのバナーの基準がviewport→bodyに変わり二重表示になる） ---
+  const mainEl = document.querySelector("main");
+  if (mainEl) {
+    mainEl.classList.add("screen-shake");
+    setTimeout(() => mainEl.classList.remove("screen-shake"), 400);
+  }
 
   // --- 4. 完了カードのグロウフラッシュ ---
   const card = anchorEl?.closest(".card");
