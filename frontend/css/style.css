@@ -3339,16 +3339,21 @@ textarea {
     border-color: var(--accent);
   }
 
-  /* ── Input Form Grid Columns ── */
+  /* ── Input Form Masonry Columns ── */
   .input-grid {
-    display: grid;
-    gap: 16px;
-    align-items: start;
+    display: block;
+    column-gap: 16px;
+    column-width: 1px;
   }
 
-  .input-grid[data-columns="2"] { grid-template-columns: repeat(2, 1fr); }
-  .input-grid[data-columns="3"] { grid-template-columns: repeat(3, 1fr); }
-  .input-grid[data-columns="4"] { grid-template-columns: repeat(4, 1fr); }
+  .input-grid[data-columns="2"] { column-count: 2; }
+  .input-grid[data-columns="3"] { column-count: 3; }
+  .input-grid[data-columns="4"] { column-count: 4; }
+
+  .input-grid > * {
+    break-inside: avoid;
+    margin-bottom: 16px;
+  }
 
   /* Drag handle */
   .card-drag-handle {
