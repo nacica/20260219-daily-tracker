@@ -1020,6 +1020,12 @@ textarea {
   font-weight: 700;
 }
 
+/* ===== カラム切り替えバー ===== */
+
+.col-toggle-bar {
+  display: none; /* モバイルでは非表示 */
+}
+
 /* ===== 入力フォーム 2列グリッド（モバイルではフラット表示） ===== */
 
 .input-grid {
@@ -3298,17 +3304,50 @@ textarea {
     gap: 12px;
   }
 
-  /* 記録タブ表示時は main の幅制限を解除して5列表示を可能に */
+  /* 記録タブ表示時は main の幅制限を解除 */
   main:has(.input-grid) {
     max-width: none;
+  }
+
+  /* ── カラム切り替えバー (デスクトップ表示) ── */
+  .col-toggle-bar {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 12px;
+    justify-content: flex-end;
+  }
+
+  .col-toggle-btn {
+    padding: 5px 14px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--bg-card);
+    color: var(--text-secondary);
+    font-size: 0.82rem;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+  }
+
+  .col-toggle-btn:hover {
+    border-color: var(--accent);
+    color: var(--text-primary);
+  }
+
+  .col-toggle-btn.active {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
   }
 
   /* ── Input Form Masonry Columns ── */
   .input-grid {
     display: block;
-    columns: 350px 5;
     column-gap: 20px;
   }
+
+  .input-grid[data-columns="2"] { columns: 2; }
+  .input-grid[data-columns="3"] { columns: 3; }
+  .input-grid[data-columns="4"] { columns: 4; }
 
   .input-grid > * {
     break-inside: avoid;

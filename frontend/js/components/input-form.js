@@ -5,9 +5,9 @@
  * 朝のタスク整理（ソクラテス式問答）統合
  */
 
-import { recordsApi, analysisApi, morningDialogueApi } from "../api.js?v=20260316d";
-import { showToast } from "../app.js?v=20260316d";
-import { showTaskCompleteAnimation, buildTaskStatsCards } from "./task-stats.js?v=20260316d";
+import { recordsApi, analysisApi, morningDialogueApi } from "../api.js?v=20260316e";
+import { showToast } from "../app.js?v=20260316e";
+import { showTaskCompleteAnimation, buildTaskStatsCards } from "./task-stats.js?v=20260316e";
 
 /* ── カテゴリ管理 ── */
 
@@ -69,6 +69,29 @@ function refreshCategoryDropdowns() {
     const current = sel.value;
     sel.innerHTML = buildCategoryOptions(current || last);
   }
+}
+
+/* ── カラム数永続化 ── */
+
+const COLUMN_COUNT_KEY = "input-form-column-count";
+
+function getColumnCount() {
+  const saved = localStorage.getItem(COLUMN_COUNT_KEY);
+  return saved ? parseInt(saved, 10) : 3;
+}
+
+function saveColumnCount(count) {
+  localStorage.setItem(COLUMN_COUNT_KEY, String(count));
+}
+
+function applyColumnCount(count) {
+  const grid = document.getElementById("input-grid");
+  if (!grid) return;
+  grid.setAttribute("data-columns", count);
+  // ボタンのアクティブ状態を更新
+  document.querySelectorAll(".col-toggle-btn").forEach((btn) => {
+    btn.classList.toggle("active", parseInt(btn.dataset.cols, 10) === count);
+  });
 }
 
 /* ── レイアウト永続化 ── */
@@ -896,7 +919,11 @@ function buildFormHTML(date, record, tasks, isEdit, morningDialogue, isRestDay =
       </div>
     </div>
 
-    <div class="input-grid" id="input-grid">
+    <div class="col-toggle-bar" id="col-toggle-bar">
+      ${[2, 3, 4].map((n) => `<button class="col-toggle-btn${n === getColumnCount() ? " active" : ""}" data-cols="${n}">${n}列</button>`).join("")}
+    </div>
+
+    <div class="input-grid" id="input-grid" data-columns="${getColumnCount()}">
       ${sortedCards.map((c) => c.cardHTML).join("")}
     </div>
   `;
@@ -1098,7 +1125,20 @@ function applyMorningPlanToForm(plan) {
 
 /* ── イベント登録 ── */
 
+function attachColumnToggleEvents() {
+  const bar = document.getElementById("col-toggle-bar");
+  if (!bar) return;
+  bar.addEventListener("click", (e) => {
+    const btn = e.target.closest(".col-toggle-btn");
+    if (!btn) return;
+    const cols = parseInt(btn.dataset.cols, 10);
+    saveColumnCount(cols);
+    applyColumnCount(cols);
+  });
+}
+
 function attachFormEvents(date, isEdit) {
+  attachColumnToggleEvents();
   const plannedList = document.getElementById("planned-list");
   const plannedInput = document.getElementById("planned-input");
   const completedList = document.getElementById("completed-list");
