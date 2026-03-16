@@ -185,6 +185,37 @@ function emitParticles(cx, cy, count) {
   }
 }
 
+const CONFETTI_COLORS = ["#00ff94", "#fbbf24", "#a855f7", "#00d4ff", "#ff6b6b", "#34d399"];
+
+function emitConfetti(count) {
+  const vw = window.innerWidth;
+  for (let i = 0; i < count; i++) {
+    const c = document.createElement("div");
+    c.className = "confetti-piece";
+    // ランダムな開始位置（画面上部の幅全体）
+    c.style.left = `${Math.random() * vw}px`;
+    c.style.top = `${-10 - Math.random() * 40}px`;
+    // ランダムな色・サイズ・形状
+    const color = CONFETTI_COLORS[Math.floor(Math.random() * CONFETTI_COLORS.length)];
+    c.style.background = color;
+    c.style.setProperty("--drift", `${(Math.random() - 0.5) * 120}px`);
+    c.style.setProperty("--spin", `${Math.random() * 720 - 360}deg`);
+    c.style.animationDuration = `${1.8 + Math.random() * 1.4}s`;
+    c.style.animationDelay = `${Math.random() * 600}ms`;
+    // 長方形 or 正方形をランダムに
+    if (Math.random() > 0.5) {
+      c.style.width = `${6 + Math.random() * 4}px`;
+      c.style.height = `${10 + Math.random() * 6}px`;
+    } else {
+      const s = 6 + Math.random() * 5;
+      c.style.width = `${s}px`;
+      c.style.height = `${s}px`;
+    }
+    document.body.appendChild(c);
+    c.addEventListener("animationend", () => c.remove());
+  }
+}
+
 let _lastAnimTime = 0;
 
 export function showTaskCompleteAnimation(anchorEl) {
@@ -241,6 +272,10 @@ export function showTaskCompleteAnimation(anchorEl) {
   // --- 6. 放射状パーティクル ---
   const particleCount = combo >= 3 ? 16 : combo >= 2 ? 12 : 8;
   emitParticles(cx, cy, particleCount);
+
+  // --- 7. 紙吹雪 ---
+  const confettiCount = combo >= 3 ? 50 : combo >= 2 ? 35 : 25;
+  emitConfetti(confettiCount);
 
   // ホーム画面のカウンターをバンプ（表示されていれば）
   const todayEl = document.getElementById("task-stat-today");

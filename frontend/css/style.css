@@ -1536,6 +1536,30 @@ textarea {
   }
 }
 
+/* 紙吹雪（Confetti） */
+.confetti-piece {
+  position: fixed;
+  z-index: 9997;
+  pointer-events: none;
+  border-radius: 2px;
+  opacity: 1;
+  animation: confettiFall 2.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+
+@keyframes confettiFall {
+  0% {
+    opacity: 1;
+    transform: translateY(0) translateX(0) rotate(0deg) scale(1);
+  }
+  25% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(calc(100vh + 20px)) translateX(var(--drift)) rotate(var(--spin)) scale(0.5);
+  }
+}
+
 /* ===== タスク実績詳細ページ ===== */
 
 .task-stats-page { padding: 0; }
