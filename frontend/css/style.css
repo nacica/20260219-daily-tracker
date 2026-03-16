@@ -3354,15 +3354,6 @@ textarea {
     gap: 16px;
   }
 
-  /* フラット状態（ドラッグ中）のフォールバック */
-  .input-grid.masonry-flat {
-    display: block;
-    column-gap: 16px;
-  }
-  .input-grid.masonry-flat > .draggable-card {
-    margin-bottom: 16px;
-  }
-
   /* Drag handle */
   .card-drag-handle {
     display: flex;

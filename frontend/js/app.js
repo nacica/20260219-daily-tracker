@@ -3,19 +3,19 @@
  * ルーティングの設定とホーム画面の表示を担当する
  */
 
-import { addRoute, navigate, updateNavActive } from "./router.js?v=20260316i";
-import { renderInputForm } from "./components/input-form.js?v=20260316i";
-import { renderAnalysisView } from "./components/analysis-view.js?v=20260316i";
-import { renderHistoryList } from "./components/history-list.js?v=20260316i";
-import { renderWeeklyReport } from "./components/weekly-report.js?v=20260316i";
-import { renderSuggestions } from "./components/suggestions.js?v=20260316i";
-import { renderCoachingChat } from "./components/coaching-chat.js?v=20260316i";
-import { renderKnowledgeGraph } from "./components/knowledge-graph.js?v=20260316i";
-import { renderMonthlyReport } from "./components/monthly-report.js?v=20260316i";
-import { renderJournal } from "./components/journal.js?v=20260316i";
-import { recordsApi, analysisApi } from "./api.js?v=20260316i";
-import { initSwipeNav } from "./swipe-nav.js?v=20260316i";
-import { buildTaskStatsCards, renderTaskStats } from "./components/task-stats.js?v=20260316i";
+import { addRoute, navigate, updateNavActive } from "./router.js?v=20260316j";
+import { renderInputForm } from "./components/input-form.js?v=20260316j";
+import { renderAnalysisView } from "./components/analysis-view.js?v=20260316j";
+import { renderHistoryList } from "./components/history-list.js?v=20260316j";
+import { renderWeeklyReport } from "./components/weekly-report.js?v=20260316j";
+import { renderSuggestions } from "./components/suggestions.js?v=20260316j";
+import { renderCoachingChat } from "./components/coaching-chat.js?v=20260316j";
+import { renderKnowledgeGraph } from "./components/knowledge-graph.js?v=20260316j";
+import { renderMonthlyReport } from "./components/monthly-report.js?v=20260316j";
+import { renderJournal } from "./components/journal.js?v=20260316j";
+import { recordsApi, analysisApi } from "./api.js?v=20260316j";
+import { initSwipeNav } from "./swipe-nav.js?v=20260316j";
+import { buildTaskStatsCards, renderTaskStats } from "./components/task-stats.js?v=20260316j";
 
 // ===== ユーティリティ =====
 

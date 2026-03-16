@@ -5,9 +5,9 @@
  * 朝のタスク整理（ソクラテス式問答）統合
  */
 
-import { recordsApi, analysisApi, morningDialogueApi } from "../api.js?v=20260316i";
-import { showToast } from "../app.js?v=20260316i";
-import { showTaskCompleteAnimation, buildTaskStatsCards } from "./task-stats.js?v=20260316i";
+import { recordsApi, analysisApi, morningDialogueApi } from "../api.js?v=20260316j";
+import { showToast } from "../app.js?v=20260316j";
+import { showTaskCompleteAnimation, buildTaskStatsCards } from "./task-stats.js?v=20260316j";
 
 /* ── カテゴリ管理 ── */
 
@@ -1911,14 +1911,10 @@ function attachDragDropEvents() {
     });
   });
 
-  // dragstart — masonry列をフラットに戻してからドラッグ
+  // dragstart — DOM構造を変更しない（変更するとブラウザがドラッグを中断する）
   grid.addEventListener("dragstart", (e) => {
     const card = e.target.closest(".draggable-card");
     if (!card) { e.preventDefault(); return; }
-
-    // masonry列を解除してフラットにする
-    flattenMasonry(grid);
-    grid.classList.add("masonry-flat");
 
     draggedCard = card;
     card.classList.add("dragging");
@@ -1930,7 +1926,7 @@ function attachDragDropEvents() {
     });
   });
 
-  // dragend — masonry列を再構成
+  // dragend — 必ずクリーンアップしてmasonry再構成
   grid.addEventListener("dragend", (e) => {
     const card = e.target.closest(".draggable-card");
     if (card) {
@@ -1940,11 +1936,9 @@ function attachDragDropEvents() {
     }
     draggedCard = null;
     grid.querySelectorAll(".drop-indicator").forEach((el) => el.remove());
-    // masonry列を再構成
-    distributeMasonry();
   });
 
-  // グリッド全体をドロップゾーンとして設定
+  // dragover — masonry-col内のカードも検索対象にする
   grid.addEventListener("dragover", (e) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = "move";
@@ -1960,9 +1954,10 @@ function attachDragDropEvents() {
     indicator.className = "drop-indicator";
 
     if (afterCard) {
-      grid.insertBefore(indicator, afterCard);
+      afterCard.parentNode.insertBefore(indicator, afterCard);
     } else {
-      grid.appendChild(indicator);
+      const lastCol = grid.querySelector(".masonry-col:last-child") || grid;
+      lastCol.appendChild(indicator);
     }
   });
 
@@ -1978,6 +1973,9 @@ function attachDragDropEvents() {
 
     if (!draggedCard) return;
 
+    // 一旦フラットに戻してから挿入位置を決定
+    flattenMasonry(grid);
+
     const visibleCards = [...grid.querySelectorAll(".draggable-card:not(.dragging)")].filter(
       (c) => c.style.display !== "none"
     );
@@ -1990,6 +1988,8 @@ function attachDragDropEvents() {
     }
 
     persistCurrentLayout(grid);
+    // masonry列を再構成
+    distributeMasonry();
   });
 
   // ビューポート変更への対応
