@@ -137,7 +137,51 @@ export async function buildTaskStatsCards() {
   }
 }
 
-// ===== +1 フローティングアニメーション =====
+// ===== レベルアップ演出 + コンボ管理 =====
+
+let _comboCount = 0;
+let _comboTimer = null;
+const COMBO_WINDOW_MS = 8000; // 8秒以内の連続完了でコンボ
+
+function tickCombo() {
+  _comboCount++;
+  clearTimeout(_comboTimer);
+  _comboTimer = setTimeout(() => { _comboCount = 0; }, COMBO_WINDOW_MS);
+  return _comboCount;
+}
+
+function showLevelUpBanner(combo) {
+  // 既存バナーを除去
+  document.querySelectorAll(".levelup-banner").forEach(el => el.remove());
+
+  const banner = document.createElement("div");
+  banner.className = "levelup-banner";
+
+  if (combo >= 2) {
+    banner.innerHTML = `<span class="levelup-text">${combo} COMBO!</span>`;
+    banner.classList.add("combo");
+  } else {
+    banner.innerHTML = `<span class="levelup-text">TASK COMPLETE!</span>`;
+  }
+  document.body.appendChild(banner);
+  banner.addEventListener("animationend", () => banner.remove());
+}
+
+function emitParticles(cx, cy, count) {
+  for (let i = 0; i < count; i++) {
+    const p = document.createElement("div");
+    p.className = "radial-particle";
+    const angle = (Math.PI * 2 * i) / count;
+    const dist = 60 + Math.random() * 50;
+    p.style.left = `${cx}px`;
+    p.style.top = `${cy}px`;
+    p.style.setProperty("--dx", `${Math.cos(angle) * dist}px`);
+    p.style.setProperty("--dy", `${Math.sin(angle) * dist}px`);
+    p.style.animationDelay = `${Math.random() * 80}ms`;
+    document.body.appendChild(p);
+    p.addEventListener("animationend", () => p.remove());
+  }
+}
 
 export function showTaskCompleteAnimation(anchorEl) {
   const rect = anchorEl
@@ -177,6 +221,14 @@ export function showTaskCompleteAnimation(anchorEl) {
     card.classList.add("card-glow-flash");
     setTimeout(() => card.classList.remove("card-glow-flash"), 600);
   }
+
+  // --- 5. レベルアップバナー + コンボ ---
+  const combo = tickCombo();
+  showLevelUpBanner(combo);
+
+  // --- 6. 放射状パーティクル ---
+  const particleCount = combo >= 3 ? 16 : combo >= 2 ? 12 : 8;
+  emitParticles(cx, cy, particleCount);
 
   // ホーム画面のカウンターをバンプ（表示されていれば）
   const todayEl = document.getElementById("task-stat-today");
