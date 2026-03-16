@@ -2564,6 +2564,11 @@ textarea {
   min-width: 0;
 }
 
+.sticky-text {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .sticky-note-date {
   font-size: 0.9rem;
   font-weight: 400;
