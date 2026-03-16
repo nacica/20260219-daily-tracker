@@ -185,7 +185,13 @@ function emitParticles(cx, cy, count) {
   }
 }
 
+let _lastAnimTime = 0;
+
 export function showTaskCompleteAnimation(anchorEl) {
+  const now = Date.now();
+  if (now - _lastAnimTime < 500) return;
+  _lastAnimTime = now;
+
   const rect = anchorEl
     ? anchorEl.getBoundingClientRect()
     : { left: window.innerWidth / 2, top: window.innerHeight / 2 };
