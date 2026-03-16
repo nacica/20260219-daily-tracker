@@ -2668,6 +2668,11 @@ textarea {
   font-family: 'Klee One', cursive;
   outline: none;
   transition: border-color 0.2s;
+  resize: none;
+  overflow: hidden;
+  min-height: 34px;
+  max-height: 120px;
+  line-height: 1.4;
 }
 
 .sticky-input:focus {

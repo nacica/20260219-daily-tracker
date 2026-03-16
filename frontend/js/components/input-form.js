@@ -5,9 +5,9 @@
  * 朝のタスク整理（ソクラテス式問答）統合
  */
 
-import { recordsApi, analysisApi, morningDialogueApi } from "../api.js?v=20260316c";
-import { showToast } from "../app.js?v=20260316c";
-import { showTaskCompleteAnimation, buildTaskStatsCards } from "./task-stats.js?v=20260316c";
+import { recordsApi, analysisApi, morningDialogueApi } from "../api.js?v=20260316d";
+import { showToast } from "../app.js?v=20260316d";
+import { showTaskCompleteAnimation, buildTaskStatsCards } from "./task-stats.js?v=20260316d";
 
 /* ── カテゴリ管理 ── */
 
@@ -248,7 +248,7 @@ function buildReminderBoardHTML() {
       </div>
       <div class="sticky-add-area">
         <div class="sticky-add-row">
-          <input type="text" id="sticky-input" class="sticky-input" placeholder="意識することを追加..." />
+          <textarea id="sticky-input" class="sticky-input" placeholder="意識することを追加...（Shift+Enterで改行）" rows="1"></textarea>
           <button class="btn btn-primary btn-sm" id="btn-add-sticky">追加</button>
         </div>
       </div>
@@ -275,7 +275,11 @@ function attachReminderEvents() {
 
   addBtn.addEventListener("click", addSticky);
   input.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") { e.preventDefault(); addSticky(); }
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); addSticky(); }
+  });
+  input.addEventListener("input", () => {
+    input.style.height = "auto";
+    input.style.height = input.scrollHeight + "px";
   });
 
   // 削除・編集（イベント委譲）
