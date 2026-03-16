@@ -5,9 +5,9 @@
  * 朝のタスク整理（ソクラテス式問答）統合
  */
 
-import { recordsApi, analysisApi, morningDialogueApi } from "../api.js?v=20260316n";
-import { showToast } from "../app.js?v=20260316n";
-import { showTaskCompleteAnimation, buildTaskStatsCards } from "./task-stats.js?v=20260316n";
+import { recordsApi, analysisApi, morningDialogueApi } from "../api.js?v=20260316o";
+import { showToast } from "../app.js?v=20260316o";
+import { showTaskCompleteAnimation, buildTaskStatsCards } from "./task-stats.js?v=20260316o";
 
 /* ── カテゴリ管理 ── */
 
@@ -1654,9 +1654,11 @@ function attachFormEvents(date, isEdit) {
       return;
     }
     if (e.target.type === "checkbox") {
+      if (e.target.dataset.animating) { delete e.target.dataset.animating; return; }
       const li = e.target.closest("li");
       if (e.target.checked) {
         li.classList.add("completed");
+        e.target.dataset.animating = "1";
         completedList.appendChild(li);
         showTaskCompleteAnimation(e.target);
       } else {
