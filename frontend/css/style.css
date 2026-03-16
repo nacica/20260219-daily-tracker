@@ -3342,12 +3342,12 @@ textarea {
   /* ── Input Form Masonry Columns ── */
   .input-grid {
     display: block;
-    column-gap: 20px;
+    column-gap: 16px;
   }
 
-  .input-grid[data-columns="2"] { columns: 2; }
-  .input-grid[data-columns="3"] { columns: 3; }
-  .input-grid[data-columns="4"] { columns: 4; }
+  .input-grid[data-columns="2"] { column-count: 2; }
+  .input-grid[data-columns="3"] { column-count: 3; }
+  .input-grid[data-columns="4"] { column-count: 4; }
 
   .input-grid > * {
     break-inside: avoid;
