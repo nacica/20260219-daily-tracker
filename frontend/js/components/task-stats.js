@@ -144,6 +144,10 @@ export function showTaskCompleteAnimation(anchorEl) {
     ? anchorEl.getBoundingClientRect()
     : { left: window.innerWidth / 2, top: window.innerHeight / 2 };
 
+  const cx = rect.left + (rect.width || 0) / 2;
+  const cy = rect.top + (rect.height || 0) / 2;
+
+  // --- 1. "+1" フローティング ---
   const float = document.createElement("div");
   float.className = "task-complete-float";
   float.textContent = "+1";
@@ -151,6 +155,28 @@ export function showTaskCompleteAnimation(anchorEl) {
   float.style.top = `${rect.top - 10}px`;
   document.body.appendChild(float);
   float.addEventListener("animationend", () => float.remove());
+
+  // --- 2. パルスウェーブ（衝撃波リング x3） ---
+  for (let i = 0; i < 3; i++) {
+    const ring = document.createElement("div");
+    ring.className = "pulse-ring";
+    ring.style.left = `${cx}px`;
+    ring.style.top = `${cy}px`;
+    ring.style.animationDelay = `${i * 120}ms`;
+    document.body.appendChild(ring);
+    ring.addEventListener("animationend", () => ring.remove());
+  }
+
+  // --- 3. 画面シェイク ---
+  document.body.classList.add("screen-shake");
+  setTimeout(() => document.body.classList.remove("screen-shake"), 400);
+
+  // --- 4. 完了カードのグロウフラッシュ ---
+  const card = anchorEl?.closest(".card");
+  if (card) {
+    card.classList.add("card-glow-flash");
+    setTimeout(() => card.classList.remove("card-glow-flash"), 600);
+  }
 
   // ホーム画面のカウンターをバンプ（表示されていれば）
   const todayEl = document.getElementById("task-stat-today");

@@ -1377,6 +1377,70 @@ textarea {
   }
 }
 
+/* パルスウェーブ（衝撃波リング） */
+.pulse-ring {
+  position: fixed;
+  z-index: 9998;
+  pointer-events: none;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  border: 3px solid var(--neon-green);
+  box-shadow: 0 0 12px rgba(0, 255, 148, 0.5), inset 0 0 12px rgba(0, 255, 148, 0.2);
+  transform: translate(-50%, -50%);
+  animation: pulseExpand 0.7s cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
+}
+
+@keyframes pulseExpand {
+  0% {
+    width: 0;
+    height: 0;
+    opacity: 1;
+    border-width: 3px;
+  }
+  100% {
+    width: 280px;
+    height: 280px;
+    opacity: 0;
+    border-width: 1px;
+  }
+}
+
+/* 画面シェイク */
+.screen-shake {
+  animation: shake 0.4s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  10% { transform: translateX(-4px) translateY(2px); }
+  20% { transform: translateX(4px) translateY(-2px); }
+  30% { transform: translateX(-6px) translateY(1px); }
+  40% { transform: translateX(6px) translateY(-1px); }
+  50% { transform: translateX(-4px) translateY(2px); }
+  60% { transform: translateX(4px) translateY(-1px); }
+  70% { transform: translateX(-2px) translateY(1px); }
+  80% { transform: translateX(2px); }
+  90% { transform: translateX(-1px); }
+}
+
+/* カードグロウフラッシュ */
+.card-glow-flash {
+  animation: cardGlow 0.6s ease-out;
+}
+
+@keyframes cardGlow {
+  0% {
+    box-shadow: 0 0 0 0 rgba(0, 255, 148, 0.6);
+  }
+  30% {
+    box-shadow: 0 0 20px 8px rgba(0, 255, 148, 0.4), 0 0 60px 20px rgba(0, 255, 148, 0.15);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(0, 255, 148, 0);
+  }
+}
+
 /* ===== タスク実績詳細ページ ===== */
 
 .task-stats-page { padding: 0; }
