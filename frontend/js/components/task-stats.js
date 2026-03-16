@@ -164,7 +164,9 @@ function showLevelUpBanner(combo) {
     banner.innerHTML = `<span class="levelup-text">TASK COMPLETE!</span>`;
   }
   document.body.appendChild(banner);
-  banner.addEventListener("animationend", () => banner.remove());
+  banner.addEventListener("animationend", (e) => {
+    if (e.target === banner) banner.remove();
+  });
 }
 
 function emitParticles(cx, cy, count) {

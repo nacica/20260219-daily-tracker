@@ -1454,28 +1454,29 @@ textarea {
 
 .levelup-text {
   display: block;
-  font-size: 2rem;
+  font-size: 3rem;
   font-weight: 900;
   letter-spacing: 0.08em;
-  color: #fff;
+  color: #fbbf24;
   text-shadow:
-    0 0 20px rgba(0, 255, 148, 0.8),
-    0 0 40px rgba(0, 255, 148, 0.5),
-    0 0 80px rgba(0, 255, 148, 0.3);
+    0 0 20px rgba(251, 191, 36, 0.8),
+    0 0 40px rgba(251, 191, 36, 0.5),
+    0 0 80px rgba(251, 191, 36, 0.3),
+    0 2px 4px rgba(0, 0, 0, 0.5);
   white-space: nowrap;
 }
 
 .levelup-banner.combo .levelup-text {
-  font-size: 2.4rem;
-  background: linear-gradient(90deg, #00ff94, #00d4ff, #a855f7, #facc15);
+  font-size: 3.6rem;
+  background: linear-gradient(90deg, #fbbf24, #f59e0b, #ff6b6b, #facc15, #fbbf24);
   background-size: 300% 100%;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
   animation: levelupZoom 1.4s cubic-bezier(0.16, 1, 0.3, 1) forwards,
              comboShimmer 0.8s linear infinite;
-  filter: drop-shadow(0 0 16px rgba(0, 255, 148, 0.6))
-          drop-shadow(0 0 40px rgba(168, 85, 247, 0.4));
+  filter: drop-shadow(0 0 16px rgba(251, 191, 36, 0.7))
+          drop-shadow(0 0 40px rgba(245, 158, 11, 0.4));
 }
 
 @keyframes levelupZoom {
