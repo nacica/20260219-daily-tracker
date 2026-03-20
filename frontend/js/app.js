@@ -3,19 +3,19 @@
  * ルーティングの設定とホーム画面の表示を担当する
  */
 
-import { addRoute, navigate, updateNavActive } from "./router.js?v=20260320a";
-import { renderInputForm } from "./components/input-form.js?v=20260320a";
-import { renderAnalysisView } from "./components/analysis-view.js?v=20260320a";
-import { renderHistoryList } from "./components/history-list.js?v=20260320a";
-import { renderWeeklyReport } from "./components/weekly-report.js?v=20260320a";
-import { renderSuggestions } from "./components/suggestions.js?v=20260320a";
-import { renderCoachingChat } from "./components/coaching-chat.js?v=20260320a";
-import { renderKnowledgeGraph } from "./components/knowledge-graph.js?v=20260320a";
-import { renderMonthlyReport } from "./components/monthly-report.js?v=20260320a";
-import { renderJournal } from "./components/journal.js?v=20260320a";
-import { recordsApi, analysisApi } from "./api.js?v=20260320a";
-import { initSwipeNav } from "./swipe-nav.js?v=20260320a";
-import { buildTaskStatsCards, renderTaskStats } from "./components/task-stats.js?v=20260320a";
+import { addRoute, navigate, updateNavActive } from "./router.js?v=20260320b";
+import { renderInputForm } from "./components/input-form.js?v=20260320b";
+import { renderAnalysisView } from "./components/analysis-view.js?v=20260320b";
+import { renderHistoryList } from "./components/history-list.js?v=20260320b";
+import { renderWeeklyReport } from "./components/weekly-report.js?v=20260320b";
+import { renderSuggestions } from "./components/suggestions.js?v=20260320b";
+import { renderCoachingChat } from "./components/coaching-chat.js?v=20260320b";
+import { renderKnowledgeGraph } from "./components/knowledge-graph.js?v=20260320b";
+import { renderMonthlyReport } from "./components/monthly-report.js?v=20260320b";
+import { renderJournal } from "./components/journal.js?v=20260320b";
+import { recordsApi, analysisApi } from "./api.js?v=20260320b";
+import { initSwipeNav } from "./swipe-nav.js?v=20260320b";
+import { buildTaskStatsCards, renderTaskStats } from "./components/task-stats.js?v=20260320b";
 
 // ===== ユーティリティ =====
 
@@ -264,6 +264,89 @@ export function showToast(message, type = "info") {
   }
 }
 
+// ===== 今日意識すること（ホーム用） =====
+
+function getHomeReminders() {
+  try {
+    const saved = localStorage.getItem("daily-reminders");
+    return saved ? JSON.parse(saved) : [];
+  } catch { return []; }
+}
+
+let homeReminderIndex = 0;
+
+function buildHomeReminderCard() {
+  const reminders = getHomeReminders();
+  if (reminders.length === 0) return "";
+
+  if (homeReminderIndex >= reminders.length) homeReminderIndex = 0;
+
+  const navHTML = reminders.length > 1
+    ? `<div class="sticky-nav">
+        <button class="sticky-nav-btn" id="home-sticky-prev">&#9664;</button>
+        <span class="sticky-counter" id="home-sticky-counter">${homeReminderIndex + 1} / ${reminders.length}</span>
+        <button class="sticky-nav-btn" id="home-sticky-next">&#9654;</button>
+      </div>`
+    : "";
+
+  const notesHTML = reminders.map((r, i) => {
+    const activeClass = i === homeReminderIndex ? " active" : "";
+    const d = r.createdAt ? new Date(r.createdAt) : null;
+    const dateStr = d
+      ? `${d.getMonth() + 1}/${d.getDate()}(${["日","月","火","水","木","金","土"][d.getDay()]}) ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`
+      : "";
+    const escaped = r.text.replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]);
+    return `<div class="sticky-note${activeClass}" data-id="${r.id}">
+      <div class="sticky-note-body">
+        ${dateStr ? `<div class="sticky-note-date">${dateStr}</div>` : ""}
+        <span class="sticky-text">${escaped}</span>
+      </div>
+    </div>`;
+  }).join("");
+
+  return `
+    <div class="card reminder-board-card" id="home-reminder-board">
+      <div class="card-title">今日意識すること</div>
+      ${navHTML}
+      <div class="sticky-notes" id="home-sticky-notes">
+        ${notesHTML}
+      </div>
+    </div>`;
+}
+
+function attachHomeReminderEvents() {
+  const reminders = getHomeReminders();
+  if (reminders.length <= 1) return;
+
+  const container = document.getElementById("home-sticky-notes");
+  if (!container) return;
+
+  function showAtIndex() {
+    const notes = container.querySelectorAll(".sticky-note");
+    notes.forEach((note, i) => note.classList.toggle("active", i === homeReminderIndex));
+    const counter = document.getElementById("home-sticky-counter");
+    if (counter) counter.textContent = `${homeReminderIndex + 1} / ${notes.length}`;
+  }
+
+  function navigate(delta) {
+    const len = reminders.length;
+    homeReminderIndex = (homeReminderIndex + delta + len) % len;
+    showAtIndex();
+  }
+
+  const prev = document.getElementById("home-sticky-prev");
+  const next = document.getElementById("home-sticky-next");
+  if (prev) prev.addEventListener("click", () => navigate(-1));
+  if (next) next.addEventListener("click", () => navigate(1));
+
+  // カード本体クリックで次へ
+  container.addEventListener("click", (e) => {
+    if (e.target.closest(".sticky-note") && reminders.length > 1) {
+      navigate(1);
+    }
+  });
+}
+
 // ===== ホーム画面 =====
 
 async function renderHome() {
@@ -285,6 +368,7 @@ async function renderHome() {
     getMain().innerHTML = `
       <div class="home-date">${formatDateJP(todayStr)}</div>
       <h1 class="home-title">今日の行動分析</h1>
+      ${buildHomeReminderCard()}
       ${isRestDay ? `
       <div class="card" style="border: 1px solid rgba(168, 85, 247, 0.3); background: rgba(168, 85, 247, 0.08); margin-bottom: var(--gap);">
         <div style="display: flex; align-items: center; gap: 10px;">
@@ -300,13 +384,16 @@ async function renderHome() {
       ${hasAnalysis && !isRestDay ? buildHomeSummary(analysis.value) : ""}
       ${buildHomeActions(hasRecord, hasAnalysis, todayStr, isRestDay)}
     `;
+    attachHomeReminderEvents();
   } catch (e) {
     getMain().innerHTML = `
+      ${buildHomeReminderCard()}
       <div class="empty-state">
         <div class="icon">📝</div>
         <p>今日の記録はまだありません。<br>行動記録を入力して分析を始めましょう。</p>
         <button class="btn btn-primary" onclick="window.location.hash='/input'">記録を入力する</button>
       </div>`;
+    attachHomeReminderEvents();
   }
 }
 
