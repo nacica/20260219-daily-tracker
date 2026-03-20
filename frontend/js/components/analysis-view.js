@@ -4,8 +4,8 @@
  * ソクラテス式対話UIにも対応
  */
 
-import { analysisApi, dialogueApi, recordsApi } from "../api.js?v=20260311e";
-import { showToast } from "../app.js?v=20260311e";
+import { analysisApi, dialogueApi, recordsApi } from "../api.js?v=20260320a";
+import { showToast } from "../app.js?v=20260320a";
 
 /** 日付を日本語表記にフォーマット */
 function formatDateJP(dateStr) {
@@ -49,8 +49,8 @@ export async function renderAnalysisView(date) {
     main.innerHTML = buildDialogueUI(date, dialogueResult.value);
     attachDialogueEvents(date);
   } else if (hasRecord) {
-    // 状態3: 記録あり・未分析 → 選択画面
-    main.innerHTML = buildChoiceHTML(date);
+    // 状態3: 記録あり・未分析 → 記録表示 + 選択画面
+    main.innerHTML = buildChoiceHTML(date, recordResult.value);
     attachChoiceEvents(date);
   } else {
     // 状態4: 記録なし
@@ -61,28 +61,74 @@ export async function renderAnalysisView(date) {
 
 // ===== 状態3: 選択画面 =====
 
-function buildChoiceHTML(date) {
+function buildChoiceHTML(date, record) {
   const dateLabel = formatDateJP(date);
+
+  // 記録内容の表示
+  const rawInput = record?.raw_input || "";
+  const tasks = record?.tasks || {};
+  const plannedTasks = tasks.planned || [];
+  const completedTasks = tasks.completed || [];
+  const backlogTasks = tasks.backlog || [];
+
+  let recordHTML = "";
+  if (rawInput) {
+    recordHTML += `
+      <div class="card">
+        <div class="card-title">行動ログ</div>
+        <div style="white-space: pre-wrap; font-size: 0.9rem; line-height: 1.6; color: var(--text-primary);">${escapeHTML(rawInput)}</div>
+      </div>`;
+  }
+
+  if (plannedTasks.length > 0 || completedTasks.length > 0) {
+    const completedSet = new Set(completedTasks);
+    const allTasks = [...new Set([...plannedTasks, ...completedTasks])];
+    const taskListHTML = allTasks.map((t) => {
+      const done = completedSet.has(t);
+      return `<li style="margin-bottom: 4px; color: ${done ? "var(--text-primary)" : "var(--text-muted)"};">
+        ${done ? "✅" : "⬜"} ${escapeHTML(t)}
+      </li>`;
+    }).join("");
+
+    const completionRate = plannedTasks.length > 0
+      ? Math.round((completedTasks.length / plannedTasks.length) * 100)
+      : 0;
+
+    recordHTML += `
+      <div class="card">
+        <div class="card-title">タスク ${completedTasks.length}/${plannedTasks.length} 完了（${completionRate}%）</div>
+        <ul style="list-style: none; padding: 0; margin: 0; font-size: 0.9rem;">${taskListHTML}</ul>
+      </div>`;
+  }
+
+  if (backlogTasks.length > 0) {
+    recordHTML += `
+      <div class="card">
+        <div class="card-title">持ち越しタスク</div>
+        <ul style="list-style: none; padding: 0; margin: 0; font-size: 0.9rem;">
+          ${backlogTasks.map((t) => `<li style="margin-bottom: 4px;">📋 ${escapeHTML(t)}</li>`).join("")}
+        </ul>
+      </div>`;
+  }
+
   return `
-    <h2 style="font-size: 1.1rem; margin-bottom: 4px;">分析方法を選択</h2>
-    <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: var(--gap);">${dateLabel}</p>
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
+      <h2 style="font-size: 1.1rem;">${dateLabel}の記録</h2>
+      <button class="btn btn-outline btn-sm" onclick="window.location.hash='/input/${date}'">記録を編集</button>
+    </div>
+    <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: var(--gap);">未分析</p>
+
+    ${recordHTML}
 
     <div class="card">
-      <div class="card-title">振り返り対話</div>
+      <div class="card-title">分析する</div>
       <p class="dialogue-choice-desc">
-        AIと対話しながら、今日の行動を振り返ります。<br>
-        あなたの視点を反映した、より深い分析が生成されます。
+        AIと対話しながら振り返り、より深い分析を生成できます。
       </p>
-      <button class="btn btn-primary" id="btn-start-dialogue" style="width: 100%;">
+      <button class="btn btn-primary" id="btn-start-dialogue" style="width: 100%; margin-bottom: 10px;">
         振り返り対話を始める
       </button>
-    </div>
-
-    <div class="card" style="text-align: center;">
-      <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 12px;">
-        対話なしで一括分析することもできます
-      </p>
-      <button class="btn btn-outline btn-sm" id="btn-quick-analysis">
+      <button class="btn btn-outline btn-sm" id="btn-quick-analysis" style="width: 100%;">
         通常の分析を生成
       </button>
     </div>`;
