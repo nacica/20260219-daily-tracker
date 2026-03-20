@@ -48,7 +48,7 @@ export async function renderCoachingChat() {
 
       <div class="chat-input-area">
         <textarea class="chat-input" id="coach-input"
-          placeholder="コーチに相談する..."
+          placeholder=""
           rows="1"></textarea>
         <button class="btn btn-primary chat-send" id="btn-send-coach" disabled>
           <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">

@@ -5,9 +5,9 @@
  * 朝のタスク整理（ソクラテス式問答）統合
  */
 
-import { recordsApi, analysisApi, morningDialogueApi } from "../api.js?v=20260320b";
-import { showToast } from "../app.js?v=20260320b";
-import { showTaskCompleteAnimation, buildTaskStatsCards } from "./task-stats.js?v=20260320b";
+import { recordsApi, analysisApi, morningDialogueApi } from "../api.js?v=20260320c";
+import { showToast } from "../app.js?v=20260320c";
+import { showTaskCompleteAnimation, buildTaskStatsCards } from "./task-stats.js?v=20260320c";
 
 /* ── カテゴリ管理 ── */
 
@@ -379,7 +379,7 @@ function buildReminderBoardHTML() {
       </div>
       <div class="sticky-add-area">
         <div class="sticky-add-row">
-          <textarea id="sticky-input" class="sticky-input" placeholder="意識することを追加...（Shift+Enterで改行）" rows="1"></textarea>
+          <textarea id="sticky-input" class="sticky-input" placeholder="" rows="1"></textarea>
           <button class="btn btn-primary btn-sm" id="btn-add-sticky">追加</button>
         </div>
       </div>
@@ -716,7 +716,7 @@ function buildMorningDialogueHTML(morningDialogue) {
           </div>
           ${!isMaxed ? `
           <div class="dialogue-input-area">
-            <textarea id="morning-input" rows="2" placeholder="回答を入力..."></textarea>
+            <textarea id="morning-input" rows="2" placeholder=""></textarea>
             <button class="btn btn-primary btn-sm" id="btn-morning-send">送信</button>
           </div>` : `
           <div class="dialogue-maxed-notice">
@@ -793,7 +793,7 @@ function buildTimelineRowHTML(start = "", end = "", activity = "") {
         <input type="time" class="timeline-end" value="${end}" />
       </span>
       <button class="timeline-toggle-end"${hasEnd ? ' style="display:none"' : ""}>${hasEnd ? "" : "+終了"}</button>
-      <input type="text" class="timeline-activity" value="${escapeHTMLAttr(activity)}" placeholder="何をした？" />
+      <input type="text" class="timeline-activity" value="${escapeHTMLAttr(activity)}" placeholder="" />
       <button class="timeline-row-remove" title="削除">✕</button>
     </div>`;
 }
@@ -904,7 +904,7 @@ function buildFormHTML(date, record, tasks, isEdit, morningDialogue, isRestDay =
         </ul>
         <div class="task-input-row">
           <select id="planned-category" class="category-select">${buildCategoryOptions(getLastCategory())}</select>
-          <input type="text" id="planned-input" placeholder="タスクを追加..." />
+          <input type="text" id="planned-input" placeholder="" />
           <button class="btn btn-outline btn-sm" id="btn-add-task">追加</button>
         </div>
         <details class="category-manager">
@@ -917,7 +917,7 @@ function buildFormHTML(date, record, tasks, isEdit, morningDialogue, isRestDay =
               </li>`).join("")}
           </ul>
           <div class="task-input-row">
-            <input type="text" id="new-category-input" placeholder="新しいカテゴリ名..." />
+            <input type="text" id="new-category-input" placeholder="" />
             <button class="btn btn-outline btn-sm" id="btn-add-category">追加</button>
           </div>
         </details>
@@ -933,7 +933,7 @@ function buildFormHTML(date, record, tasks, isEdit, morningDialogue, isRestDay =
         </ul>
         <div class="task-input-row">
           <select id="backlog-category" class="category-select">${buildCategoryOptions(getLastCategory())}</select>
-          <input type="text" id="backlog-input" placeholder="近日中タスクを追加..." />
+          <input type="text" id="backlog-input" placeholder="" />
           <button class="btn btn-outline btn-sm" id="btn-add-backlog">追加</button>
         </div>
       </div>`,

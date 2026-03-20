@@ -4,8 +4,8 @@
  * ソクラテス式対話UIにも対応
  */
 
-import { analysisApi, dialogueApi, recordsApi } from "../api.js?v=20260320b";
-import { showToast } from "../app.js?v=20260320b";
+import { analysisApi, dialogueApi, recordsApi } from "../api.js?v=20260320c";
+import { showToast } from "../app.js?v=20260320c";
 
 /** 日付を日本語表記にフォーマット */
 function formatDateJP(dateStr) {
@@ -196,7 +196,7 @@ function buildDialogueUI(date, dialogue) {
     ` : `
       <div class="dialogue-input-area">
         <textarea id="dialogue-input"
-          placeholder="あなたの考えや気づきを入力してください..."
+          placeholder=""
           rows="3"></textarea>
         <button class="btn btn-primary" id="btn-send-reply" style="width: 100%;">
           送信

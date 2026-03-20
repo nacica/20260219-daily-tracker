@@ -182,7 +182,7 @@ function buildJournalHTML(date, entries, last7, monthlyBlockers, recentEntries, 
           <textarea
             class="journal-textarea"
             id="journal-content"
-            placeholder="最近感じたこと、起きたこと、考えていることなど、自由に書いてください..."
+            placeholder=""
             ${isFuture ? "disabled" : ""}
           ></textarea>
           <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
@@ -319,7 +319,7 @@ function buildDiaryDialogueHTML(diaryDialogue) {
         </div>
         ${!isMaxed ? `
         <div class="dialogue-input-area">
-          <textarea id="diary-dialogue-input" rows="2" placeholder="回答を入力..."></textarea>
+          <textarea id="diary-dialogue-input" rows="2" placeholder=""></textarea>
           <button class="btn btn-primary btn-sm" id="btn-diary-dialogue-send">送信</button>
         </div>` : `
         <div class="dialogue-maxed-notice">
