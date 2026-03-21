@@ -67,6 +67,7 @@ def _build_dialogue_response(data: dict) -> AnalysisDialogue:
         messages=messages,
         turn_count=data.get("turn_count", 0),
         max_turns=data.get("max_turns", 5),
+        plan=data.get("plan"),
         created_at=data.get("created_at"),
         updated_at=data.get("updated_at"),
     )

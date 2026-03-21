@@ -146,6 +146,7 @@ class AnalysisDialogue(BaseModel):
     messages: list[DialogueMessage] = []
     turn_count: int = 0    # ユーザーの発言回数
     max_turns: int = 5
+    plan: Optional[dict] = None  # 朝問答の生成プラン
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
 
