@@ -1095,6 +1095,62 @@ textarea {
   box-shadow: none;
 }
 
+/* 新規エントリ追加ボタン（ピル型 + グラデーション） */
+.btn-add-entry {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 24px;
+  border: none;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #00b8d9 0%, #0070c0 100%);
+  color: #fff;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 18px rgba(0, 180, 220, 0.35);
+  transition: box-shadow 0.25s, transform 0.2s;
+  margin-bottom: 16px;
+}
+
+.btn-add-entry:hover {
+  box-shadow: 0 6px 28px rgba(0, 212, 255, 0.55);
+  transform: translateY(-1px);
+}
+
+.btn-add-entry:active {
+  transform: scale(0.97);
+}
+
+.btn-add-entry:disabled {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
+.btn-add-entry-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.25);
+  font-size: 1rem;
+  line-height: 1;
+}
+
+[data-theme="light"] .btn-add-entry {
+  box-shadow: 0 4px 16px rgba(0, 153, 204, 0.25);
+}
+
+[data-theme="light"] .btn-add-entry:disabled {
+  background: rgba(0, 0, 0, 0.04);
+}
+
 .btn-outline {
   background: transparent;
   border: 1px solid var(--border-bright);

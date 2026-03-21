@@ -3,8 +3,8 @@
  * 1日に複数エントリ作成可能。各エントリに独立した分析・MD要約。
  */
 
-import { journalApi, diaryDialogueApi } from "../api.js?v=20260321b";
-import { showToast } from "../app.js?v=20260321b";
+import { journalApi, diaryDialogueApi } from "../api.js?v=20260321c";
+import { showToast } from "../app.js?v=20260321c";
 
 // ===== ユーティリティ =====
 
@@ -170,8 +170,9 @@ function buildJournalHTML(date, entries, last7, monthlyBlockers, recentEntries, 
       ${entries.length > 0 ? buildEntryListHTML(entries, isFuture) : ""}
 
       <!-- 新規エントリ追加ボタン -->
-      <button class="btn btn-primary" id="journal-accordion-toggle" ${isFuture ? "disabled" : ""} style="width:auto;margin-bottom:16px">
-        ＋ ${entries.length > 0 ? "新しいエントリを追加" : "最近の気持ち・出来事を記録"}
+      <button class="btn-add-entry" id="journal-accordion-toggle" ${isFuture ? "disabled" : ""}>
+        <span class="btn-add-entry-icon">＋</span>
+        ${entries.length > 0 ? "新しいエントリを追加" : "最近の気持ち・出来事を記録"}
       </button>
 
       <!-- 入力エリア（ボタンクリックで表示） -->
