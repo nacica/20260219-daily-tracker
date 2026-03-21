@@ -5,9 +5,9 @@
  * 朝のタスク整理（ソクラテス式問答）統合
  */
 
-import { recordsApi, analysisApi, morningDialogueApi } from "../api.js?v=20260321d";
-import { showToast } from "../app.js?v=20260321d";
-import { showTaskCompleteAnimation, buildTaskStatsCards } from "./task-stats.js?v=20260321d";
+import { recordsApi, analysisApi, morningDialogueApi } from "../api.js?v=20260321e";
+import { showToast } from "../app.js?v=20260321e";
+import { showTaskCompleteAnimation, buildTaskStatsCards } from "./task-stats.js?v=20260321e";
 
 /* ── カテゴリ管理 ── */
 
@@ -289,6 +289,29 @@ export async function renderInputForm(date) {
         }
       }
     } catch { /* ignore */ }
+  }
+
+  // 朝問答のプランからタスクをマージ（completedの場合）
+  if (morningDialogue?.status === "completed" && morningDialogue.plan) {
+    const plan = morningDialogue.plan;
+    const existingNames = new Set([
+      ...tasks.planned.map((t) => (typeof t === "string" ? t : t.name || t.task || "")),
+      ...tasks.completed.map((t) => (typeof t === "string" ? t : t.name || t.task || "")),
+      ...tasks.backlog.map((t) => (typeof t === "string" ? t : t.name || t.task || "")),
+    ]);
+    for (const item of plan.tasks_today || []) {
+      const name = item.task || "";
+      if (name && !existingNames.has(name)) {
+        tasks.planned.push(name);
+        existingNames.add(name);
+      }
+    }
+    for (const task of plan.carried_over || []) {
+      if (task && !existingNames.has(task)) {
+        tasks.planned.push(task);
+        existingNames.add(task);
+      }
+    }
   }
 
   const isRestDay = existingRecord?.rest_day || false;
@@ -1152,14 +1175,10 @@ function attachMorningDialogueEvents(date, morningDialogue) {
       btnSynthesize.disabled = true;
       btnSynthesize.textContent = "まとめ中...";
       try {
-        const result = await morningDialogueApi.synthesize(date);
-        const plan = result.plan || {};
-
-        // タスクをフォームに反映
-        applyMorningPlanToForm(plan);
+        await morningDialogueApi.synthesize(date);
 
         showToast("今日のプランができました！", "success");
-        // ページ再レンダリング
+        // ページ再レンダリング（renderInputForm内でプランのタスクを自動マージ）
         await renderInputForm(date);
       } catch (err) {
         showToast("プランの生成に失敗しました: " + err.message, "error");
