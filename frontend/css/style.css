@@ -1099,18 +1099,20 @@ textarea {
 .btn-add-entry {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 24px;
+  gap: 6px;
+  width: auto;
+  padding: 8px 18px;
   border: none;
   border-radius: 999px;
   background: linear-gradient(135deg, #00b8d9 0%, #0070c0 100%);
   color: #fff;
-  font-size: 0.95rem;
+  font-size: 0.85rem;
   font-weight: 600;
   cursor: pointer;
-  box-shadow: 0 4px 18px rgba(0, 180, 220, 0.35);
+  box-shadow: 0 3px 14px rgba(0, 180, 220, 0.3);
   transition: box-shadow 0.25s, transform 0.2s;
   margin-bottom: 16px;
+  align-self: flex-start;
 }
 
 .btn-add-entry:hover {
@@ -1135,11 +1137,11 @@ textarea {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.25);
-  font-size: 1rem;
+  font-size: 0.85rem;
   line-height: 1;
 }
 
