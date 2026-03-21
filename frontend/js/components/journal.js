@@ -3,8 +3,8 @@
  * 1日に複数エントリ作成可能。各エントリに独立した分析・MD要約。
  */
 
-import { journalApi, diaryDialogueApi } from "../api.js?v=20260316b";
-import { showToast } from "../app.js?v=20260316b";
+import { journalApi, diaryDialogueApi } from "../api.js?v=20260321a";
+import { showToast } from "../app.js?v=20260321a";
 
 // ===== ユーティリティ =====
 
@@ -169,30 +169,33 @@ function buildJournalHTML(date, entries, last7, monthlyBlockers, recentEntries, 
       <!-- 既存エントリ一覧 -->
       ${entries.length > 0 ? buildEntryListHTML(entries, isFuture) : ""}
 
-      <!-- 新規エントリ入力エリア -->
+      <!-- 新規エントリ入力エリア（アコーディオン） -->
       <div class="card">
-        <div class="card-title">
-          ${entries.length > 0 ? "新しいエントリを追加" : "最近の気持ち・出来事"}
+        <div class="card-title journal-accordion-toggle" id="journal-accordion-toggle" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;margin-bottom:0">
+          <span>${entries.length > 0 ? "新しいエントリを追加" : "最近の気持ち・出来事"}</span>
+          <span class="journal-accordion-icon" style="font-size:0.8rem;transition:transform 0.3s;transform:rotate(0deg)">▶</span>
         </div>
-        <div class="diary-mode-toggle">
-          <button class="diary-mode-btn ${activeMode === "free" ? "active" : ""}" data-mode="free">フリー入力</button>
-          <button class="diary-mode-btn ${activeMode === "socratic" ? "active" : ""}" data-mode="socratic">問答で記録</button>
-        </div>
-        <div id="journal-free-mode" style="${activeMode === "free" ? "" : "display:none"}">
-          <textarea
-            class="journal-textarea"
-            id="journal-content"
-            placeholder=""
-            ${isFuture ? "disabled" : ""}
-          ></textarea>
-          <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
-            <button class="btn btn-primary" id="journal-save" ${isFuture ? "disabled" : ""}>
-              保存する
-            </button>
+        <div id="journal-accordion-body" style="display:none;margin-top:14px">
+          <div class="diary-mode-toggle">
+            <button class="diary-mode-btn ${activeMode === "free" ? "active" : ""}" data-mode="free">フリー入力</button>
+            <button class="diary-mode-btn ${activeMode === "socratic" ? "active" : ""}" data-mode="socratic">問答で記録</button>
           </div>
-        </div>
-        <div id="journal-socratic-mode" style="${activeMode === "socratic" ? "" : "display:none"}">
-          ${buildDiaryDialogueHTML(diaryDialogue)}
+          <div id="journal-free-mode" style="${activeMode === "free" ? "" : "display:none"}">
+            <textarea
+              class="journal-textarea"
+              id="journal-content"
+              placeholder=""
+              ${isFuture ? "disabled" : ""}
+            ></textarea>
+            <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+              <button class="btn btn-primary" id="journal-save" ${isFuture ? "disabled" : ""}>
+                保存する
+              </button>
+            </div>
+          </div>
+          <div id="journal-socratic-mode" style="${activeMode === "socratic" ? "" : "display:none"}">
+            ${buildDiaryDialogueHTML(diaryDialogue)}
+          </div>
         </div>
       </div>
 
@@ -351,6 +354,18 @@ function buildDiaryDialogueHTML(diaryDialogue) {
 // ===== 日記入力対話イベント =====
 
 function attachDiaryDialogueEvents(date) {
+  // アコーディオン開閉
+  const accordionToggle = document.getElementById("journal-accordion-toggle");
+  const accordionBody = document.getElementById("journal-accordion-body");
+  if (accordionToggle && accordionBody) {
+    accordionToggle.addEventListener("click", () => {
+      const isOpen = accordionBody.style.display !== "none";
+      accordionBody.style.display = isOpen ? "none" : "";
+      const icon = accordionToggle.querySelector(".journal-accordion-icon");
+      if (icon) icon.style.transform = isOpen ? "rotate(0deg)" : "rotate(90deg)";
+    });
+  }
+
   const modeButtons = document.querySelectorAll(".diary-mode-btn");
   for (const btn of modeButtons) {
     btn.addEventListener("click", () => {
