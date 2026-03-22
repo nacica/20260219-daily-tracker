@@ -5,9 +5,9 @@
  * 朝のタスク整理（ソクラテス式問答）統合
  */
 
-import { recordsApi, analysisApi, morningDialogueApi } from "../api.js?v=20260321e";
-import { showToast } from "../app.js?v=20260321e";
-import { showTaskCompleteAnimation, buildTaskStatsCards } from "./task-stats.js?v=20260321e";
+import { recordsApi, analysisApi, morningDialogueApi } from "../api.js?v=20260322a";
+import { showToast } from "../app.js?v=20260322a";
+import { showTaskCompleteAnimation, buildTaskStatsCards } from "./task-stats.js?v=20260322a";
 
 /* ── カテゴリ管理 ── */
 
@@ -808,17 +808,49 @@ function padTime(t) {
 
 function buildTimelineRowHTML(start = "", end = "", activity = "") {
   const hasEnd = !!end;
+  const isCompleted = !!(start && activity);
+  const summaryText = isCompleted
+    ? `${start}${end ? " ～ " + end : ""}　${escapeHTMLAttr(activity)}`
+    : "";
   return `
-    <div class="timeline-row${hasEnd ? " has-end" : ""}">
-      <input type="time" class="timeline-start" value="${start}" />
-      <span class="timeline-end-group"${hasEnd ? "" : ' style="display:none"'}>
-        <span class="timeline-separator">～</span>
-        <input type="time" class="timeline-end" value="${end}" />
-      </span>
-      <button class="timeline-toggle-end"${hasEnd ? ' style="display:none"' : ""}>${hasEnd ? "" : "+終了"}</button>
-      <input type="text" class="timeline-activity" value="${escapeHTMLAttr(activity)}" placeholder="" />
+    <div class="timeline-row${hasEnd ? " has-end" : ""}${isCompleted ? " collapsed" : ""}">
+      <div class="timeline-row-summary"${isCompleted ? "" : ' style="display:none"'}>${summaryText}</div>
+      <div class="timeline-row-edit"${isCompleted ? ' style="display:none"' : ""}>
+        <input type="time" class="timeline-start" value="${start}" />
+        <span class="timeline-end-group"${hasEnd ? "" : ' style="display:none"'}>
+          <span class="timeline-separator">～</span>
+          <input type="time" class="timeline-end" value="${end}" />
+        </span>
+        <button class="timeline-toggle-end"${hasEnd ? ' style="display:none"' : ""}>${hasEnd ? "" : "+終了"}</button>
+        <input type="text" class="timeline-activity" value="${escapeHTMLAttr(activity)}" placeholder="" />
+      </div>
       <button class="timeline-row-remove" title="削除">✕</button>
     </div>`;
+}
+
+/**
+ * タイムライン行を折りたたみ表示にする
+ */
+function collapseTimelineRow(row) {
+  const start = row.querySelector(".timeline-start").value;
+  const end = row.querySelector(".timeline-end").value;
+  const activity = row.querySelector(".timeline-activity").value.trim();
+  if (!start || !activity) return; // 未入力なら折りたたまない
+  const summary = row.querySelector(".timeline-row-summary");
+  summary.textContent = `${start}${end ? " ～ " + end : ""}　${activity}`;
+  summary.style.display = "";
+  row.querySelector(".timeline-row-edit").style.display = "none";
+  row.classList.add("collapsed");
+}
+
+/**
+ * 折りたたみ行を展開して編集可能にする
+ */
+function expandTimelineRow(row) {
+  row.querySelector(".timeline-row-summary").style.display = "none";
+  row.querySelector(".timeline-row-edit").style.display = "";
+  row.classList.remove("collapsed");
+  row.querySelector(".timeline-activity").focus();
 }
 
 function buildTimelineRowsFromRawInput(rawInput) {
@@ -1382,8 +1414,14 @@ function attachFormEvents(date, isEdit) {
       }
     }, { passive: false });
 
-    // 削除ボタン & +終了トグル
+    // 折りたたみサマリーをクリックで展開
     timelineRows.addEventListener("click", (e) => {
+      const summary = e.target.closest(".timeline-row-summary");
+      if (summary) {
+        expandTimelineRow(summary.closest(".timeline-row"));
+        return;
+      }
+
       // +終了トグル
       const toggleEnd = e.target.closest(".timeline-toggle-end");
       if (toggleEnd) {
@@ -1410,10 +1448,24 @@ function attachFormEvents(date, isEdit) {
         row.querySelector(".timeline-toggle-end").style.display = "";
         row.querySelector(".timeline-toggle-end").textContent = "+終了";
         row.classList.remove("has-end");
+        row.classList.remove("collapsed");
+        row.querySelector(".timeline-row-summary").style.display = "none";
+        row.querySelector(".timeline-row-edit").style.display = "";
       } else {
         row.remove();
       }
       debounceTimelineSave();
+    });
+
+    // 行からフォーカスが外れたら折りたたむ
+    timelineRows.addEventListener("focusout", (e) => {
+      const row = e.target.closest(".timeline-row");
+      if (!row || row.classList.contains("collapsed")) return;
+      // フォーカスが同じ行内の別要素に移る場合は折りたたまない
+      setTimeout(() => {
+        if (row.contains(document.activeElement)) return;
+        collapseTimelineRow(row);
+      }, 100);
     });
 
     // 終了時刻の自動補完: 次の行の開始時刻にコピー

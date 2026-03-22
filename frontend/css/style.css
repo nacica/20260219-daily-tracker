@@ -2435,6 +2435,47 @@ textarea {
   background: rgba(0, 212, 255, 0.06);
 }
 
+/* 折りたたみ済み行 */
+.timeline-row.collapsed {
+  background: transparent;
+  border-color: transparent;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.timeline-row.collapsed:hover {
+  background: rgba(0, 212, 255, 0.04);
+  border-color: rgba(0, 212, 255, 0.15);
+}
+
+.timeline-row-summary {
+  flex: 1;
+  font-size: 0.88rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.6;
+  user-select: none;
+}
+
+.timeline-row.collapsed .timeline-row-remove {
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.timeline-row.collapsed:hover .timeline-row-remove {
+  opacity: 1;
+}
+
+.timeline-row-edit {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+
 .timeline-add-btn {
   width: 100%;
   margin-top: 4px;
@@ -2443,10 +2484,14 @@ textarea {
 
 /* モバイル対応: タイムライン行を縦に */
 @media (max-width: 480px) {
-  .timeline-row {
+  .timeline-row:not(.collapsed) {
     flex-wrap: wrap;
     position: relative;
     padding-right: 34px;
+  }
+
+  .timeline-row-edit {
+    flex-wrap: wrap;
   }
 
   .timeline-start {
