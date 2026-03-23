@@ -5179,6 +5179,11 @@ main.swipe-enter-right {
   margin-bottom: 16px;
 }
 
+.braindump-date-nav .btn {
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
 .braindump-date-label {
   font-size: 1rem;
   font-weight: 600;
