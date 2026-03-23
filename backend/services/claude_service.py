@@ -554,6 +554,31 @@ def generate_weekly_journal_digest(
     return _extract_json(response.content[0].text)
 
 
+def generate_braindump_title(content: str) -> str:
+    """
+    ブレインダンプの内容からタイトルを自動生成する
+    """
+    client = get_client()
+    model = os.getenv("DAILY_ANALYSIS_MODEL", "claude-sonnet-4-6")
+
+    system_prompt = (
+        "あなたはメモのタイトルを生成するアシスタントです。"
+        "ユーザーのメモ内容を読み、内容を端的に表す短いタイトル（15文字以内）を生成してください。"
+        "タイトルのみを出力し、余計な前置きや説明、記号、カッコは不要です。"
+        "日本語で出力してください。"
+    )
+
+    response = _call_claude_with_retry(
+        client,
+        model=model,
+        max_tokens=64,
+        system=system_prompt,
+        messages=[{"role": "user", "content": content[:500]}],
+    )
+
+    return response.content[0].text.strip()
+
+
 def _extract_json(text: str) -> dict | list:
     """
     テキストから JSON を抽出してパースする

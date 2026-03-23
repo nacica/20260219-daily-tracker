@@ -264,6 +264,51 @@ export const journalApi = {
     apiFetch(`/journal/digest/${weekId}/generate`, { method: "POST" }),
 };
 
+// ---- ブレインダンプ ----
+
+export const braindumpApi = {
+  /** メモ作成（1日に複数作成可能） */
+  create: (date, content) =>
+    apiFetch("/braindump", {
+      method: "POST",
+      body: { date, content },
+    }),
+
+  /** メモ一覧（日付範囲） */
+  list: (startDate, endDate) => {
+    const params = new URLSearchParams();
+    if (startDate) params.set("start_date", startDate);
+    if (endDate) params.set("end_date", endDate);
+    return apiFetch(`/braindump?${params}`);
+  },
+
+  /** 指定日の全メモ取得 */
+  listByDate: (date) => apiFetch(`/braindump/by-date/${date}`),
+
+  /** メモが存在する日付一覧 */
+  datesWithEntries: (startDate, endDate) => {
+    const params = new URLSearchParams();
+    if (startDate) params.set("start_date", startDate);
+    if (endDate) params.set("end_date", endDate);
+    return apiFetch(`/braindump/dates-with-entries?${params}`);
+  },
+
+  /** 単一メモ取得 */
+  getEntry: (entryId) => apiFetch(`/braindump/entry/${encodeURIComponent(entryId)}`),
+
+  /** メモ更新 */
+  update: (entryId, content) =>
+    apiFetch(`/braindump/entry/${encodeURIComponent(entryId)}`, { method: "PUT", body: { content } }),
+
+  /** メモ削除 */
+  delete: (entryId) =>
+    apiFetch(`/braindump/entry/${encodeURIComponent(entryId)}`, { method: "DELETE" }),
+
+  /** AIタイトル生成 */
+  generateTitle: (entryId) =>
+    apiFetch(`/braindump/entry/${encodeURIComponent(entryId)}/generate-title`, { method: "POST" }),
+};
+
 // ---- 月次サマリー ----
 
 export const summariesApi = {

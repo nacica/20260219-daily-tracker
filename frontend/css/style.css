@@ -5030,3 +5030,195 @@ main.swipe-enter-right {
 [data-theme="light"] .md-output pre {
   background: rgba(0, 0, 0, 0.04);
 }
+
+/* ===================================================
+   ブレインダンプ
+   =================================================== */
+
+.braindump-container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap, 16px);
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 0 var(--gap, 16px);
+}
+
+.braindump-memo-area {
+  min-height: 40vh;
+}
+
+.braindump-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.braindump-title {
+  font-size: 1.3rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.braindump-new-form {
+  margin-bottom: 16px;
+}
+
+.braindump-textarea {
+  width: 100%;
+  min-height: 120px;
+  padding: 14px;
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.1));
+  border-radius: 10px;
+  background: var(--bg-card, rgba(255, 255, 255, 0.04));
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 0.95rem;
+  line-height: 1.7;
+  resize: vertical;
+  transition: border-color 0.2s;
+}
+
+.braindump-textarea:focus {
+  outline: none;
+  border-color: var(--accent, #00d4ff);
+  box-shadow: 0 0 0 2px rgba(0, 212, 255, 0.15);
+}
+
+.braindump-form-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+  justify-content: flex-end;
+}
+
+/* エントリ一覧 */
+
+.braindump-entries {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.braindump-entry {
+  padding: 14px 16px;
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+  border-radius: 10px;
+  background: var(--bg-card, rgba(255, 255, 255, 0.04));
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.braindump-entry:hover {
+  border-color: var(--accent, #00d4ff);
+  background: rgba(0, 212, 255, 0.04);
+}
+
+.braindump-entry.editing {
+  cursor: default;
+  border-color: var(--accent, #00d4ff);
+  background: rgba(0, 212, 255, 0.06);
+}
+
+.braindump-entry-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.braindump-entry-title {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--text-primary);
+}
+
+.braindump-entry-time {
+  font-size: 0.78rem;
+  color: var(--text-muted, rgba(255, 255, 255, 0.4));
+  flex-shrink: 0;
+}
+
+.braindump-entry-preview {
+  font-size: 0.85rem;
+  color: var(--text-secondary, rgba(255, 255, 255, 0.6));
+  line-height: 1.5;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 日付エリア */
+
+.braindump-date-area {
+  padding: 16px 0;
+}
+
+.braindump-date-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.braindump-date-label {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 6px 12px;
+  border-radius: 8px;
+  transition: background 0.2s;
+}
+
+.braindump-date-label:hover {
+  background: rgba(0, 212, 255, 0.08);
+}
+
+/* カレンダー（既存のcal-*クラスを再利用） */
+
+.braindump-calendar {
+  max-width: 360px;
+  margin: 0 auto;
+}
+
+.braindump-calendar .cal-day.selected {
+  background: var(--accent, #00d4ff);
+  color: #000;
+  font-weight: 700;
+}
+
+/* ライトテーマ */
+
+[data-theme="light"] .braindump-textarea {
+  border-color: rgba(0, 0, 0, 0.15);
+  background: rgba(0, 0, 0, 0.02);
+}
+
+[data-theme="light"] .braindump-textarea:focus {
+  border-color: #0078d4;
+  box-shadow: 0 0 0 2px rgba(0, 120, 212, 0.15);
+}
+
+[data-theme="light"] .braindump-entry {
+  border-color: rgba(0, 0, 0, 0.1);
+  background: rgba(0, 0, 0, 0.02);
+}
+
+[data-theme="light"] .braindump-entry:hover {
+  border-color: #0078d4;
+  background: rgba(0, 120, 212, 0.04);
+}
+
+[data-theme="light"] .braindump-entry.editing {
+  border-color: #0078d4;
+  background: rgba(0, 120, 212, 0.06);
+}
+
+[data-theme="light"] .braindump-date-label:hover {
+  background: rgba(0, 120, 212, 0.08);
+}

@@ -3,19 +3,20 @@
  * ルーティングの設定とホーム画面の表示を担当する
  */
 
-import { addRoute, navigate, updateNavActive } from "./router.js?v=20260323f";
-import { renderInputForm } from "./components/input-form.js?v=20260323f";
-import { renderAnalysisView } from "./components/analysis-view.js?v=20260323f";
-import { renderHistoryList } from "./components/history-list.js?v=20260323f";
-import { renderWeeklyReport } from "./components/weekly-report.js?v=20260323f";
-import { renderSuggestions } from "./components/suggestions.js?v=20260323f";
-import { renderCoachingChat } from "./components/coaching-chat.js?v=20260323f";
-import { renderKnowledgeGraph } from "./components/knowledge-graph.js?v=20260323f";
-import { renderMonthlyReport } from "./components/monthly-report.js?v=20260323f";
-import { renderJournal } from "./components/journal.js?v=20260323f";
-import { recordsApi, analysisApi } from "./api.js?v=20260323f";
-import { initSwipeNav } from "./swipe-nav.js?v=20260323f";
-import { buildTaskStatsCards, renderTaskStats } from "./components/task-stats.js?v=20260323f";
+import { addRoute, navigate, updateNavActive } from "./router.js?v=20260323g";
+import { renderInputForm } from "./components/input-form.js?v=20260323g";
+import { renderAnalysisView } from "./components/analysis-view.js?v=20260323g";
+import { renderHistoryList } from "./components/history-list.js?v=20260323g";
+import { renderWeeklyReport } from "./components/weekly-report.js?v=20260323g";
+import { renderSuggestions } from "./components/suggestions.js?v=20260323g";
+import { renderCoachingChat } from "./components/coaching-chat.js?v=20260323g";
+import { renderKnowledgeGraph } from "./components/knowledge-graph.js?v=20260323g";
+import { renderMonthlyReport } from "./components/monthly-report.js?v=20260323g";
+import { renderJournal } from "./components/journal.js?v=20260323g";
+import { renderBraindump } from "./components/braindump.js?v=20260323g";
+import { recordsApi, analysisApi } from "./api.js?v=20260323g";
+import { initSwipeNav } from "./swipe-nav.js?v=20260323g";
+import { buildTaskStatsCards, renderTaskStats } from "./components/task-stats.js?v=20260323g";
 
 // ===== ユーティリティ =====
 
@@ -49,6 +50,7 @@ const ROUTE_TITLES = {
   "/knowledge": { title: "ナレッジグラフ", breadcrumb: "行動パターン" },
   "/monthly": { title: "月次レポート", breadcrumb: "月次サマリー" },
   "/journal": { title: "フリージャーナル", breadcrumb: "ジャーナル" },
+  "/braindump": { title: "ブレインダンプ", breadcrumb: "頭の整理メモ" },
   "/task-stats": { title: "タスク実績", breadcrumb: "タスク実績" },
 };
 
@@ -509,6 +511,8 @@ addRoute("/monthly", () => renderMonthlyReport(null));
 addRoute("/monthly/:yearMonth", ({ yearMonth }) => renderMonthlyReport(yearMonth));
 addRoute("/journal", () => renderJournal(today()));
 addRoute("/journal/:date", ({ date }) => renderJournal(date));
+addRoute("/braindump", () => renderBraindump(today()));
+addRoute("/braindump/:date", ({ date }) => renderBraindump(date));
 addRoute("/task-stats", () => renderTaskStats());
 
 // ===== 初期化 =====

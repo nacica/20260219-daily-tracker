@@ -474,3 +474,72 @@ def save_journal_digest(week_id: str, data: dict) -> dict:
     db = get_db()
     db.collection("weekly_journal_digests").document(week_id).set(data)
     return data
+
+
+# ---- braindump_entries ----
+
+def get_braindump(entry_id: str) -> Optional[dict]:
+    """指定IDのブレインダンプを取得"""
+    db = get_db()
+    doc = db.collection("braindump_entries").document(entry_id).get()
+    if doc.exists:
+        return doc.to_dict()
+    return None
+
+
+def list_braindumps(start_date: Optional[str] = None, end_date: Optional[str] = None) -> list[dict]:
+    """ブレインダンプ一覧を取得（日付範囲指定可能）"""
+    db = get_db()
+    query = db.collection("braindump_entries").order_by("date", direction=firestore.Query.DESCENDING)
+
+    if start_date:
+        query = query.where(filter=FieldFilter("date", ">=", start_date))
+    if end_date:
+        query = query.where(filter=FieldFilter("date", "<=", end_date))
+
+    return [doc.to_dict() for doc in query.stream()]
+
+
+def list_braindumps_for_date(date: str) -> list[dict]:
+    """指定日の全ブレインダンプを取得（entry_number 昇順）"""
+    db = get_db()
+    query = db.collection("braindump_entries").where(filter=FieldFilter("date", "==", date))
+    results = [doc.to_dict() for doc in query.stream()]
+    results.sort(key=lambda e: e.get("entry_number", 1))
+    return results
+
+
+def get_next_braindump_entry_number(date: str) -> int:
+    """指定日の次のブレインダンプエントリ番号を返す"""
+    entries = list_braindumps_for_date(date)
+    if not entries:
+        return 1
+    max_num = max(e.get("entry_number", 1) for e in entries)
+    return max_num + 1
+
+
+def create_braindump(entry_id: str, data: dict) -> dict:
+    """ブレインダンプを作成"""
+    db = get_db()
+    db.collection("braindump_entries").document(entry_id).set(data)
+    return data
+
+
+def update_braindump(entry_id: str, data: dict) -> Optional[dict]:
+    """ブレインダンプを更新"""
+    db = get_db()
+    ref = db.collection("braindump_entries").document(entry_id)
+    if not ref.get().exists:
+        return None
+    ref.update(data)
+    return ref.get().to_dict()
+
+
+def delete_braindump(entry_id: str) -> bool:
+    """ブレインダンプを削除"""
+    db = get_db()
+    ref = db.collection("braindump_entries").document(entry_id)
+    if not ref.get().exists:
+        return False
+    ref.delete()
+    return True
