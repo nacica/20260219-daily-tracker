@@ -8,6 +8,7 @@ GET  /api/v1/weekly                     - 週次分析一覧を取得
 import os
 import json
 from datetime import datetime, timedelta
+import anthropic
 from fastapi import APIRouter, HTTPException, Query
 from services import firestore_service, claude_service
 from utils.helpers import now_jst
@@ -70,8 +71,14 @@ async def generate_weekly_analysis(week_id: str):
             daily_analyses=daily_analyses,
             last_week_analysis=last_week_analysis,
         )
+    except anthropic.APIStatusError as e:
+        if e.status_code == 529:
+            raise HTTPException(status_code=503, detail="AIサーバーが混み合っています。しばらく待ってからもう一度お試しください。")
+        if e.status_code == 429:
+            raise HTTPException(status_code=503, detail="APIリクエストの上限に達しました。しばらく待ってからもう一度お試しください。")
+        raise HTTPException(status_code=500, detail=f"AI応答の生成に失敗しました。しばらく待ってから再度お試しください。")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Claude API エラー: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"AI応答の生成に失敗しました。しばらく待ってから再度お試しください。")
 
     # Firestore に保存
     doc = {

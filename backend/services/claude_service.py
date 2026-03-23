@@ -32,7 +32,7 @@ from prompts.journal_analysis import (
 
 logger = logging.getLogger(__name__)
 
-MAX_RETRIES = 3
+MAX_RETRIES = 5
 INITIAL_BACKOFF = 2  # seconds
 
 

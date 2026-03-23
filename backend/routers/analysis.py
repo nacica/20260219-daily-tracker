@@ -5,6 +5,7 @@ GET  /api/v1/analysis/{date}           - 保存済み分析を取得
 GET  /api/v1/analysis                  - 分析一覧を取得
 """
 
+import anthropic
 from fastapi import APIRouter, HTTPException, Query, BackgroundTasks, Response
 from typing import Optional
 
@@ -54,8 +55,14 @@ async def generate_analysis(date: str, background_tasks: BackgroundTasks):
                 past_records=past_records,
                 past_analyses=past_analyses,
             )
+        except anthropic.APIStatusError as e:
+            if e.status_code == 529:
+                raise HTTPException(status_code=503, detail="AIサーバーが混み合っています。しばらく待ってからもう一度お試しください。")
+            if e.status_code == 429:
+                raise HTTPException(status_code=503, detail="APIリクエストの上限に達しました。しばらく待ってからもう一度お試しください。")
+            raise HTTPException(status_code=500, detail=f"AI応答の生成に失敗しました。しばらく待ってから再度お試しください。")
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Claude API エラー: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"AI応答の生成に失敗しました。しばらく待ってから再度お試しください。")
 
         # 分析結果を Firestore に保存
         now = now_jst()

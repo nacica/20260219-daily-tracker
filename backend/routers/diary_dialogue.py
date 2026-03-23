@@ -9,6 +9,7 @@ GET    /api/v1/diary-dialogue/{date}              - 保存済み対話を取得
 DELETE /api/v1/diary-dialogue/{date}              - 対話を削除
 """
 
+import anthropic
 from fastapi import APIRouter, HTTPException, Response
 
 from models.schemas import AnalysisDialogue, DialogueReplyRequest, DialogueMessage
@@ -47,8 +48,14 @@ async def start_diary_dialogue(date: str):
         # 初期質問を生成
         try:
             ai_text = claude_service.generate_diary_questions(date=date)
+        except anthropic.APIStatusError as e:
+            if e.status_code == 529:
+                raise HTTPException(status_code=503, detail="AIサーバーが混み合っています。しばらく待ってからもう一度お試しください。")
+            if e.status_code == 429:
+                raise HTTPException(status_code=503, detail="APIリクエストの上限に達しました。しばらく待ってからもう一度お試しください。")
+            raise HTTPException(status_code=500, detail=f"AI応答の生成に失敗しました。しばらく待ってから再度お試しください。")
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Claude API エラー: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"AI応答の生成に失敗しました。しばらく待ってから再度お試しください。")
 
         now = now_jst()
         doc = {
@@ -100,8 +107,14 @@ async def reply_diary_dialogue(date: str, body: DialogueReplyRequest):
                 turn_count=turn_count,
                 max_turns=max_turns,
             )
+        except anthropic.APIStatusError as e:
+            if e.status_code == 529:
+                raise HTTPException(status_code=503, detail="AIサーバーが混み合っています。しばらく待ってからもう一度お試しください。")
+            if e.status_code == 429:
+                raise HTTPException(status_code=503, detail="APIリクエストの上限に達しました。しばらく待ってからもう一度お試しください。")
+            raise HTTPException(status_code=500, detail=f"AI応答の生成に失敗しました。しばらく待ってから再度お試しください。")
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Claude API エラー: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"AI応答の生成に失敗しました。しばらく待ってから再度お試しください。")
 
         now2 = now_jst()
         messages.append({"role": "ai", "content": ai_text, "timestamp": now2})
@@ -140,8 +153,14 @@ async def synthesize_diary_dialogue(date: str):
                 date=date,
                 messages=messages,
             )
+        except anthropic.APIStatusError as e:
+            if e.status_code == 529:
+                raise HTTPException(status_code=503, detail="AIサーバーが混み合っています。しばらく待ってからもう一度お試しください。")
+            if e.status_code == 429:
+                raise HTTPException(status_code=503, detail="APIリクエストの上限に達しました。しばらく待ってからもう一度お試しください。")
+            raise HTTPException(status_code=500, detail=f"AI応答の生成に失敗しました。しばらく待ってから再度お試しください。")
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Claude API エラー: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"AI応答の生成に失敗しました。しばらく待ってから再度お試しください。")
 
         raw_input = result.get("raw_input", "")
         if not raw_input:
