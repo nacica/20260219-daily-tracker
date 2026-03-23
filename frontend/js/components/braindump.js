@@ -4,8 +4,8 @@
  * 日付切替（前日/翌日 + カレンダー）、自動保存、AIタイトル自動生成。
  */
 
-import { braindumpApi } from "../api.js?v=20260323k";
-import { showToast } from "../app.js?v=20260323k";
+import { braindumpApi } from "../api.js?v=20260323l";
+import { showToast } from "../app.js?v=20260323l";
 
 // ===== ユーティリティ =====
 
@@ -16,7 +16,7 @@ function today() {
 function formatDateJP(dateStr) {
   const d = new Date(dateStr + "T00:00:00");
   const weekdays = ["日", "月", "火", "水", "木", "金", "土"];
-  return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日（${weekdays[d.getDay()]}）`;
+  return `${d.getFullYear()}年<br>${d.getMonth() + 1}月${d.getDate()}日（${weekdays[d.getDay()]}）`;
 }
 
 function prevDate(dateStr) {
