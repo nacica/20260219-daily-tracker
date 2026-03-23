@@ -3,8 +3,8 @@
  * 1日に複数エントリ作成可能。各エントリに独立した分析・MD要約。
  */
 
-import { journalApi, diaryDialogueApi } from "../api.js?v=20260321d";
-import { showToast } from "../app.js?v=20260321d";
+import { journalApi, diaryDialogueApi } from "../api.js?v=20260323e";
+import { showToast } from "../app.js?v=20260323e";
 
 // ===== ユーティリティ =====
 
@@ -48,6 +48,20 @@ function getWeekId(dateStr) {
   const week1 = new Date(d.getFullYear(), 0, 4);
   const weekNum = 1 + Math.round(((d - week1) / 86400000 - 3 + ((week1.getDay() + 6) % 7)) / 7);
   return `${d.getFullYear()}-W${String(weekNum).padStart(2, "0")}`;
+}
+
+function formatWeekLabel(weekId) {
+  const [year, week] = weekId.split("-W").map(Number);
+  const jan4 = new Date(year, 0, 4);
+  const mondayW1 = new Date(jan4);
+  mondayW1.setDate(jan4.getDate() - ((jan4.getDay() + 6) % 7));
+  const monday = new Date(mondayW1);
+  monday.setDate(mondayW1.getDate() + (week - 1) * 7);
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+  const month = monday.getMonth() + 1;
+  const weekOfMonth = Math.ceil(monday.getDate() / 7);
+  return `${month}月 第${weekOfMonth}週（${monday.getMonth() + 1}/${monday.getDate()}〜${sunday.getMonth() + 1}/${sunday.getDate()}）`;
 }
 
 function escapeHTML(str) {
@@ -629,7 +643,7 @@ function buildWeeklyDigestSection(date) {
     <div class="card" id="weekly-digest-section">
       <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
         <div class="card-title" style="margin:0">週次ダイジェスト</div>
-        <span style="font-size:0.8rem;color:var(--text-muted)">${weekId}</span>
+        <span style="font-size:0.8rem;color:var(--text-muted)">${formatWeekLabel(weekId)}</span>
       </div>
       <div id="weekly-digest-content">
         <div style="text-align:center;padding:16px 0">

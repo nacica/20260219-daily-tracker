@@ -42,7 +42,7 @@ function buildWeeklyHTML(data, weekId) {
       <button class="btn btn-outline btn-sm" id="btn-regenerate-weekly">🔄 再分析</button>
     </div>
     <p style="color:var(--text-muted); font-size:0.85rem; margin-bottom:var(--gap);">
-      ${weekId}（${formatDate(week_start)} 〜 ${formatDate(week_end)}）
+      ${formatWeekLabel(weekId)}
     </p>
 
     <!-- サマリー -->
@@ -186,7 +186,7 @@ function buildListCard(title, items, cssClass) {
 function buildNoWeeklyHTML(weekId) {
   return `
     <h2 style="margin-bottom:4px;">週次レポート</h2>
-    <p style="color:var(--text-muted); font-size:0.85rem; margin-bottom:var(--gap);">${weekId}</p>
+    <p style="color:var(--text-muted); font-size:0.85rem; margin-bottom:var(--gap);">${formatWeekLabel(weekId)}</p>
     <div class="empty-state">
       <div class="icon">📊</div>
       <p>この週の分析はまだ生成されていません。<br>日次記録が揃ったら分析を実行してください。</p>
@@ -257,6 +257,25 @@ function formatDate(dateStr) {
   if (!dateStr) return "";
   const d = new Date(dateStr + "T00:00:00");
   return `${d.getMonth() + 1}/${d.getDate()}`;
+}
+
+function weekIdToMonday(weekId) {
+  const [year, week] = weekId.split("-W").map(Number);
+  const jan4 = new Date(year, 0, 4);
+  const mondayW1 = new Date(jan4);
+  mondayW1.setDate(jan4.getDate() - ((jan4.getDay() + 6) % 7));
+  const monday = new Date(mondayW1);
+  monday.setDate(mondayW1.getDate() + (week - 1) * 7);
+  return monday;
+}
+
+function formatWeekLabel(weekId) {
+  const monday = weekIdToMonday(weekId);
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+  const month = monday.getMonth() + 1;
+  const weekOfMonth = Math.ceil(monday.getDate() / 7);
+  return `${month}月 第${weekOfMonth}週（${monday.getMonth() + 1}/${monday.getDate()}〜${sunday.getMonth() + 1}/${sunday.getDate()}）`;
 }
 
 function esc(str) {
