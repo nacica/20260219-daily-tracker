@@ -5,15 +5,15 @@
  * 朝のタスク整理（ソクラテス式問答）統合
  */
 
-import { recordsApi, analysisApi, morningDialogueApi } from "../api.js?v=20260323b";
-import { showToast } from "../app.js?v=20260323b";
-import { showTaskCompleteAnimation, buildTaskStatsCards } from "./task-stats.js?v=20260323b";
+import { recordsApi, analysisApi, morningDialogueApi } from "../api.js?v=20260323c";
+import { showToast } from "../app.js?v=20260323c";
+import { showTaskCompleteAnimation, buildTaskStatsCards } from "./task-stats.js?v=20260323c";
 
 /* ── カテゴリ管理 ── */
 
 const CATEGORY_STORAGE_KEY = "task-categories";
 const LAST_CATEGORY_KEY = "task-last-category";
-const DEFAULT_COLORS = ["#00d4ff", "#00e676", "#ffa726", "#e040fb", "#ff5252", "#40c4ff", "#69f0ae", "#ffab40"];
+const DEFAULT_COLORS = ["#0088aa", "#00894d", "#c47800", "#9c27b0", "#c62828", "#0277bd", "#2e7d32", "#e65100"];
 
 function getCategories() {
   try {
