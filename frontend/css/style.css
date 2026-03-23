@@ -5085,10 +5085,10 @@ main.swipe-enter-right {
   width: 100%;
   min-height: 360px;
   padding: 14px;
-  border: 1px solid var(--border, rgba(255, 255, 255, 0.1));
+  border: 1px solid rgba(0, 0, 0, 0.15);
   border-radius: 10px;
-  background: var(--bg-card, rgba(255, 255, 255, 0.04));
-  color: var(--text-primary);
+  background: #ffffff;
+  color: #1a1a1a;
   font-family: inherit;
   font-size: 0.95rem;
   line-height: 1.7;
@@ -5217,12 +5217,7 @@ main.swipe-enter-right {
 
 [data-theme="light"] .braindump-textarea {
   border-color: rgba(0, 0, 0, 0.15);
-  background: rgba(0, 0, 0, 0.02);
-}
-
-[data-theme="light"] .braindump-textarea:focus {
-  border-color: #0078d4;
-  box-shadow: 0 0 0 2px rgba(0, 120, 212, 0.15);
+  background: #ffffff;
 }
 
 [data-theme="light"] .braindump-entry {
