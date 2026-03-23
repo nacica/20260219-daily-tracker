@@ -805,8 +805,15 @@ textarea {
   min-width: 0;
 }
 
+.task-item.completed {
+  border-left: 3px solid #4caf50;
+  background: rgba(100, 160, 255, 0.08);
+  border-radius: 4px;
+}
+[data-theme="light"] .task-item.completed {
+  background: rgba(80, 140, 240, 0.10);
+}
 .task-item.completed > span:not(.task-category-badge):not(.task-drag-handle) {
-  text-decoration: line-through;
   color: var(--text-muted);
 }
 
