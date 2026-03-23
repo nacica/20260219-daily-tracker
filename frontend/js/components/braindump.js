@@ -4,8 +4,8 @@
  * 日付切替（前日/翌日 + カレンダー）、自動保存、AIタイトル自動生成。
  */
 
-import { braindumpApi } from "../api.js?v=20260323h";
-import { showToast } from "../app.js?v=20260323h";
+import { braindumpApi } from "../api.js?v=20260323i";
+import { showToast } from "../app.js?v=20260323i";
 
 // ===== ユーティリティ =====
 
@@ -60,36 +60,34 @@ export async function renderBraindump(date) {
 
   main.innerHTML = `
     <div class="braindump-container">
-      <!-- 上半分: メモエリア -->
-      <div class="braindump-memo-area">
+      <!-- 左カラム: 入力エリア (7) -->
+      <div class="braindump-left">
         <div class="braindump-header">
           <h2 class="braindump-title">ブレインダンプ</h2>
           <button class="btn btn-primary btn-sm" id="bd-new-btn">＋ 新しいメモ</button>
         </div>
-
-        <!-- 新規メモ入力エリア（常時表示） -->
         <div class="braindump-new-form" id="bd-new-form">
-          <textarea class="braindump-textarea" id="bd-new-textarea" placeholder="思いついたことを自由に書き出してください..." rows="6"></textarea>
+          <textarea class="braindump-textarea" id="bd-new-textarea" placeholder="思いついたことを自由に書き出してください..." rows="18"></textarea>
           <div class="braindump-form-actions">
             <button class="btn btn-primary btn-sm" id="bd-save-new-btn">保存</button>
             <button class="btn btn-outline btn-sm" id="bd-cancel-new-btn">クリア</button>
           </div>
         </div>
+      </div>
 
-        <!-- メモ一覧 -->
+      <!-- 右カラム: カレンダー + メモ一覧 (3) -->
+      <div class="braindump-right">
+        <div class="braindump-date-area">
+          <div class="braindump-date-nav">
+            <button class="btn btn-outline btn-sm" id="bd-prev-date">← 前日</button>
+            <button class="braindump-date-label" id="bd-date-label">${formatDateJP(currentDate)}</button>
+            <button class="btn btn-outline btn-sm" id="bd-next-date"${currentDate >= today() ? ' disabled' : ''}>翌日 →</button>
+          </div>
+          <div class="braindump-calendar" id="bd-calendar"></div>
+        </div>
         <div class="braindump-entries" id="bd-entries">
           ${renderEntries()}
         </div>
-      </div>
-
-      <!-- 下半分: 日付切替UI -->
-      <div class="braindump-date-area">
-        <div class="braindump-date-nav">
-          <button class="btn btn-outline btn-sm" id="bd-prev-date">← 前日</button>
-          <button class="braindump-date-label" id="bd-date-label">${formatDateJP(currentDate)}</button>
-          <button class="btn btn-outline btn-sm" id="bd-next-date"${currentDate >= today() ? ' disabled' : ''}>翌日 →</button>
-        </div>
-        <div class="braindump-calendar" id="bd-calendar"></div>
       </div>
     </div>
   `;

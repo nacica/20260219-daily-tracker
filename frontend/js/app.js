@@ -3,20 +3,20 @@
  * ルーティングの設定とホーム画面の表示を担当する
  */
 
-import { addRoute, navigate, updateNavActive } from "./router.js?v=20260323h";
-import { renderInputForm } from "./components/input-form.js?v=20260323h";
-import { renderAnalysisView } from "./components/analysis-view.js?v=20260323h";
-import { renderHistoryList } from "./components/history-list.js?v=20260323h";
-import { renderWeeklyReport } from "./components/weekly-report.js?v=20260323h";
-import { renderSuggestions } from "./components/suggestions.js?v=20260323h";
-import { renderCoachingChat } from "./components/coaching-chat.js?v=20260323h";
-import { renderKnowledgeGraph } from "./components/knowledge-graph.js?v=20260323h";
-import { renderMonthlyReport } from "./components/monthly-report.js?v=20260323h";
-import { renderJournal } from "./components/journal.js?v=20260323h";
-import { renderBraindump } from "./components/braindump.js?v=20260323h";
-import { recordsApi, analysisApi } from "./api.js?v=20260323h";
-import { initSwipeNav } from "./swipe-nav.js?v=20260323h";
-import { buildTaskStatsCards, renderTaskStats } from "./components/task-stats.js?v=20260323h";
+import { addRoute, navigate, updateNavActive } from "./router.js?v=20260323i";
+import { renderInputForm } from "./components/input-form.js?v=20260323i";
+import { renderAnalysisView } from "./components/analysis-view.js?v=20260323i";
+import { renderHistoryList } from "./components/history-list.js?v=20260323i";
+import { renderWeeklyReport } from "./components/weekly-report.js?v=20260323i";
+import { renderSuggestions } from "./components/suggestions.js?v=20260323i";
+import { renderCoachingChat } from "./components/coaching-chat.js?v=20260323i";
+import { renderKnowledgeGraph } from "./components/knowledge-graph.js?v=20260323i";
+import { renderMonthlyReport } from "./components/monthly-report.js?v=20260323i";
+import { renderJournal } from "./components/journal.js?v=20260323i";
+import { renderBraindump } from "./components/braindump.js?v=20260323i";
+import { recordsApi, analysisApi } from "./api.js?v=20260323i";
+import { initSwipeNav } from "./swipe-nav.js?v=20260323i";
+import { buildTaskStatsCards, renderTaskStats } from "./components/task-stats.js?v=20260323i";
 
 // ===== ユーティリティ =====
 
