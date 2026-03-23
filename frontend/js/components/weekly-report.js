@@ -45,6 +45,14 @@ function buildWeeklyHTML(data, weekId) {
       ${formatWeekLabel(weekId)}
     </p>
 
+    <!-- 週ナビゲーション -->
+    <div class="card">
+      <div style="display:flex; gap:10px;">
+        <button class="btn btn-outline btn-sm" id="btn-prev-week" style="flex:1;">← 先週</button>
+        <button class="btn btn-outline btn-sm" id="btn-next-week" style="flex:1;">今週 →</button>
+      </div>
+    </div>
+
     <!-- サマリー -->
     <div class="card">
       <div class="card-title">週間サマリー</div>
@@ -94,13 +102,7 @@ function buildWeeklyHTML(data, weekId) {
     <!-- 前週比較 -->
     ${buildProgressSection(d?.progress_vs_last_week)}
 
-    <!-- 週ナビゲーション -->
-    <div class="card">
-      <div style="display:flex; gap:10px;">
-        <button class="btn btn-outline btn-sm" id="btn-prev-week" style="flex:1;">← 先週</button>
-        <button class="btn btn-outline btn-sm" id="btn-next-week" style="flex:1;">今週 →</button>
-      </div>
-    </div>`;
+  `;
 }
 
 function buildTimewastersSection(timewasters) {
