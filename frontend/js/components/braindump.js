@@ -4,8 +4,8 @@
  * 日付切替（前日/翌日 + カレンダー）、自動保存、AIタイトル自動生成。
  */
 
-import { braindumpApi } from "../api.js?v=20260323g";
-import { showToast } from "../app.js?v=20260323g";
+import { braindumpApi } from "../api.js?v=20260323h";
+import { showToast } from "../app.js?v=20260323h";
 
 // ===== ユーティリティ =====
 
@@ -67,12 +67,12 @@ export async function renderBraindump(date) {
           <button class="btn btn-primary btn-sm" id="bd-new-btn">＋ 新しいメモ</button>
         </div>
 
-        <!-- 新規メモ入力エリア（非表示） -->
-        <div class="braindump-new-form" id="bd-new-form" style="display:none;">
+        <!-- 新規メモ入力エリア（常時表示） -->
+        <div class="braindump-new-form" id="bd-new-form">
           <textarea class="braindump-textarea" id="bd-new-textarea" placeholder="思いついたことを自由に書き出してください..." rows="6"></textarea>
           <div class="braindump-form-actions">
             <button class="btn btn-primary btn-sm" id="bd-save-new-btn">保存</button>
-            <button class="btn btn-outline btn-sm" id="bd-cancel-new-btn">キャンセル</button>
+            <button class="btn btn-outline btn-sm" id="bd-cancel-new-btn">クリア</button>
           </div>
         </div>
 
@@ -142,22 +142,23 @@ function renderEntries() {
 function attachEvents() {
   const main = document.querySelector("main");
 
-  // 新しいメモボタン
+  // 新しいメモボタン（テキストエリアにフォーカス）
   document.getElementById("bd-new-btn")?.addEventListener("click", () => {
-    const form = document.getElementById("bd-new-form");
-    form.style.display = form.style.display === "none" ? "block" : "none";
-    if (form.style.display === "block") {
-      document.getElementById("bd-new-textarea")?.focus();
-    }
+    document.getElementById("bd-new-textarea")?.focus();
   });
+
+  // ページ表示時に自動フォーカス
+  setTimeout(() => {
+    document.getElementById("bd-new-textarea")?.focus();
+  }, 100);
 
   // 新規保存
   document.getElementById("bd-save-new-btn")?.addEventListener("click", saveNewEntry);
 
-  // 新規キャンセル
+  // クリアボタン
   document.getElementById("bd-cancel-new-btn")?.addEventListener("click", () => {
-    document.getElementById("bd-new-form").style.display = "none";
     document.getElementById("bd-new-textarea").value = "";
+    document.getElementById("bd-new-textarea")?.focus();
   });
 
   // エントリクリック（展開/編集）
@@ -223,7 +224,7 @@ async function saveNewEntry() {
   try {
     await braindumpApi.create(currentDate, content);
     textarea.value = "";
-    document.getElementById("bd-new-form").style.display = "none";
+    textarea.focus();
     entries = await braindumpApi.listByDate(currentDate) || [];
     refreshEntries();
     // カレンダーのマーク更新
