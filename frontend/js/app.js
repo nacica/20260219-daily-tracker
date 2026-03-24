@@ -3,20 +3,20 @@
  * ルーティングの設定とホーム画面の表示を担当する
  */
 
-import { addRoute, navigate, updateNavActive } from "./router.js?v=20260324a";
-import { renderInputForm } from "./components/input-form.js?v=20260324a";
-import { renderAnalysisView } from "./components/analysis-view.js?v=20260324a";
-import { renderHistoryList } from "./components/history-list.js?v=20260324a";
-import { renderWeeklyReport } from "./components/weekly-report.js?v=20260324a";
-import { renderSuggestions } from "./components/suggestions.js?v=20260324a";
-import { renderCoachingChat } from "./components/coaching-chat.js?v=20260324a";
-import { renderKnowledgeGraph } from "./components/knowledge-graph.js?v=20260324a";
-import { renderMonthlyReport } from "./components/monthly-report.js?v=20260324a";
-import { renderJournal } from "./components/journal.js?v=20260324a";
-import { renderBraindump } from "./components/braindump.js?v=20260324a";
-import { recordsApi, analysisApi, remindersApi } from "./api.js?v=20260324a";
-import { initSwipeNav } from "./swipe-nav.js?v=20260324a";
-import { buildTaskStatsCards, renderTaskStats } from "./components/task-stats.js?v=20260324a";
+import { addRoute, navigate, updateNavActive } from "./router.js?v=20260324b";
+import { renderInputForm } from "./components/input-form.js?v=20260324b";
+import { renderAnalysisView } from "./components/analysis-view.js?v=20260324b";
+import { renderHistoryList } from "./components/history-list.js?v=20260324b";
+import { renderWeeklyReport } from "./components/weekly-report.js?v=20260324b";
+import { renderSuggestions } from "./components/suggestions.js?v=20260324b";
+import { renderCoachingChat } from "./components/coaching-chat.js?v=20260324b";
+import { renderKnowledgeGraph } from "./components/knowledge-graph.js?v=20260324b";
+import { renderMonthlyReport } from "./components/monthly-report.js?v=20260324b";
+import { renderJournal } from "./components/journal.js?v=20260324b";
+import { renderBraindump } from "./components/braindump.js?v=20260324b";
+import { recordsApi, analysisApi, remindersApi } from "./api.js?v=20260324b";
+import { initSwipeNav } from "./swipe-nav.js?v=20260324b";
+import { buildTaskStatsCards, renderTaskStats } from "./components/task-stats.js?v=20260324b";
 
 // ===== ユーティリティ =====
 
@@ -279,13 +279,17 @@ async function syncRemindersFromServer() {
   try {
     const res = await remindersApi.get();
     const serverItems = res.items || [];
-    if (serverItems.length > 0) {
-      localStorage.setItem("daily-reminders", JSON.stringify(serverItems));
-    } else {
-      const local = getHomeReminders();
-      if (local.length > 0) {
-        await remindersApi.save(local);
-      }
+    const localItems = getHomeReminders();
+
+    const merged = new Map();
+    for (const item of localItems) merged.set(item.id, item);
+    for (const item of serverItems) merged.set(item.id, item);
+    const mergedList = [...merged.values()].sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+
+    localStorage.setItem("daily-reminders", JSON.stringify(mergedList));
+
+    if (mergedList.length !== serverItems.length) {
+      await remindersApi.save(mergedList);
     }
   } catch {}
 }

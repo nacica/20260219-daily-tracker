@@ -5,9 +5,9 @@
  * 朝のタスク整理（ソクラテス式問答）統合
  */
 
-import { recordsApi, analysisApi, morningDialogueApi, remindersApi } from "../api.js?v=20260324a";
-import { showToast } from "../app.js?v=20260324a";
-import { showTaskCompleteAnimation, buildTaskStatsCards } from "./task-stats.js?v=20260324a";
+import { recordsApi, analysisApi, morningDialogueApi, remindersApi } from "../api.js?v=20260324b";
+import { showToast } from "../app.js?v=20260324b";
+import { showTaskCompleteAnimation, buildTaskStatsCards } from "./task-stats.js?v=20260324b";
 
 /* ── カテゴリ管理 ── */
 
@@ -345,19 +345,24 @@ function saveReminders(list) {
   remindersApi.save(list).catch(() => {});
 }
 
-/** サーバーからリマインダーを取得してlocalStorageに反映 */
+/** サーバーとローカルのリマインダーをマージして同期 */
 async function syncRemindersFromServer() {
   try {
     const res = await remindersApi.get();
     const serverItems = res.items || [];
-    if (serverItems.length > 0) {
-      localStorage.setItem(REMINDER_STORAGE_KEY, JSON.stringify(serverItems));
-    } else {
-      // サーバーが空ならローカルをアップロード
-      const local = getReminders();
-      if (local.length > 0) {
-        await remindersApi.save(local);
-      }
+    const localItems = getReminders();
+
+    // IDをキーにマージ（両方のデータを保持、重複はサーバー優先）
+    const merged = new Map();
+    for (const item of localItems) merged.set(item.id, item);
+    for (const item of serverItems) merged.set(item.id, item);
+    const mergedList = [...merged.values()].sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+
+    localStorage.setItem(REMINDER_STORAGE_KEY, JSON.stringify(mergedList));
+
+    // マージ結果をサーバーにも保存（ローカルにしかないデータを反映）
+    if (mergedList.length !== serverItems.length) {
+      await remindersApi.save(mergedList);
     }
   } catch {
     // オフライン時はローカルのみで動作
