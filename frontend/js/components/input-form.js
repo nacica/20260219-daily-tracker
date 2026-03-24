@@ -5,9 +5,9 @@
  * 朝のタスク整理（ソクラテス式問答）統合
  */
 
-import { recordsApi, analysisApi, morningDialogueApi, remindersApi } from "../api.js?v=20260324b";
-import { showToast } from "../app.js?v=20260324b";
-import { showTaskCompleteAnimation, buildTaskStatsCards } from "./task-stats.js?v=20260324b";
+import { recordsApi, analysisApi, morningDialogueApi, remindersApi } from "../api.js?v=20260324c";
+import { showToast } from "../app.js?v=20260324c";
+import { showTaskCompleteAnimation, buildTaskStatsCards } from "./task-stats.js?v=20260324c";
 
 /* ── カテゴリ管理 ── */
 
@@ -330,42 +330,25 @@ export async function renderInputForm(date) {
 
 /* ── 付箋リマインダー ── */
 
-const REMINDER_STORAGE_KEY = "daily-reminders";
+// メモリキャッシュ（サーバーが唯一のデータソース）
+let _remindersCache = [];
 
 function getReminders() {
-  try {
-    const saved = localStorage.getItem(REMINDER_STORAGE_KEY);
-    return saved ? JSON.parse(saved) : [];
-  } catch { return []; }
+  return _remindersCache;
 }
 
-function saveReminders(list) {
-  localStorage.setItem(REMINDER_STORAGE_KEY, JSON.stringify(list));
-  // バックグラウンドでサーバーに同期
-  remindersApi.save(list).catch(() => {});
+async function saveReminders(list) {
+  _remindersCache = list;
+  await remindersApi.save(list).catch(() => {});
 }
 
-/** サーバーとローカルのリマインダーをマージして同期 */
+/** サーバーからリマインダーを取得 */
 async function syncRemindersFromServer() {
   try {
     const res = await remindersApi.get();
-    const serverItems = res.items || [];
-    const localItems = getReminders();
-
-    // IDをキーにマージ（両方のデータを保持、重複はサーバー優先）
-    const merged = new Map();
-    for (const item of localItems) merged.set(item.id, item);
-    for (const item of serverItems) merged.set(item.id, item);
-    const mergedList = [...merged.values()].sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
-
-    localStorage.setItem(REMINDER_STORAGE_KEY, JSON.stringify(mergedList));
-
-    // マージ結果をサーバーにも保存（ローカルにしかないデータを反映）
-    if (mergedList.length !== serverItems.length) {
-      await remindersApi.save(mergedList);
-    }
+    _remindersCache = res.items || [];
   } catch {
-    // オフライン時はローカルのみで動作
+    // オフライン時はキャッシュのまま
   }
 }
 
