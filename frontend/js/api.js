@@ -309,6 +309,17 @@ export const braindumpApi = {
     apiFetch(`/braindump/entry/${encodeURIComponent(entryId)}/generate-title`, { method: "POST" }),
 };
 
+// ---- リマインダー（今日意識すること） ----
+
+export const remindersApi = {
+  /** リマインダー一覧を取得 */
+  get: () => apiFetch("/reminders"),
+
+  /** リマインダー一覧を保存（全件上書き） */
+  save: (items) =>
+    apiFetch("/reminders", { method: "PUT", body: { items } }),
+};
+
 // ---- 月次サマリー ----
 
 export const summariesApi = {

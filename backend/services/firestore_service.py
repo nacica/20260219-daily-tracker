@@ -543,3 +543,22 @@ def delete_braindump(entry_id: str) -> bool:
         return False
     ref.delete()
     return True
+
+
+# ---- reminders (今日意識すること) ----
+
+def get_reminders() -> list[dict]:
+    """リマインダー一覧を取得"""
+    db = get_db()
+    doc = db.collection("reminders").document("global").get()
+    if doc.exists:
+        data = doc.to_dict()
+        return data.get("items", [])
+    return []
+
+
+def save_reminders(items: list[dict]) -> list[dict]:
+    """リマインダー一覧を保存（全件上書き）"""
+    db = get_db()
+    db.collection("reminders").document("global").set({"items": items})
+    return items

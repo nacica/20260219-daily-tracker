@@ -5,9 +5,9 @@
  * 朝のタスク整理（ソクラテス式問答）統合
  */
 
-import { recordsApi, analysisApi, morningDialogueApi } from "../api.js?v=20260323m";
-import { showToast } from "../app.js?v=20260323m";
-import { showTaskCompleteAnimation, buildTaskStatsCards } from "./task-stats.js?v=20260323m";
+import { recordsApi, analysisApi, morningDialogueApi, remindersApi } from "../api.js?v=20260324a";
+import { showToast } from "../app.js?v=20260324a";
+import { showTaskCompleteAnimation, buildTaskStatsCards } from "./task-stats.js?v=20260324a";
 
 /* ── カテゴリ管理 ── */
 
@@ -265,6 +265,7 @@ export async function renderInputForm(date) {
   const [recordResult, morningResult] = await Promise.allSettled([
     recordsApi.get(date),
     morningDialogueApi.get(date),
+    syncRemindersFromServer(),
   ]);
 
   if (recordResult.status === "fulfilled") existingRecord = recordResult.value;
@@ -340,6 +341,27 @@ function getReminders() {
 
 function saveReminders(list) {
   localStorage.setItem(REMINDER_STORAGE_KEY, JSON.stringify(list));
+  // バックグラウンドでサーバーに同期
+  remindersApi.save(list).catch(() => {});
+}
+
+/** サーバーからリマインダーを取得してlocalStorageに反映 */
+async function syncRemindersFromServer() {
+  try {
+    const res = await remindersApi.get();
+    const serverItems = res.items || [];
+    if (serverItems.length > 0) {
+      localStorage.setItem(REMINDER_STORAGE_KEY, JSON.stringify(serverItems));
+    } else {
+      // サーバーが空ならローカルをアップロード
+      const local = getReminders();
+      if (local.length > 0) {
+        await remindersApi.save(local);
+      }
+    }
+  } catch {
+    // オフライン時はローカルのみで動作
+  }
 }
 
 

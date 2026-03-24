@@ -3,20 +3,20 @@
  * ルーティングの設定とホーム画面の表示を担当する
  */
 
-import { addRoute, navigate, updateNavActive } from "./router.js?v=20260323m";
-import { renderInputForm } from "./components/input-form.js?v=20260323m";
-import { renderAnalysisView } from "./components/analysis-view.js?v=20260323m";
-import { renderHistoryList } from "./components/history-list.js?v=20260323m";
-import { renderWeeklyReport } from "./components/weekly-report.js?v=20260323m";
-import { renderSuggestions } from "./components/suggestions.js?v=20260323m";
-import { renderCoachingChat } from "./components/coaching-chat.js?v=20260323m";
-import { renderKnowledgeGraph } from "./components/knowledge-graph.js?v=20260323m";
-import { renderMonthlyReport } from "./components/monthly-report.js?v=20260323m";
-import { renderJournal } from "./components/journal.js?v=20260323m";
-import { renderBraindump } from "./components/braindump.js?v=20260323m";
-import { recordsApi, analysisApi } from "./api.js?v=20260323m";
-import { initSwipeNav } from "./swipe-nav.js?v=20260323m";
-import { buildTaskStatsCards, renderTaskStats } from "./components/task-stats.js?v=20260323m";
+import { addRoute, navigate, updateNavActive } from "./router.js?v=20260324a";
+import { renderInputForm } from "./components/input-form.js?v=20260324a";
+import { renderAnalysisView } from "./components/analysis-view.js?v=20260324a";
+import { renderHistoryList } from "./components/history-list.js?v=20260324a";
+import { renderWeeklyReport } from "./components/weekly-report.js?v=20260324a";
+import { renderSuggestions } from "./components/suggestions.js?v=20260324a";
+import { renderCoachingChat } from "./components/coaching-chat.js?v=20260324a";
+import { renderKnowledgeGraph } from "./components/knowledge-graph.js?v=20260324a";
+import { renderMonthlyReport } from "./components/monthly-report.js?v=20260324a";
+import { renderJournal } from "./components/journal.js?v=20260324a";
+import { renderBraindump } from "./components/braindump.js?v=20260324a";
+import { recordsApi, analysisApi, remindersApi } from "./api.js?v=20260324a";
+import { initSwipeNav } from "./swipe-nav.js?v=20260324a";
+import { buildTaskStatsCards, renderTaskStats } from "./components/task-stats.js?v=20260324a";
 
 // ===== ユーティリティ =====
 
@@ -275,6 +275,21 @@ function getHomeReminders() {
   } catch { return []; }
 }
 
+async function syncRemindersFromServer() {
+  try {
+    const res = await remindersApi.get();
+    const serverItems = res.items || [];
+    if (serverItems.length > 0) {
+      localStorage.setItem("daily-reminders", JSON.stringify(serverItems));
+    } else {
+      const local = getHomeReminders();
+      if (local.length > 0) {
+        await remindersApi.save(local);
+      }
+    }
+  } catch {}
+}
+
 let homeReminderIndex = 0;
 
 function buildHomeReminderCard() {
@@ -356,10 +371,11 @@ async function renderHome() {
   showLoading("今日のデータを確認中...");
 
   try {
-    // 今日の記録と分析を並行取得
+    // 今日の記録と分析を並行取得 + リマインダー同期
     const [record, analysis] = await Promise.allSettled([
       recordsApi.get(todayStr),
       analysisApi.get(todayStr),
+      syncRemindersFromServer(),
     ]);
 
     const hasRecord = record.status === "fulfilled" && record.value;
