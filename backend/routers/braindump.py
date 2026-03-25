@@ -129,6 +129,24 @@ async def delete_braindump_entry(entry_id: str):
         raise HTTPException(status_code=404, detail=f"{entry_id} のメモが見つかりません")
 
 
+@router.post("/braindump/summarize")
+async def summarize_braindump(body: BraindumpCreate):
+    """ブレインダンプの内容をマークダウン形式で要約する"""
+    content = body.content
+    if not content or not content.strip():
+        raise HTTPException(status_code=400, detail="要約する内容がありません")
+
+    try:
+        summary = claude_service.summarize_braindump_as_markdown(content)
+    except Exception as e:
+        raise HTTPException(
+            status_code=502,
+            detail=f"要約生成でエラーが発生しました: {str(e)[:200]}",
+        )
+
+    return {"summary": summary}
+
+
 @router.post("/braindump/entry/{entry_id}/generate-title", response_model=BraindumpEntry)
 async def generate_braindump_title(entry_id: str):
     """AIタイトルを手動で生成する"""

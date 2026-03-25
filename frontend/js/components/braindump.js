@@ -4,8 +4,8 @@
  * 日付切替（前日/翌日 + カレンダー）、自動保存、AIタイトル自動生成。
  */
 
-import { braindumpApi } from "../api.js?v=20260325d";
-import { showToast } from "../app.js?v=20260325d";
+import { braindumpApi } from "../api.js?v=20260326a";
+import { showToast } from "../app.js?v=20260326a";
 
 // ===== ユーティリティ =====
 
@@ -86,6 +86,7 @@ export async function renderBraindump(date) {
         <div class="braindump-new-form" id="bd-new-form">
           <textarea class="braindump-textarea" id="bd-new-textarea" placeholder="思いついたことを自由に書き出してください..." rows="18"></textarea>
           <div class="braindump-form-actions">
+            <button class="btn btn-outline btn-sm" id="bd-summarize-btn">📝 MD要約</button>
             <button class="btn btn-primary btn-sm" id="bd-save-new-btn">保存</button>
             <button class="btn btn-outline btn-sm" id="bd-cancel-new-btn">クリア</button>
           </div>
@@ -237,6 +238,9 @@ function attachEvents() {
     newAutoSaveTimer = setTimeout(() => autoSaveNewEntry(), 2000);
   });
 
+  // マークダウン要約ボタン
+  document.getElementById("bd-summarize-btn")?.addEventListener("click", summarizeContent);
+
   // クリアボタン
   document.getElementById("bd-cancel-new-btn")?.addEventListener("click", () => {
     newEntryId = null; // 新規エントリIDをリセット
@@ -298,6 +302,34 @@ function attachEvents() {
 }
 
 // ===== CRUD操作 =====
+
+async function summarizeContent() {
+  const textarea = document.getElementById("bd-new-textarea");
+  const content = textarea.value.trim();
+  if (!content) {
+    showToast("要約する内容を入力してください", "error");
+    return;
+  }
+
+  const btn = document.getElementById("bd-summarize-btn");
+  const origText = btn.textContent;
+  btn.textContent = "要約中...";
+  btn.disabled = true;
+
+  try {
+    const result = await braindumpApi.summarize(content);
+    textarea.value = result.summary;
+    textarea.focus();
+    // 自動保存タイマーをリセット
+    if (newAutoSaveTimer) clearTimeout(newAutoSaveTimer);
+    newAutoSaveTimer = setTimeout(() => autoSaveNewEntry(), 2000);
+  } catch (e) {
+    showToast(`要約に失敗しました: ${e.message}`, "error");
+  } finally {
+    btn.textContent = origText;
+    btn.disabled = false;
+  }
+}
 
 async function saveNewEntry() {
   const textarea = document.getElementById("bd-new-textarea");

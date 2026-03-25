@@ -554,6 +554,37 @@ def generate_weekly_journal_digest(
     return _extract_json(response.content[0].text)
 
 
+def summarize_braindump_as_markdown(content: str) -> str:
+    """
+    ブレインダンプの内容をマークダウン形式で要約する（内容を極力省略しない）
+    """
+    client = get_client()
+    model = os.getenv("DAILY_ANALYSIS_MODEL", "claude-sonnet-4-6")
+
+    system_prompt = (
+        "あなたはメモの整理・要約を行うアシスタントです。"
+        "ユーザーのブレインダンプ（思考メモ）を読み、マークダウン形式で構造化してください。\n\n"
+        "【重要なルール】\n"
+        "- 入力された内容を極力省略せず、すべての情報を含めてください\n"
+        "- 情報を削除するのではなく、構造化・整理することが目的です\n"
+        "- 見出し(##, ###)、箇条書き(-)、太字(**)、番号リスト(1.)などを活用し読みやすく整理してください\n"
+        "- 関連するトピックをグループ化し、論理的な順序に並べ替えてください\n"
+        "- 元の表現やニュアンスをできるだけ保持してください\n"
+        "- マークダウンのみを出力し、余計な前置きや説明は不要です\n"
+        "- 日本語で出力してください"
+    )
+
+    response = _call_claude_with_retry(
+        client,
+        model=model,
+        max_tokens=4096,
+        system=system_prompt,
+        messages=[{"role": "user", "content": content}],
+    )
+
+    return response.content[0].text
+
+
 def generate_braindump_title(content: str) -> str:
     """
     ブレインダンプの内容からタイトルを自動生成する

@@ -307,6 +307,10 @@ export const braindumpApi = {
   /** AIタイトル生成 */
   generateTitle: (entryId) =>
     apiFetch(`/braindump/entry/${encodeURIComponent(entryId)}/generate-title`, { method: "POST" }),
+
+  /** マークダウン要約 */
+  summarize: (content) =>
+    apiFetch("/braindump/summarize", { method: "POST", body: { date: "2000-01-01", content } }),
 };
 
 // ---- リマインダー（今日意識すること） ----
