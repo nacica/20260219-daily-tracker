@@ -4,8 +4,8 @@
  * 日付切替（前日/翌日 + カレンダー）、自動保存、AIタイトル自動生成。
  */
 
-import { braindumpApi } from "../api.js?v=20260325c";
-import { showToast } from "../app.js?v=20260325c";
+import { braindumpApi } from "../api.js?v=20260325d";
+import { showToast } from "../app.js?v=20260325d";
 
 // ===== ユーティリティ =====
 
@@ -50,12 +50,15 @@ let entries = [];
 let recentEntries = []; // 過去15日分のメモ
 let editingEntryId = null;
 let autoSaveTimer = null;
+let newAutoSaveTimer = null;
+let newEntryId = null; // 新規メモが自動保存された後のエントリID
 let calendarEntryDates = new Set();
 
 // ===== メインレンダー =====
 
 export async function renderBraindump(date) {
   currentDate = date || today();
+  newEntryId = null; // ページ遷移時にリセット
   const main = document.querySelector("main");
   main.innerHTML = `<div class="loading"><div class="spinner"></div><p>読み込み中...</p></div>`;
 
@@ -228,8 +231,15 @@ function attachEvents() {
   // 新規保存
   document.getElementById("bd-save-new-btn")?.addEventListener("click", saveNewEntry);
 
+  // 新規テキストエリアの自動保存（2秒間入力停止で発火）
+  document.getElementById("bd-new-textarea")?.addEventListener("input", () => {
+    if (newAutoSaveTimer) clearTimeout(newAutoSaveTimer);
+    newAutoSaveTimer = setTimeout(() => autoSaveNewEntry(), 2000);
+  });
+
   // クリアボタン
   document.getElementById("bd-cancel-new-btn")?.addEventListener("click", () => {
+    newEntryId = null; // 新規エントリIDをリセット
     document.getElementById("bd-new-textarea").value = "";
     document.getElementById("bd-new-textarea")?.focus();
   });
@@ -295,16 +305,49 @@ async function saveNewEntry() {
   if (!content) return;
 
   try {
-    await braindumpApi.create(currentDate, content);
+    if (newEntryId) {
+      // 既に自動保存済みのエントリがあれば更新
+      await braindumpApi.update(newEntryId, content);
+    } else {
+      await braindumpApi.create(currentDate, content);
+    }
+    newEntryId = null;
     textarea.value = "";
     textarea.focus();
     entries = await braindumpApi.listByDate(currentDate) || [];
     refreshEntries();
-    // カレンダーのマーク更新
     calendarEntryDates.add(currentDate);
     renderCalendar();
   } catch (e) {
     showToast(`保存に失敗しました: ${e.message}`, "error");
+  }
+}
+
+async function autoSaveNewEntry() {
+  const textarea = document.getElementById("bd-new-textarea");
+  if (!textarea) return;
+
+  const content = textarea.value.trim();
+  if (!content) return;
+
+  try {
+    if (newEntryId) {
+      // 既に作成済み → 更新
+      await braindumpApi.update(newEntryId, content);
+    } else {
+      // 初回 → 新規作成してIDを保持
+      const created = await braindumpApi.create(currentDate, content);
+      if (created && created.id) {
+        newEntryId = created.id;
+      }
+      calendarEntryDates.add(currentDate);
+      renderCalendar();
+    }
+    // 右カラムの一覧も更新
+    entries = await braindumpApi.listByDate(currentDate) || [];
+    refreshEntries();
+  } catch {
+    // 自動保存失敗は静かに無視
   }
 }
 
