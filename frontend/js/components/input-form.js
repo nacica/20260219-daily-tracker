@@ -5,9 +5,9 @@
  * 朝のタスク整理（ソクラテス式問答）統合
  */
 
-import { recordsApi, analysisApi, morningDialogueApi, remindersApi } from "../api.js?v=20260324c";
-import { showToast } from "../app.js?v=20260324c";
-import { showTaskCompleteAnimation, buildTaskStatsCards } from "./task-stats.js?v=20260324c";
+import { recordsApi, analysisApi, morningDialogueApi, remindersApi } from "../api.js?v=20260325a";
+import { showToast } from "../app.js?v=20260325a";
+import { showTaskCompleteAnimation, buildTaskStatsCards } from "./task-stats.js?v=20260325a";
 
 /* ── カテゴリ管理 ── */
 
@@ -834,6 +834,10 @@ function buildTimelineRowHTML(start = "", end = "", activity = "") {
         <button class="timeline-toggle-end"${hasEnd ? ' style="display:none"' : ""}>${hasEnd ? "" : "+終了"}</button>
         <input type="text" class="timeline-activity" value="${escapeHTMLAttr(activity)}" placeholder="" />
       </div>
+      <div class="timeline-row-reorder">
+        <button class="timeline-row-up" title="上に移動">▲</button>
+        <button class="timeline-row-down" title="下に移動">▼</button>
+      </div>
       <button class="timeline-row-remove" title="削除">✕</button>
     </div>`;
 }
@@ -929,9 +933,14 @@ function buildFormHTML(date, record, tasks, isEdit, morningDialogue, isRestDay =
             <div class="timeline-rows" id="timeline-rows">
               ${buildTimelineRowsFromRawInput(rawInput)}
             </div>
-            <button class="btn btn-outline btn-sm timeline-add-btn" id="btn-add-timeline-row">
-              ＋ 行動を追加
-            </button>
+            <div class="timeline-bottom-actions">
+              <button class="btn btn-outline btn-sm timeline-add-btn" id="btn-add-timeline-row">
+                ＋ 行動を追加
+              </button>
+              <button class="btn btn-outline btn-sm timeline-sort-btn" id="btn-sort-timeline" title="時刻順に並べ替え">
+                ↕ 時刻順
+              </button>
+            </div>
           </div>
           <div id="freeform-mode" style="display: none;">
             <label for="raw-input">今日の行動を自由に入力してください</label>
@@ -1444,6 +1453,30 @@ function attachFormEvents(date, isEdit) {
         return;
       }
 
+      // ▲ 上に移動
+      const upBtn = e.target.closest(".timeline-row-up");
+      if (upBtn) {
+        const row = upBtn.closest(".timeline-row");
+        const prev = row.previousElementSibling;
+        if (prev) {
+          row.parentNode.insertBefore(row, prev);
+          debounceTimelineSave();
+        }
+        return;
+      }
+
+      // ▼ 下に移動
+      const downBtn = e.target.closest(".timeline-row-down");
+      if (downBtn) {
+        const row = downBtn.closest(".timeline-row");
+        const next = row.nextElementSibling;
+        if (next) {
+          row.parentNode.insertBefore(next, row);
+          debounceTimelineSave();
+        }
+        return;
+      }
+
       const removeBtn = e.target.closest(".timeline-row-remove");
       if (!removeBtn) return;
       const row = removeBtn.closest(".timeline-row");
@@ -1516,6 +1549,22 @@ function attachFormEvents(date, isEdit) {
       // 新しい行の活動入力にフォーカス
       const newRow = timelineRows.lastElementChild;
       newRow.querySelector(".timeline-activity").focus();
+    });
+  }
+
+  // 時刻順ソートボタン
+  const sortBtn = document.getElementById("btn-sort-timeline");
+  if (sortBtn) {
+    sortBtn.addEventListener("click", () => {
+      const rows = [...timelineRows.querySelectorAll(".timeline-row")];
+      if (rows.length <= 1) return;
+      rows.sort((a, b) => {
+        const ta = a.querySelector(".timeline-start").value || "99:99";
+        const tb = b.querySelector(".timeline-start").value || "99:99";
+        return ta.localeCompare(tb);
+      });
+      for (const row of rows) timelineRows.appendChild(row);
+      debounceTimelineSave();
     });
   }
 

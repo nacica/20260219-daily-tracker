@@ -2488,10 +2488,64 @@ textarea {
   min-width: 0;
 }
 
-.timeline-add-btn {
-  width: 100%;
+/* 並べ替えボタン（上下矢印） */
+.timeline-row-reorder {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex-shrink: 0;
+}
+
+.timeline-row-up,
+.timeline-row-down {
+  width: 24px;
+  height: 16px;
+  border-radius: 3px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.55rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: all 0.15s;
+  line-height: 1;
+}
+
+.timeline-row-up:hover,
+.timeline-row-down:hover {
+  background: rgba(0, 212, 255, 0.1);
+  border-color: rgba(0, 212, 255, 0.3);
+  color: var(--cyan);
+}
+
+.timeline-row.collapsed .timeline-row-reorder {
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.timeline-row.collapsed:hover .timeline-row-reorder {
+  opacity: 1;
+}
+
+/* 下部アクションボタン群 */
+.timeline-bottom-actions {
+  display: flex;
+  gap: 8px;
   margin-top: 4px;
+}
+
+.timeline-add-btn {
+  flex: 1;
   border-style: dashed;
+}
+
+.timeline-sort-btn {
+  flex-shrink: 0;
+  border-style: dashed;
+  white-space: nowrap;
 }
 
 /* モバイル対応: タイムライン行を縦に */
@@ -2499,7 +2553,7 @@ textarea {
   .timeline-row:not(.collapsed) {
     flex-wrap: wrap;
     position: relative;
-    padding-right: 34px;
+    padding-right: 60px;
   }
 
   .timeline-row-edit {
@@ -2524,6 +2578,14 @@ textarea {
     position: absolute;
     right: 4px;
     top: 4px;
+  }
+
+  .timeline-row-reorder {
+    position: absolute;
+    right: 28px;
+    top: 4px;
+    flex-direction: row;
+    gap: 2px;
   }
 }
 
