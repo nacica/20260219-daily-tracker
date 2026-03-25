@@ -4,8 +4,8 @@
  * 日付切替（前日/翌日 + カレンダー）、自動保存、AIタイトル自動生成。
  */
 
-import { braindumpApi } from "../api.js?v=20260324c";
-import { showToast } from "../app.js?v=20260324c";
+import { braindumpApi } from "../api.js?v=20260325c";
+import { showToast } from "../app.js?v=20260325c";
 
 // ===== ユーティリティ =====
 
@@ -37,10 +37,17 @@ function escapeHTML(str) {
   return div.innerHTML;
 }
 
+function daysAgo(n) {
+  const d = new Date();
+  d.setDate(d.getDate() - n);
+  return d.toLocaleDateString("sv-SE");
+}
+
 // ===== 状態管理 =====
 
 let currentDate = today();
 let entries = [];
+let recentEntries = []; // 過去15日分のメモ
 let editingEntryId = null;
 let autoSaveTimer = null;
 let calendarEntryDates = new Set();
@@ -56,6 +63,13 @@ export async function renderBraindump(date) {
     entries = await braindumpApi.listByDate(currentDate) || [];
   } catch {
     entries = [];
+  }
+
+  // 過去15日分のメモを取得
+  try {
+    recentEntries = await braindumpApi.list(daysAgo(14), today()) || [];
+  } catch {
+    recentEntries = [];
   }
 
   main.innerHTML = `
@@ -86,7 +100,7 @@ export async function renderBraindump(date) {
           <div class="braindump-calendar" id="bd-calendar"></div>
         </div>
         <div class="braindump-entries" id="bd-entries">
-          ${renderEntries()}
+          ${renderRecentEntries()}
         </div>
       </div>
     </div>
@@ -97,6 +111,67 @@ export async function renderBraindump(date) {
 }
 
 // ===== エントリ一覧レンダリング =====
+
+function renderRecentEntries() {
+  if (recentEntries.length === 0) {
+    return `
+      <div class="empty-state" style="padding: 32px 0;">
+        <div class="icon">📝</div>
+        <p>過去15日間のメモはありません</p>
+      </div>`;
+  }
+
+  // 日付ごとにグループ化（新しい日付順）
+  const grouped = {};
+  for (const entry of recentEntries) {
+    const date = entry.date;
+    if (!grouped[date]) grouped[date] = [];
+    grouped[date].push(entry);
+  }
+  const sortedDates = Object.keys(grouped).sort().reverse();
+
+  return sortedDates.map(date => {
+    const dateEntries = grouped[date];
+    const d = new Date(date + "T00:00:00");
+    const weekdays = ["日", "月", "火", "水", "木", "金", "土"];
+    const dateLabel = `${d.getMonth() + 1}/${d.getDate()}（${weekdays[d.getDay()]}）`;
+    const isToday = date === today();
+    const badge = isToday ? ' <span class="braindump-today-badge">今日</span>' : '';
+
+    const entriesHTML = dateEntries.map(entry => {
+      const isEditing = editingEntryId === entry.id;
+      const time = entry.created_at ? entry.created_at.slice(11, 16) : "";
+      const title = entry.title || entry.content.slice(0, 30).replace(/\n/g, " ");
+      const preview = entry.content.slice(0, 80).replace(/\n/g, " ");
+
+      if (isEditing) {
+        return `
+          <div class="braindump-entry editing" data-id="${entry.id}">
+            <textarea class="braindump-textarea" id="bd-edit-textarea" rows="8">${escapeHTML(entry.content)}</textarea>
+            <div class="braindump-form-actions">
+              <button class="btn btn-outline btn-sm bd-close-edit-btn">閉じる</button>
+              <button class="btn btn-danger btn-sm bd-delete-btn" data-id="${entry.id}">削除</button>
+            </div>
+          </div>`;
+      }
+
+      return `
+        <div class="braindump-entry" data-id="${entry.id}">
+          <div class="braindump-entry-header">
+            <span class="braindump-entry-title">${escapeHTML(title)}</span>
+            <span class="braindump-entry-time">${time}</span>
+          </div>
+          <div class="braindump-entry-preview">${escapeHTML(preview)}${entry.content.length > 80 ? '...' : ''}</div>
+        </div>`;
+    }).join("");
+
+    return `
+      <div class="braindump-date-group">
+        <div class="braindump-date-group-header">${dateLabel}${badge}</div>
+        ${entriesHTML}
+      </div>`;
+  }).join("");
+}
 
 function renderEntries() {
   if (entries.length === 0) {
@@ -272,10 +347,16 @@ async function deleteEntry(entryId) {
   }
 }
 
-function refreshEntries() {
+async function refreshEntries() {
+  // 過去15日分も再取得
+  try {
+    recentEntries = await braindumpApi.list(daysAgo(14), today()) || [];
+  } catch {
+    // 失敗時は既存データを維持
+  }
   const container = document.getElementById("bd-entries");
   if (container) {
-    container.innerHTML = renderEntries();
+    container.innerHTML = renderRecentEntries();
   }
 }
 

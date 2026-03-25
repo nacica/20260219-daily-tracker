@@ -5236,6 +5236,35 @@ main.swipe-enter-right {
   white-space: nowrap;
 }
 
+/* 日付グループ（過去15日分表示） */
+
+.braindump-date-group {
+  margin-bottom: 12px;
+}
+
+.braindump-date-group-header {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-secondary, rgba(255, 255, 255, 0.6));
+  padding: 8px 4px 4px;
+  border-bottom: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
+  margin-bottom: 6px;
+  position: sticky;
+  top: 0;
+  background: var(--bg-primary, #1a1a2e);
+  z-index: 1;
+}
+
+.braindump-today-badge {
+  background: var(--accent-color, #4cc9f0);
+  color: #000;
+  font-size: 0.7rem;
+  padding: 1px 6px;
+  border-radius: 8px;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
 /* 日付エリア */
 
 .braindump-date-area {
@@ -5310,4 +5339,10 @@ main.swipe-enter-right {
 
 [data-theme="light"] .braindump-date-label:hover {
   background: rgba(0, 120, 212, 0.08);
+}
+
+[data-theme="light"] .braindump-date-group-header {
+  color: rgba(0, 0, 0, 0.55);
+  border-bottom-color: rgba(0, 0, 0, 0.1);
+  background: var(--bg-primary, #f5f6fa);
 }
