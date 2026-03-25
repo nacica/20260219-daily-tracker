@@ -5,7 +5,7 @@
  * - タスク完了時 +1 フローティングアニメーション
  */
 
-import { recordsApi } from "../api.js?v=20260324c";
+import { recordsApi } from "../api.js?v=20260325b";
 
 // ===== ユーティリティ =====
 
@@ -75,6 +75,36 @@ function buildTrend(current, previous) {
   return `<div class="task-stat-trend flat">±0</div>`;
 }
 
+// ===== 瞑想連続日数の算出 =====
+
+const MEDITATION_TASK_NAME = "トラタカ瞑想";
+
+/** 今日から遡って瞑想タスクが連続で完了されている日数を返す */
+function calcMeditationStreak(allRecords, todayStr) {
+  // 日付降順でソート
+  const sorted = [...allRecords].sort((a, b) => (b.date > a.date ? 1 : -1));
+  let streak = 0;
+  const d = new Date(todayStr + "T00:00:00");
+
+  for (let i = 0; i <= 365; i++) {
+    const dateStr = d.toLocaleDateString("sv-SE");
+    const rec = sorted.find((r) => r.date === dateStr);
+    const completed = rec?.tasks?.completed || [];
+    if (completed.includes(MEDITATION_TASK_NAME)) {
+      streak++;
+    } else {
+      // 今日まだ未完了の場合はスキップして昨日以前の連続を数える
+      if (i === 0) {
+        d.setDate(d.getDate() - 1);
+        continue;
+      }
+      break;
+    }
+    d.setDate(d.getDate() - 1);
+  }
+  return streak;
+}
+
 // ===== ホーム画面サマリーカード =====
 
 export async function buildTaskStatsCards() {
@@ -91,9 +121,16 @@ export async function buildTaskStatsCards() {
   const prevMonthRange = getPrevMonthRange(todayStr);
 
   try {
-    // 必要なレコードを並行取得（今月+先月で十分）
+    // 必要なレコードを並行取得（瞑想ストリーク用に過去90日分も取得）
     const earliest = prevMonthRange.start < prevWeekRange.start ? prevMonthRange.start : prevWeekRange.start;
-    const allRecords = await recordsApi.list(earliest, monthRange.end);
+    const streakStart = new Date(todayStr + "T00:00:00");
+    streakStart.setDate(streakStart.getDate() - 90);
+    const streakStartStr = streakStart.toLocaleDateString("sv-SE");
+    const fetchStart = earliest < streakStartStr ? earliest : streakStartStr;
+    const allRecords = await recordsApi.list(fetchStart, monthRange.end);
+
+    // 瞑想連続日数
+    const meditationStreak = calcMeditationStreak(allRecords, todayStr);
 
     // 今日
     const todayCount = getCompletedForDate(allRecords, todayStr);
@@ -111,8 +148,17 @@ export async function buildTaskStatsCards() {
     const prevMonthRecords = allRecords.filter((r) => r.date >= prevMonthRange.start && r.date <= prevMonthRange.end);
     const prevMonthCount = sumCompleted(prevMonthRecords);
 
+    // 今日瞑想完了済みかチェック
+    const todayRec = allRecords.find((r) => r.date === todayStr);
+    const meditationDoneToday = (todayRec?.tasks?.completed || []).includes(MEDITATION_TASK_NAME);
+
     return `
       <div class="task-stats-row" id="task-stats-row">
+        <div class="task-stat-card" data-period="meditation">
+          <div class="task-stat-number" id="task-stat-meditation">${meditationStreak}</div>
+          <div class="task-stat-period">瞑想連続</div>
+          <div class="task-stat-trend ${meditationDoneToday ? "up" : "flat"}">${meditationDoneToday ? "完了" : "未完了"}</div>
+        </div>
         <div class="task-stat-card" data-period="today" onclick="window.location.hash='/task-stats'">
           <div class="task-stat-number" id="task-stat-today">${todayCount}</div>
           <div class="task-stat-period">今日</div>

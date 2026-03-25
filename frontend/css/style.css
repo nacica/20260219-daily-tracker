@@ -1308,9 +1308,15 @@ textarea {
 
 .task-stats-row {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 10px;
   margin-bottom: var(--gap);
+}
+
+@media (max-width: 480px) {
+  .task-stats-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 
 .task-stat-card {
@@ -1325,7 +1331,8 @@ textarea {
   transition: border-color 0.25s, background 0.25s, transform 0.15s, box-shadow 0.25s;
 }
 
-/* --- カラーテーマ: 今日=シアン, 週=バイオレット, 月=グリーン --- */
+/* --- カラーテーマ: 瞑想=アンバー, 今日=シアン, 週=バイオレット, 月=グリーン --- */
+.task-stat-card[data-period="meditation"] { --card-accent: #ffaa00; --card-glow: rgba(255,170,0,0.25); }
 .task-stat-card[data-period="today"] { --card-accent: #00d4ff; --card-glow: rgba(0,212,255,0.25); }
 .task-stat-card[data-period="week"]  { --card-accent: #a855f7; --card-glow: rgba(168,85,247,0.25); }
 .task-stat-card[data-period="month"] { --card-accent: #00ff94; --card-glow: rgba(0,255,148,0.25); }
@@ -1414,6 +1421,7 @@ textarea {
 .task-stat-card:hover .task-stat-detail-link { opacity: 0.7; }
 
 /* ライトテーマ調整 */
+[data-theme="light"] .task-stat-card[data-period="meditation"] { --card-accent: #d97706; --card-glow: rgba(217,119,6,0.18); }
 [data-theme="light"] .task-stat-card[data-period="today"] { --card-accent: #0891b2; --card-glow: rgba(8,145,178,0.18); }
 [data-theme="light"] .task-stat-card[data-period="week"]  { --card-accent: #7c3aed; --card-glow: rgba(124,58,237,0.18); }
 [data-theme="light"] .task-stat-card[data-period="month"] { --card-accent: #059669; --card-glow: rgba(5,150,105,0.18); }

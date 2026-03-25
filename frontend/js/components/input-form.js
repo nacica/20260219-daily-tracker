@@ -5,9 +5,9 @@
  * 朝のタスク整理（ソクラテス式問答）統合
  */
 
-import { recordsApi, analysisApi, morningDialogueApi, remindersApi } from "../api.js?v=20260325a";
-import { showToast } from "../app.js?v=20260325a";
-import { showTaskCompleteAnimation, buildTaskStatsCards } from "./task-stats.js?v=20260325a";
+import { recordsApi, analysisApi, morningDialogueApi, remindersApi } from "../api.js?v=20260325b";
+import { showToast } from "../app.js?v=20260325b";
+import { showTaskCompleteAnimation, buildTaskStatsCards } from "./task-stats.js?v=20260325b";
 
 /* ── カテゴリ管理 ── */
 
@@ -313,6 +313,16 @@ export async function renderInputForm(date) {
         existingNames.add(task);
       }
     }
+  }
+
+  // デフォルトタスク「トラタカ瞑想」を自動注入（未登録かつ未完了の場合）
+  const MEDITATION_TASK = "トラタカ瞑想";
+  const allTaskNames = new Set([
+    ...tasks.planned.map((t) => (typeof t === "string" ? t : t.name || t.task || "")),
+    ...tasks.completed.map((t) => (typeof t === "string" ? t : t.name || t.task || "")),
+  ]);
+  if (!allTaskNames.has(MEDITATION_TASK)) {
+    tasks.planned.unshift(MEDITATION_TASK);
   }
 
   const isRestDay = existingRecord?.rest_day || false;
