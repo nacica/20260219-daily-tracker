@@ -233,12 +233,15 @@ body {
 [data-theme="light"] .analysis-list.tip li   { background: rgba(0, 153, 204, 0.05); }
 
 [data-theme="light"] .suggestion-card {
-  background: rgba(0, 0, 0, 0.02);
+  background: #ffffff;
   backdrop-filter: none;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
 }
 
 [data-theme="light"] .suggestion-card:hover {
-  background: rgba(0, 153, 204, 0.04);
+  background: #f8fbff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
 }
 
 [data-theme="light"] .toast {
