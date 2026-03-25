@@ -4,8 +4,8 @@
  * 日付切替（前日/翌日 + カレンダー）、自動保存、AIタイトル自動生成。
  */
 
-import { braindumpApi } from "../api.js?v=20260326a";
-import { showToast } from "../app.js?v=20260326a";
+import { braindumpApi } from "../api.js?v=20260326c";
+import { showToast } from "../app.js?v=20260326c";
 
 // ===== ユーティリティ =====
 
@@ -49,7 +49,6 @@ let currentDate = today();
 let entries = [];
 let recentEntries = []; // 過去15日分のメモ
 let editingEntryId = null;
-let autoSaveTimer = null;
 let newAutoSaveTimer = null;
 let newEntryId = null; // 新規メモが自動保存された後のエントリID
 let calendarEntryDates = new Set();
@@ -143,24 +142,12 @@ function renderRecentEntries() {
     const badge = isToday ? ' <span class="braindump-today-badge">今日</span>' : '';
 
     const entriesHTML = dateEntries.map(entry => {
-      const isEditing = editingEntryId === entry.id;
       const time = entry.created_at ? entry.created_at.slice(11, 16) : "";
       const title = entry.title || entry.content.slice(0, 30).replace(/\n/g, " ");
       const preview = entry.content.slice(0, 80).replace(/\n/g, " ");
 
-      if (isEditing) {
-        return `
-          <div class="braindump-entry editing" data-id="${entry.id}">
-            <textarea class="braindump-textarea" id="bd-edit-textarea" rows="8">${escapeHTML(entry.content)}</textarea>
-            <div class="braindump-form-actions">
-              <button class="btn btn-outline btn-sm bd-close-edit-btn">閉じる</button>
-              <button class="btn btn-danger btn-sm bd-delete-btn" data-id="${entry.id}">削除</button>
-            </div>
-          </div>`;
-      }
-
       return `
-        <div class="braindump-entry" data-id="${entry.id}">
+        <div class="braindump-entry" data-id="${entry.id}" style="cursor: pointer;">
           <div class="braindump-entry-header">
             <span class="braindump-entry-title">${escapeHTML(title)}</span>
             <span class="braindump-entry-time">${time}</span>
@@ -173,43 +160,6 @@ function renderRecentEntries() {
       <div class="braindump-date-group">
         <div class="braindump-date-group-header">${dateLabel}${badge}</div>
         ${entriesHTML}
-      </div>`;
-  }).join("");
-}
-
-function renderEntries() {
-  if (entries.length === 0) {
-    return `
-      <div class="empty-state" style="padding: 32px 0;">
-        <div class="icon">📝</div>
-        <p>この日のメモはまだありません</p>
-      </div>`;
-  }
-
-  return entries.map(entry => {
-    const isEditing = editingEntryId === entry.id;
-    const time = entry.created_at ? entry.created_at.slice(11, 16) : "";
-    const title = entry.title || entry.content.slice(0, 30).replace(/\n/g, " ");
-    const preview = entry.content.slice(0, 80).replace(/\n/g, " ");
-
-    if (isEditing) {
-      return `
-        <div class="braindump-entry editing" data-id="${entry.id}">
-          <textarea class="braindump-textarea" id="bd-edit-textarea" rows="8">${escapeHTML(entry.content)}</textarea>
-          <div class="braindump-form-actions">
-            <button class="btn btn-outline btn-sm bd-close-edit-btn">閉じる</button>
-            <button class="btn btn-danger btn-sm bd-delete-btn" data-id="${entry.id}">削除</button>
-          </div>
-        </div>`;
-    }
-
-    return `
-      <div class="braindump-entry" data-id="${entry.id}">
-        <div class="braindump-entry-header">
-          <span class="braindump-entry-title">${escapeHTML(title)}</span>
-          <span class="braindump-entry-time">${time}</span>
-        </div>
-        <div class="braindump-entry-preview">${escapeHTML(preview)}${entry.content.length > 80 ? '...' : ''}</div>
       </div>`;
   }).join("");
 }
@@ -232,55 +182,57 @@ function attachEvents() {
   // 新規保存
   document.getElementById("bd-save-new-btn")?.addEventListener("click", saveNewEntry);
 
-  // 新規テキストエリアの自動保存（2秒間入力停止で発火）
-  document.getElementById("bd-new-textarea")?.addEventListener("input", () => {
-    if (newAutoSaveTimer) clearTimeout(newAutoSaveTimer);
-    newAutoSaveTimer = setTimeout(() => autoSaveNewEntry(), 2000);
-  });
+  // テキストエリアの自動保存（2秒間入力停止で発火 — 新規/既存メモ共通）
+  document.getElementById("bd-new-textarea")?.addEventListener("input", handleNewTextareaInput);
 
   // マークダウン要約ボタン
   document.getElementById("bd-summarize-btn")?.addEventListener("click", summarizeContent);
 
   // クリアボタン
   document.getElementById("bd-cancel-new-btn")?.addEventListener("click", () => {
-    newEntryId = null; // 新規エントリIDをリセット
-    document.getElementById("bd-new-textarea").value = "";
-    document.getElementById("bd-new-textarea")?.focus();
+    if (editingEntryId) {
+      resetToNewMode();
+    } else {
+      newEntryId = null;
+      document.getElementById("bd-new-textarea").value = "";
+      document.getElementById("bd-new-textarea")?.focus();
+    }
   });
 
-  // エントリクリック（展開/編集）
+  // エントリクリック → 左側テキストエリアに内容を読み込んで編集
   document.getElementById("bd-entries")?.addEventListener("click", (e) => {
     const entryEl = e.target.closest(".braindump-entry");
     if (!entryEl) return;
 
-    // 閉じるボタン
-    if (e.target.closest(".bd-close-edit-btn")) {
-      editingEntryId = null;
-      refreshEntries();
-      return;
-    }
+    const entryId = entryEl.dataset.id;
+    if (!entryId) return;
 
-    // 削除ボタン
-    if (e.target.closest(".bd-delete-btn")) {
-      const id = e.target.closest(".bd-delete-btn").dataset.id;
-      deleteEntry(id);
-      return;
-    }
+    // 対象エントリを recentEntries から探す
+    const entry = recentEntries.find(en => en.id === entryId);
+    if (!entry) return;
 
-    // 編集中でなければ展開
-    if (!entryEl.classList.contains("editing")) {
-      editingEntryId = entryEl.dataset.id;
-      refreshEntries();
-      // 自動保存設定
-      setTimeout(() => {
-        const textarea = document.getElementById("bd-edit-textarea");
-        if (textarea) {
-          textarea.addEventListener("input", () => scheduleAutoSave(entryEl.dataset.id));
-          textarea.focus();
-          textarea.setSelectionRange(textarea.value.length, textarea.value.length);
-        }
-      }, 50);
-    }
+    // 左側テキストエリアに内容を読み込み
+    const textarea = document.getElementById("bd-new-textarea");
+    if (!textarea) return;
+
+    textarea.value = entry.content;
+    editingEntryId = entryId;
+    newEntryId = null; // 新規メモのIDをリセット
+
+    // 右カラムの該当エントリにアクティブ表示
+    document.querySelectorAll(".braindump-entry").forEach(el => el.classList.remove("active"));
+    entryEl.classList.add("active");
+
+    // ヘッダーを編集モード表示に更新
+    updateHeaderForEditing(entry);
+
+    textarea.focus();
+    textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+
+    // 自動保存を既存メモ更新に切り替え
+    if (newAutoSaveTimer) clearTimeout(newAutoSaveTimer);
+    textarea.removeEventListener("input", handleNewTextareaInput);
+    textarea.addEventListener("input", handleNewTextareaInput);
   });
 
   // 日付ナビゲーション
@@ -299,6 +251,80 @@ function attachEvents() {
     const cal = document.getElementById("bd-calendar");
     cal.style.display = cal.style.display === "none" ? "block" : "none";
   });
+}
+
+// ===== ヘッダーモード切替 =====
+
+function updateHeaderForEditing(entry) {
+  const title = entry.title || entry.content.slice(0, 30).replace(/\n/g, " ");
+  const header = document.querySelector(".braindump-header");
+  if (!header) return;
+  header.innerHTML = `
+    <h2 class="braindump-title" style="font-size: 1rem;">編集中: ${escapeHTML(title)}</h2>
+    <button class="btn btn-outline btn-sm" id="bd-back-to-new-btn">＋ 新しいメモ</button>
+  `;
+  document.getElementById("bd-back-to-new-btn")?.addEventListener("click", resetToNewMode);
+}
+
+function resetToNewMode() {
+  editingEntryId = null;
+  newEntryId = null;
+  const textarea = document.getElementById("bd-new-textarea");
+  if (textarea) textarea.value = "";
+
+  // ヘッダーを元に戻す
+  const header = document.querySelector(".braindump-header");
+  if (header) {
+    header.innerHTML = `
+      <h2 class="braindump-title">ブレインダンプ</h2>
+      <button class="btn btn-primary btn-sm" id="bd-new-btn">＋ 新しいメモ</button>
+    `;
+    document.getElementById("bd-new-btn")?.addEventListener("click", () => {
+      document.getElementById("bd-new-textarea")?.focus();
+    });
+  }
+
+  // 右カラムのアクティブ表示を解除
+  document.querySelectorAll(".braindump-entry").forEach(el => el.classList.remove("active"));
+
+  textarea?.focus();
+}
+
+function handleNewTextareaInput() {
+  if (newAutoSaveTimer) clearTimeout(newAutoSaveTimer);
+  newAutoSaveTimer = setTimeout(() => {
+    if (editingEntryId) {
+      autoSaveExistingEntry(editingEntryId);
+    } else {
+      autoSaveNewEntry();
+    }
+  }, 2000);
+}
+
+async function autoSaveExistingEntry(entryId) {
+  const textarea = document.getElementById("bd-new-textarea");
+  if (!textarea) return;
+  const content = textarea.value.trim();
+  if (!content) return;
+
+  try {
+    const updated = await braindumpApi.update(entryId, content);
+    // recentEntries を更新
+    const idx = recentEntries.findIndex(e => e.id === entryId);
+    if (idx >= 0 && updated) {
+      recentEntries[idx] = updated;
+    }
+    // 右カラムの一覧を再描画（アクティブ状態を維持）
+    const container = document.getElementById("bd-entries");
+    if (container) {
+      container.innerHTML = renderRecentEntries();
+      // アクティブ状態を再適用
+      const activeEl = container.querySelector(`.braindump-entry[data-id="${entryId}"]`);
+      if (activeEl) activeEl.classList.add("active");
+    }
+  } catch {
+    // 自動保存失敗は静かに無視
+  }
 }
 
 // ===== CRUD操作 =====
@@ -320,9 +346,15 @@ async function summarizeContent() {
     const result = await braindumpApi.summarize(content);
     textarea.value = result.summary;
     textarea.focus();
-    // 自動保存タイマーをリセット
+    // 自動保存タイマーをリセット（編集中メモ対応）
     if (newAutoSaveTimer) clearTimeout(newAutoSaveTimer);
-    newAutoSaveTimer = setTimeout(() => autoSaveNewEntry(), 2000);
+    newAutoSaveTimer = setTimeout(() => {
+      if (editingEntryId) {
+        autoSaveExistingEntry(editingEntryId);
+      } else {
+        autoSaveNewEntry();
+      }
+    }, 2000);
   } catch (e) {
     showToast(`要約に失敗しました: ${e.message}`, "error");
   } finally {
@@ -337,15 +369,23 @@ async function saveNewEntry() {
   if (!content) return;
 
   try {
-    if (newEntryId) {
+    if (editingEntryId) {
+      // 既存メモの上書き保存
+      await braindumpApi.update(editingEntryId, content);
+      showToast("保存しました");
+      resetToNewMode();
+    } else if (newEntryId) {
       // 既に自動保存済みのエントリがあれば更新
       await braindumpApi.update(newEntryId, content);
+      newEntryId = null;
+      textarea.value = "";
+      textarea.focus();
     } else {
       await braindumpApi.create(currentDate, content);
+      newEntryId = null;
+      textarea.value = "";
+      textarea.focus();
     }
-    newEntryId = null;
-    textarea.value = "";
-    textarea.focus();
     entries = await braindumpApi.listByDate(currentDate) || [];
     refreshEntries();
     calendarEntryDates.add(currentDate);
@@ -380,30 +420,6 @@ async function autoSaveNewEntry() {
     refreshEntries();
   } catch {
     // 自動保存失敗は静かに無視
-  }
-}
-
-function scheduleAutoSave(entryId) {
-  if (autoSaveTimer) clearTimeout(autoSaveTimer);
-  autoSaveTimer = setTimeout(() => autoSaveEntry(entryId), 2000);
-}
-
-async function autoSaveEntry(entryId) {
-  const textarea = document.getElementById("bd-edit-textarea");
-  if (!textarea) return;
-
-  const content = textarea.value.trim();
-  if (!content) return;
-
-  try {
-    const updated = await braindumpApi.update(entryId, content);
-    // ローカルの entries を更新
-    const idx = entries.findIndex(e => e.id === entryId);
-    if (idx >= 0 && updated) {
-      entries[idx] = updated;
-    }
-  } catch (e) {
-    // 自動保存失敗は静かに無視（次回に再トライ）
   }
 }
 

@@ -5205,8 +5205,8 @@ main.swipe-enter-right {
   background: rgba(0, 212, 255, 0.04);
 }
 
-.braindump-entry.editing {
-  cursor: default;
+.braindump-entry.editing,
+.braindump-entry.active {
   border-color: var(--accent, #00d4ff);
   background: rgba(0, 212, 255, 0.06);
 }
@@ -5335,7 +5335,8 @@ main.swipe-enter-right {
   background: rgba(0, 120, 212, 0.04);
 }
 
-[data-theme="light"] .braindump-entry.editing {
+[data-theme="light"] .braindump-entry.editing,
+[data-theme="light"] .braindump-entry.active {
   border-color: #0078d4;
   background: rgba(0, 120, 212, 0.06);
 }
