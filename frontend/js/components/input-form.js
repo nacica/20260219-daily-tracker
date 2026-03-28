@@ -5,9 +5,9 @@
  * 朝のタスク整理（ソクラテス式問答）統合
  */
 
-import { recordsApi, analysisApi, morningDialogueApi, remindersApi } from "../api.js?v=20260326c";
-import { showToast } from "../app.js?v=20260326c";
-import { showTaskCompleteAnimation, buildTaskStatsCards } from "./task-stats.js?v=20260326c";
+import { recordsApi, analysisApi, morningDialogueApi, remindersApi, categoriesApi } from "../api.js?v=20260328a";
+import { showToast } from "../app.js?v=20260328a";
+import { showTaskCompleteAnimation, buildTaskStatsCards } from "./task-stats.js?v=20260328a";
 
 /* ── カテゴリ管理 ── */
 
@@ -24,6 +24,41 @@ function getCategories() {
 
 function saveCategories(categories) {
   localStorage.setItem(CATEGORY_STORAGE_KEY, JSON.stringify(categories));
+  // バックエンドにも同期（fire-and-forget）
+  categoriesApi.save(categories).catch(() => {});
+}
+
+/** バックエンドからカテゴリを取得してlocalStorageとドロップダウンを同期 */
+async function syncCategoriesFromServer() {
+  try {
+    const res = await categoriesApi.get();
+    const remote = res.categories || [];
+    if (remote.length > 0) {
+      // サーバー側にデータがある場合: ローカルとマージ（サーバー優先）
+      const local = getCategories();
+      const merged = [...remote];
+      // ローカルにしかないカテゴリも追加
+      for (const lc of local) {
+        if (!merged.some((rc) => rc.name === lc.name)) {
+          merged.push(lc);
+        }
+      }
+      localStorage.setItem(CATEGORY_STORAGE_KEY, JSON.stringify(merged));
+      // マージ結果をサーバーにも保存
+      if (merged.length !== remote.length) {
+        categoriesApi.save(merged).catch(() => {});
+      }
+    } else {
+      // サーバーが空でローカルにデータがある場合: ローカルをサーバーに送信
+      const local = getCategories();
+      if (local.length > 0) {
+        categoriesApi.save(local).catch(() => {});
+      }
+    }
+    refreshCategoryDropdowns();
+  } catch {
+    // オフラインなどの場合はローカルのみで動作
+  }
 }
 
 function getLastCategory() {
@@ -266,6 +301,7 @@ export async function renderInputForm(date) {
     recordsApi.get(date),
     morningDialogueApi.get(date),
     syncRemindersFromServer(),
+    syncCategoriesFromServer(),
   ]);
 
   if (recordResult.status === "fulfilled") existingRecord = recordResult.value;

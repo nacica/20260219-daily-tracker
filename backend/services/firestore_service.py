@@ -562,3 +562,22 @@ def save_reminders(items: list[dict]) -> list[dict]:
     db = get_db()
     db.collection("reminders").document("global").set({"items": items})
     return items
+
+
+# ---- categories (タスクカテゴリ) ----
+
+def get_categories() -> list[dict]:
+    """カテゴリ一覧を取得"""
+    db = get_db()
+    doc = db.collection("categories").document("global").get()
+    if doc.exists:
+        data = doc.to_dict()
+        return data.get("categories", [])
+    return []
+
+
+def save_categories(categories: list[dict]) -> list[dict]:
+    """カテゴリ一覧を保存（全件上書き）"""
+    db = get_db()
+    db.collection("categories").document("global").set({"categories": categories})
+    return categories

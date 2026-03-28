@@ -313,6 +313,17 @@ export const braindumpApi = {
     apiFetch("/braindump/summarize", { method: "POST", body: { date: "2000-01-01", content } }),
 };
 
+// ---- カテゴリ ----
+
+export const categoriesApi = {
+  /** カテゴリ一覧を取得 */
+  get: () => apiFetch("/categories"),
+
+  /** カテゴリ一覧を保存（全件上書き） */
+  save: (categories) =>
+    apiFetch("/categories", { method: "PUT", body: { categories } }),
+};
+
 // ---- リマインダー（今日意識すること） ----
 
 export const remindersApi = {
