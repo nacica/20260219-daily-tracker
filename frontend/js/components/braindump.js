@@ -4,8 +4,8 @@
  * 日付切替（前日/翌日 + カレンダー）、自動保存、AIタイトル自動生成。
  */
 
-import { braindumpApi } from "../api.js?v=20260329h";
-import { showToast } from "../app.js?v=20260329h";
+import { braindumpApi } from "../api.js?v=20260329i";
+import { showToast } from "../app.js?v=20260329i";
 
 // ===== ユーティリティ =====
 
@@ -111,6 +111,7 @@ export async function renderBraindump(date) {
         <div class="braindump-new-form" id="bd-new-form">
           <textarea class="braindump-textarea" id="bd-new-textarea" placeholder="思いついたことを自由に書き出してください..." rows="18"></textarea>
           <div class="braindump-form-actions">
+            <button class="btn btn-danger btn-sm" id="bd-delete-btn" style="display: none;">🗑 削除</button>
             <button class="btn btn-outline btn-sm" id="bd-summarize-btn">📝 MD要約</button>
             <button class="btn btn-primary btn-sm" id="bd-save-new-btn">保存</button>
             <button class="btn btn-outline btn-sm" id="bd-cancel-new-btn">クリア</button>
@@ -221,6 +222,16 @@ function attachEvents() {
   // マークダウン要約ボタン
   document.getElementById("bd-summarize-btn")?.addEventListener("click", summarizeContent);
 
+  // フォーム内の削除ボタン
+  document.getElementById("bd-delete-btn")?.addEventListener("click", async () => {
+    const targetId = editingEntryId || newEntryId;
+    if (!targetId) return;
+    if (!confirm("このメモを削除しますか？")) return;
+    await deleteEntry(targetId);
+    resetToNewMode();
+    showToast("削除しました");
+  });
+
   // クリアボタン
   document.getElementById("bd-cancel-new-btn")?.addEventListener("click", () => {
     if (editingEntryId) {
@@ -316,20 +327,13 @@ function updateHeaderForEditing(entry) {
   if (!header) return;
   header.innerHTML = `
     <h2 class="braindump-title" style="font-size: 1rem;">編集中: ${escapeHTML(title)}</h2>
-    <div style="display: flex; gap: 8px;">
-      <button class="btn btn-danger btn-sm" id="bd-delete-editing-btn">🗑 削除</button>
-      <button class="btn btn-outline btn-sm" id="bd-back-to-new-btn">＋ 新しいメモ</button>
-    </div>
+    <button class="btn btn-outline btn-sm" id="bd-back-to-new-btn">＋ 新しいメモ</button>
   `;
   document.getElementById("bd-back-to-new-btn")?.addEventListener("click", resetToNewMode);
-  document.getElementById("bd-delete-editing-btn")?.addEventListener("click", async () => {
-    if (!editingEntryId) return;
-    if (!confirm("このメモを削除しますか？")) return;
-    const id = editingEntryId;
-    await deleteEntry(id);
-    resetToNewMode();
-    showToast("削除しました");
-  });
+
+  // フォーム内の削除ボタンを表示
+  const deleteBtn = document.getElementById("bd-delete-btn");
+  if (deleteBtn) deleteBtn.style.display = "";
 }
 
 function resetToNewMode() {
@@ -351,6 +355,10 @@ function resetToNewMode() {
       document.getElementById("bd-new-textarea")?.focus();
     });
   }
+
+  // フォーム内の削除ボタンを非表示
+  const deleteBtn = document.getElementById("bd-delete-btn");
+  if (deleteBtn) deleteBtn.style.display = "none";
 
   // 右カラムのアクティブ表示を解除
   document.querySelectorAll(".braindump-entry").forEach(el => el.classList.remove("active"));
