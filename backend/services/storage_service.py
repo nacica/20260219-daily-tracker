@@ -9,7 +9,13 @@ from firebase_admin import storage
 
 
 def get_bucket():
-    """Cloud Storage バケットを返す"""
+    """Cloud Storage バケットを返す（Firebase 未初期化なら初期化する）"""
+    if not firebase_admin._apps:
+        project_id = os.getenv("GOOGLE_CLOUD_PROJECT")
+        if project_id:
+            firebase_admin.initialize_app(options={"projectId": project_id})
+        else:
+            firebase_admin.initialize_app()
     bucket_name = os.getenv("CLOUD_STORAGE_BUCKET")
     return storage.bucket(bucket_name)
 
