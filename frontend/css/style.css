@@ -5230,6 +5230,48 @@ main.swipe-enter-right {
   flex-shrink: 0;
 }
 
+.braindump-entry-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.braindump-entry-delete {
+  display: none;
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: rgba(255, 51, 102, 0.15);
+  color: var(--neon-red, #ff3366);
+  border-radius: 4px;
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.braindump-entry:hover .braindump-entry-delete {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.braindump-entry-delete:hover {
+  background: rgba(255, 51, 102, 0.35);
+}
+
+.btn-danger {
+  background: rgba(255, 51, 102, 0.2);
+  color: var(--neon-red, #ff3366);
+  border: 1px solid rgba(255, 51, 102, 0.3);
+}
+
+.btn-danger:hover {
+  background: rgba(255, 51, 102, 0.35);
+  border-color: rgba(255, 51, 102, 0.5);
+}
+
 .braindump-entry-preview {
   font-size: 0.85rem;
   color: var(--text-secondary, rgba(255, 255, 255, 0.6));
@@ -5349,6 +5391,26 @@ main.swipe-enter-right {
   color: rgba(0, 0, 0, 0.55);
   border-bottom-color: rgba(0, 0, 0, 0.1);
   background: var(--bg-primary, #f5f6fa);
+}
+
+[data-theme="light"] .braindump-entry-delete {
+  background: rgba(220, 38, 38, 0.1);
+  color: #dc2626;
+}
+
+[data-theme="light"] .braindump-entry-delete:hover {
+  background: rgba(220, 38, 38, 0.25);
+}
+
+[data-theme="light"] .btn-danger {
+  background: rgba(220, 38, 38, 0.1);
+  color: #dc2626;
+  border-color: rgba(220, 38, 38, 0.3);
+}
+
+[data-theme="light"] .btn-danger:hover {
+  background: rgba(220, 38, 38, 0.2);
+  border-color: rgba(220, 38, 38, 0.5);
 }
 
 /* 画像プレビュー */

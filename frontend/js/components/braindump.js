@@ -4,8 +4,8 @@
  * 日付切替（前日/翌日 + カレンダー）、自動保存、AIタイトル自動生成。
  */
 
-import { braindumpApi } from "../api.js?v=20260329g";
-import { showToast } from "../app.js?v=20260329g";
+import { braindumpApi } from "../api.js?v=20260329h";
+import { showToast } from "../app.js?v=20260329h";
 
 // ===== ユーティリティ =====
 
@@ -177,7 +177,10 @@ function renderRecentEntries() {
         <div class="braindump-entry" data-id="${entry.id}" style="cursor: pointer;">
           <div class="braindump-entry-header">
             <span class="braindump-entry-title">${escapeHTML(title)}</span>
-            <span class="braindump-entry-time">${time}</span>
+            <div class="braindump-entry-actions">
+              <span class="braindump-entry-time">${time}</span>
+              <button class="braindump-entry-delete" data-id="${entry.id}" title="削除">×</button>
+            </div>
           </div>
           <div class="braindump-entry-preview">${escapeHTML(preview)}${entry.content.length > 80 ? '...' : ''}</div>
         </div>`;
@@ -228,6 +231,23 @@ function attachEvents() {
       renderImagePreview();
       document.getElementById("bd-new-textarea").value = "";
       document.getElementById("bd-new-textarea")?.focus();
+    }
+  });
+
+  // エントリ削除ボタン
+  document.getElementById("bd-entries")?.addEventListener("click", async (e) => {
+    const deleteBtn = e.target.closest(".braindump-entry-delete");
+    if (deleteBtn) {
+      e.stopPropagation();
+      const entryId = deleteBtn.dataset.id;
+      if (!entryId) return;
+      if (!confirm("このメモを削除しますか？")) return;
+      await deleteEntry(entryId);
+      if (editingEntryId === entryId) {
+        resetToNewMode();
+      }
+      showToast("削除しました");
+      return;
     }
   });
 
@@ -296,9 +316,20 @@ function updateHeaderForEditing(entry) {
   if (!header) return;
   header.innerHTML = `
     <h2 class="braindump-title" style="font-size: 1rem;">編集中: ${escapeHTML(title)}</h2>
-    <button class="btn btn-outline btn-sm" id="bd-back-to-new-btn">＋ 新しいメモ</button>
+    <div style="display: flex; gap: 8px;">
+      <button class="btn btn-danger btn-sm" id="bd-delete-editing-btn">🗑 削除</button>
+      <button class="btn btn-outline btn-sm" id="bd-back-to-new-btn">＋ 新しいメモ</button>
+    </div>
   `;
   document.getElementById("bd-back-to-new-btn")?.addEventListener("click", resetToNewMode);
+  document.getElementById("bd-delete-editing-btn")?.addEventListener("click", async () => {
+    if (!editingEntryId) return;
+    if (!confirm("このメモを削除しますか？")) return;
+    const id = editingEntryId;
+    await deleteEntry(id);
+    resetToNewMode();
+    showToast("削除しました");
+  });
 }
 
 function resetToNewMode() {
