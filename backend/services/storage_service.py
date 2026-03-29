@@ -36,6 +36,32 @@ def upload_screenshot(date: str, image_bytes: bytes, content_type: str = "image/
     return f"gs://{bucket_name}/{blob_name}"
 
 
+def upload_braindump_image(image_bytes: bytes, content_type: str = "image/png") -> str:
+    """
+    ブレインダンプの貼り付け画像を Cloud Storage にアップロードする
+
+    Args:
+        image_bytes: 画像のバイト列
+        content_type: MIME タイプ
+
+    Returns:
+        公開 URL
+    """
+    import uuid
+    from datetime import datetime
+
+    bucket = get_bucket()
+    ext = content_type.split("/")[-1]  # jpeg / png
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    unique_id = uuid.uuid4().hex[:8]
+    blob_name = f"braindump-images/{timestamp}_{unique_id}.{ext}"
+    blob = bucket.blob(blob_name)
+    blob.upload_from_string(image_bytes, content_type=content_type)
+    blob.make_public()
+
+    return blob.public_url
+
+
 def get_screenshot_url(date: str, expiration_seconds: int = 3600) -> str | None:
     """
     指定日のスクリーンショットの署名付き URL を返す（存在しない場合は None）

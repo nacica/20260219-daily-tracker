@@ -12,13 +12,15 @@ DELETE /api/v1/braindump/entry/{entry_id}         - メモ削除
 POST   /api/v1/braindump/entry/{entry_id}/generate-title - AIタイトル生成
 """
 
-from fastapi import APIRouter, HTTPException, Query, Response, BackgroundTasks
+import os
+
+from fastapi import APIRouter, HTTPException, Query, Response, BackgroundTasks, UploadFile, File
 from typing import Optional
 
 from models.braindump_schemas import (
     BraindumpCreate, BraindumpUpdate, BraindumpEntry,
 )
-from services import firestore_service, claude_service
+from services import firestore_service, claude_service, storage_service
 from utils.helpers import now_jst
 
 router = APIRouter()
@@ -127,6 +129,35 @@ async def delete_braindump_entry(entry_id: str):
     deleted = firestore_service.delete_braindump(entry_id)
     if not deleted:
         raise HTTPException(status_code=404, detail=f"{entry_id} のメモが見つかりません")
+
+
+ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/jpg", "image/png", "image/webp", "image/gif"}
+MAX_IMAGE_SIZE = 10 * 1024 * 1024  # 10 MB
+
+
+@router.post("/braindump/upload-image")
+async def upload_braindump_image(file: UploadFile = File(...)):
+    """ブレインダンプに貼り付けた画像をアップロードする"""
+    if not os.getenv("CLOUD_STORAGE_BUCKET"):
+        raise HTTPException(status_code=503, detail="Cloud Storage が設定されていません")
+
+    content_type = file.content_type or "image/png"
+    if content_type not in ALLOWED_IMAGE_TYPES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"サポートされていない画像形式です: {content_type}",
+        )
+
+    image_bytes = await file.read()
+    if len(image_bytes) > MAX_IMAGE_SIZE:
+        raise HTTPException(status_code=413, detail="ファイルサイズが大きすぎます（上限 10MB）")
+
+    try:
+        url = storage_service.upload_braindump_image(image_bytes, content_type)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"画像のアップロードに失敗しました: {str(e)[:200]}")
+
+    return {"url": url}
 
 
 @router.post("/braindump/summarize")

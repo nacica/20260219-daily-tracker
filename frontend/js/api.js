@@ -311,6 +311,20 @@ export const braindumpApi = {
   /** マークダウン要約 */
   summarize: (content) =>
     apiFetch("/braindump/summarize", { method: "POST", body: { date: "2000-01-01", content } }),
+
+  /** 画像アップロード（FormData を使うため apiFetch を経由しない） */
+  uploadImage: async (file) => {
+    const url = `${API_BASE}/braindump/upload-image`;
+    const formData = new FormData();
+    formData.append("file", file);
+    const res = await fetch(url, { method: "POST", body: formData });
+    if (!res.ok) {
+      let message = `HTTP ${res.status}`;
+      try { const d = await res.json(); if (d.detail) message = d.detail; } catch {}
+      throw new Error(message);
+    }
+    return res.json();
+  },
 };
 
 // ---- カテゴリ ----

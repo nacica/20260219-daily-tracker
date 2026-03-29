@@ -4,8 +4,8 @@
  * 日付切替（前日/翌日 + カレンダー）、自動保存、AIタイトル自動生成。
  */
 
-import { braindumpApi } from "../api.js?v=20260326c";
-import { showToast } from "../app.js?v=20260326c";
+import { braindumpApi } from "../api.js?v=20260329a";
+import { showToast } from "../app.js?v=20260329a";
 
 // ===== ユーティリティ =====
 
@@ -185,6 +185,9 @@ function attachEvents() {
   // テキストエリアの自動保存（2秒間入力停止で発火 — 新規/既存メモ共通）
   document.getElementById("bd-new-textarea")?.addEventListener("input", handleNewTextareaInput);
 
+  // クリップボード画像の貼り付け対応
+  document.getElementById("bd-new-textarea")?.addEventListener("paste", handlePasteImage);
+
   // マークダウン要約ボタン
   document.getElementById("bd-summarize-btn")?.addEventListener("click", summarizeContent);
 
@@ -218,6 +221,7 @@ function attachEvents() {
     textarea.value = entry.content;
     editingEntryId = entryId;
     newEntryId = null; // 新規メモのIDをリセット
+    updateImagePreview(entry.content);
 
     // 右カラムの該当エントリにアクティブ表示
     document.querySelectorAll(".braindump-entry").forEach(el => el.classList.remove("active"));
@@ -271,6 +275,7 @@ function resetToNewMode() {
   newEntryId = null;
   const textarea = document.getElementById("bd-new-textarea");
   if (textarea) textarea.value = "";
+  updateImagePreview("");
 
   // ヘッダーを元に戻す
   const header = document.querySelector(".braindump-header");
@@ -450,6 +455,121 @@ async function refreshEntries() {
     container.innerHTML = renderRecentEntries();
   }
 }
+
+// ===== クリップボード画像貼り付け =====
+
+async function handlePasteImage(e) {
+  const items = e.clipboardData?.items;
+  if (!items) return;
+
+  for (const item of items) {
+    if (!item.type.startsWith("image/")) continue;
+
+    e.preventDefault();
+    const file = item.getAsFile();
+    if (!file) return;
+
+    const textarea = document.getElementById("bd-new-textarea");
+    if (!textarea) return;
+
+    // カーソル位置を保存
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const before = textarea.value.substring(0, start);
+    const after = textarea.value.substring(end);
+
+    // アップロード中のプレースホルダーを挿入
+    const placeholder = `\n![アップロード中...]()\n`;
+    textarea.value = before + placeholder + after;
+    textarea.selectionStart = textarea.selectionEnd = start + placeholder.length;
+
+    // プレビューエリアに一時表示
+    const tempUrl = URL.createObjectURL(file);
+    updateImagePreview(before + `\n![画像](${tempUrl})\n` + after);
+
+    try {
+      const result = await braindumpApi.uploadImage(file);
+      const markdownImg = `\n![画像](${result.url})\n`;
+      // プレースホルダーを実際の URL に置換
+      textarea.value = textarea.value.replace(placeholder, markdownImg);
+      updateImagePreview(textarea.value);
+      // 自動保存をトリガー
+      handleNewTextareaInput();
+      showToast("画像を貼り付けました");
+    } catch (err) {
+      // アップロード失敗時はプレースホルダーを除去
+      textarea.value = textarea.value.replace(placeholder, "");
+      updateImagePreview(textarea.value);
+      showToast(`画像アップロードに失敗しました: ${err.message}`, "error");
+    }
+
+    URL.revokeObjectURL(tempUrl);
+    return; // 最初の画像のみ処理
+  }
+}
+
+function updateImagePreview(content) {
+  let container = document.getElementById("bd-image-preview");
+  if (!container) {
+    // プレビューエリアが無ければ作成してテキストエリアの後に挿入
+    const form = document.getElementById("bd-new-form");
+    if (!form) return;
+    container = document.createElement("div");
+    container.id = "bd-image-preview";
+    container.className = "braindump-image-preview";
+    // テキストエリアとボタンの間に挿入
+    const actions = form.querySelector(".braindump-form-actions");
+    if (actions) {
+      form.insertBefore(container, actions);
+    } else {
+      form.appendChild(container);
+    }
+  }
+
+  // content 内の ![...](url) パターンから画像 URL を抽出
+  const imgRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;
+  const images = [];
+  let match;
+  while ((match = imgRegex.exec(content)) !== null) {
+    if (match[2]) images.push({ alt: match[1], url: match[2] });
+  }
+
+  if (images.length === 0) {
+    container.innerHTML = "";
+    container.style.display = "none";
+    return;
+  }
+
+  container.style.display = "flex";
+  container.innerHTML = images.map((img, i) => `
+    <div class="braindump-image-thumb" data-index="${i}">
+      <img src="${escapeHTML(img.url)}" alt="${escapeHTML(img.alt)}" loading="lazy" />
+      <button class="braindump-image-remove" data-url="${escapeHTML(img.url)}" title="画像を削除">×</button>
+    </div>
+  `).join("");
+
+  // 削除ボタン
+  container.querySelectorAll(".braindump-image-remove").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const url = btn.dataset.url;
+      const textarea = document.getElementById("bd-new-textarea");
+      if (!textarea) return;
+      // マークダウン画像記法を除去
+      const imgPattern = new RegExp(`\\n?!\\[[^\\]]*\\]\\(${url.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\)\\n?`, "g");
+      textarea.value = textarea.value.replace(imgPattern, "\n");
+      updateImagePreview(textarea.value);
+      handleNewTextareaInput();
+    });
+  });
+
+  // サムネイルクリックでフルサイズ表示
+  container.querySelectorAll(".braindump-image-thumb img").forEach(img => {
+    img.addEventListener("click", () => {
+      window.open(img.src, "_blank");
+    });
+  });
+}
+
 
 // ===== カレンダー =====
 
