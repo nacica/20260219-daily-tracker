@@ -4,8 +4,8 @@
  * 日付切替（前日/翌日 + カレンダー）、自動保存、AIタイトル自動生成。
  */
 
-import { braindumpApi } from "../api.js?v=20260329f";
-import { showToast } from "../app.js?v=20260329f";
+import { braindumpApi } from "../api.js?v=20260329g";
+import { showToast } from "../app.js?v=20260329g";
 
 // ===== ユーティリティ =====
 
@@ -52,6 +52,32 @@ let editingEntryId = null;
 let newAutoSaveTimer = null;
 let newEntryId = null; // 新規メモが自動保存された後のエントリID
 let calendarEntryDates = new Set();
+let currentImages = []; // テキストとは別に管理する添付画像URLリスト
+
+// ===== 画像とテキストの分離・結合ユーティリティ =====
+
+const IMG_REGEX = /\n?!\[[^\]]*\]\([^)]+\)\n?/g;
+
+/** content から画像マークダウンを抽出し、テキスト部分と画像URLリストに分離する */
+function splitContentAndImages(content) {
+  const images = [];
+  const imgMatchRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;
+  let m;
+  while ((m = imgMatchRegex.exec(content)) !== null) {
+    if (m[2]) images.push(m[2]);
+  }
+  const text = content.replace(IMG_REGEX, "\n").replace(/^\n+|\n+$/g, "");
+  return { text, images };
+}
+
+/** テキストと画像URLリストを結合して保存用 content を生成する */
+function buildContent(text, images) {
+  let content = text.trim();
+  if (images.length > 0) {
+    content += "\n" + images.map(url => `![画像](${url})`).join("\n");
+  }
+  return content;
+}
 
 // ===== メインレンダー =====
 
@@ -143,8 +169,9 @@ function renderRecentEntries() {
 
     const entriesHTML = dateEntries.map(entry => {
       const time = entry.created_at ? entry.created_at.slice(11, 16) : "";
-      const title = entry.title || entry.content.slice(0, 30).replace(/\n/g, " ");
-      const preview = entry.content.slice(0, 80).replace(/\n/g, " ");
+      const cleanContent = entry.content.replace(IMG_REGEX, " ").trim();
+      const title = entry.title || cleanContent.slice(0, 30).replace(/\n/g, " ");
+      const preview = cleanContent.slice(0, 80).replace(/\n/g, " ");
 
       return `
         <div class="braindump-entry" data-id="${entry.id}" style="cursor: pointer;">
@@ -197,6 +224,8 @@ function attachEvents() {
       resetToNewMode();
     } else {
       newEntryId = null;
+      currentImages = [];
+      renderImagePreview();
       document.getElementById("bd-new-textarea").value = "";
       document.getElementById("bd-new-textarea")?.focus();
     }
@@ -218,10 +247,12 @@ function attachEvents() {
     const textarea = document.getElementById("bd-new-textarea");
     if (!textarea) return;
 
-    textarea.value = entry.content;
+    const { text, images } = splitContentAndImages(entry.content);
+    textarea.value = text;
+    currentImages = images;
     editingEntryId = entryId;
     newEntryId = null; // 新規メモのIDをリセット
-    updateImagePreview(entry.content);
+    renderImagePreview();
 
     // 右カラムの該当エントリにアクティブ表示
     document.querySelectorAll(".braindump-entry").forEach(el => el.classList.remove("active"));
@@ -275,7 +306,8 @@ function resetToNewMode() {
   newEntryId = null;
   const textarea = document.getElementById("bd-new-textarea");
   if (textarea) textarea.value = "";
-  updateImagePreview("");
+  currentImages = [];
+  renderImagePreview();
 
   // ヘッダーを元に戻す
   const header = document.querySelector(".braindump-header");
@@ -309,7 +341,7 @@ function handleNewTextareaInput() {
 async function autoSaveExistingEntry(entryId) {
   const textarea = document.getElementById("bd-new-textarea");
   if (!textarea) return;
-  const content = textarea.value.trim();
+  const content = buildContent(textarea.value, currentImages);
   if (!content) return;
 
   try {
@@ -370,7 +402,7 @@ async function summarizeContent() {
 
 async function saveNewEntry() {
   const textarea = document.getElementById("bd-new-textarea");
-  const content = textarea.value.trim();
+  const content = buildContent(textarea.value, currentImages);
   if (!content) return;
 
   try {
@@ -383,11 +415,15 @@ async function saveNewEntry() {
       // 既に自動保存済みのエントリがあれば更新
       await braindumpApi.update(newEntryId, content);
       newEntryId = null;
+      currentImages = [];
+      renderImagePreview();
       textarea.value = "";
       textarea.focus();
     } else {
       await braindumpApi.create(currentDate, content);
       newEntryId = null;
+      currentImages = [];
+      renderImagePreview();
       textarea.value = "";
       textarea.focus();
     }
@@ -404,7 +440,7 @@ async function autoSaveNewEntry() {
   const textarea = document.getElementById("bd-new-textarea");
   if (!textarea) return;
 
-  const content = textarea.value.trim();
+  const content = buildContent(textarea.value, currentImages);
   if (!content) return;
 
   try {
@@ -488,28 +524,18 @@ async function handlePasteImage(e) {
   const textarea = document.getElementById("bd-new-textarea");
   if (!textarea) return;
 
-  // カーソル位置を保存
-  const start = textarea.selectionStart;
-  const end = textarea.selectionEnd;
-  const before = textarea.value.substring(0, start);
-  const after = textarea.value.substring(end);
-
-  // アップロード中のプレースホルダーを挿入
-  const placeholder = `\n![アップロード中...]()\n`;
-  textarea.value = before + placeholder + after;
-  textarea.selectionStart = textarea.selectionEnd = start + placeholder.length;
-
   // プレビューエリアに一時表示
   const tempUrl = URL.createObjectURL(file);
-  updateImagePreview(before + `\n![画像](${tempUrl})\n` + after);
+  currentImages.push(tempUrl);
+  renderImagePreview();
 
   try {
     const result = await braindumpApi.uploadImage(file);
-    const markdownImg = `\n![画像](${result.url})\n`;
-    // プレースホルダーを実際の URL に置換
-    textarea.value = textarea.value.replace(placeholder, markdownImg);
-    updateImagePreview(textarea.value);
-    // 画像挿入後は即座に保存（2秒タイマーだと別エントリに切り替え時にキャンセルされ画像が失われる）
+    // 一時URLを実際のURLに差し替え
+    const idx = currentImages.indexOf(tempUrl);
+    if (idx >= 0) currentImages[idx] = result.url;
+    renderImagePreview();
+    // 即座に保存
     if (editingEntryId) {
       await autoSaveExistingEntry(editingEntryId);
     } else {
@@ -517,25 +543,24 @@ async function handlePasteImage(e) {
     }
     showToast("画像を貼り付けました");
   } catch (err) {
-    // アップロード失敗時はプレースホルダーを除去
-    textarea.value = textarea.value.replace(placeholder, "");
-    updateImagePreview(textarea.value);
+    // アップロード失敗時は一時URLを除去
+    const idx = currentImages.indexOf(tempUrl);
+    if (idx >= 0) currentImages.splice(idx, 1);
+    renderImagePreview();
     showToast(`画像アップロードに失敗しました: ${err.message}`, "error");
   }
 
   URL.revokeObjectURL(tempUrl);
 }
 
-function updateImagePreview(content) {
+function renderImagePreview() {
   let container = document.getElementById("bd-image-preview");
   if (!container) {
-    // プレビューエリアが無ければ作成してテキストエリアの後に挿入
     const form = document.getElementById("bd-new-form");
     if (!form) return;
     container = document.createElement("div");
     container.id = "bd-image-preview";
     container.className = "braindump-image-preview";
-    // テキストエリアとボタンの間に挿入
     const actions = form.querySelector(".braindump-form-actions");
     if (actions) {
       form.insertBefore(container, actions);
@@ -544,39 +569,32 @@ function updateImagePreview(content) {
     }
   }
 
-  // content 内の ![...](url) パターンから画像 URL を抽出
-  const imgRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;
-  const images = [];
-  let match;
-  while ((match = imgRegex.exec(content)) !== null) {
-    if (match[2]) images.push({ alt: match[1], url: match[2] });
-  }
-
-  if (images.length === 0) {
+  if (currentImages.length === 0) {
     container.innerHTML = "";
     container.style.display = "none";
     return;
   }
 
   container.style.display = "flex";
-  container.innerHTML = images.map((img, i) => `
+  container.innerHTML = currentImages.map((url, i) => `
     <div class="braindump-image-thumb" data-index="${i}">
-      <img src="${escapeHTML(img.url)}" alt="${escapeHTML(img.alt)}" loading="lazy" />
-      <button class="braindump-image-remove" data-url="${escapeHTML(img.url)}" title="画像を削除">×</button>
+      <img src="${escapeHTML(url)}" alt="添付画像" loading="lazy" />
+      <button class="braindump-image-remove" data-index="${i}" title="画像を削除">×</button>
     </div>
   `).join("");
 
   // 削除ボタン
   container.querySelectorAll(".braindump-image-remove").forEach(btn => {
     btn.addEventListener("click", () => {
-      const url = btn.dataset.url;
-      const textarea = document.getElementById("bd-new-textarea");
-      if (!textarea) return;
-      // マークダウン画像記法を除去
-      const imgPattern = new RegExp(`\\n?!\\[[^\\]]*\\]\\(${url.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\)\\n?`, "g");
-      textarea.value = textarea.value.replace(imgPattern, "\n");
-      updateImagePreview(textarea.value);
-      handleNewTextareaInput();
+      const idx = parseInt(btn.dataset.index);
+      currentImages.splice(idx, 1);
+      renderImagePreview();
+      // 即座に保存して反映
+      if (editingEntryId) {
+        autoSaveExistingEntry(editingEntryId);
+      } else if (newEntryId) {
+        autoSaveNewEntry();
+      }
     });
   });
 
