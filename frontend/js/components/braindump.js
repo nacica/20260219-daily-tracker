@@ -4,8 +4,8 @@
  * 日付切替（前日/翌日 + カレンダー）、自動保存、AIタイトル自動生成。
  */
 
-import { braindumpApi } from "../api.js?v=20260329a";
-import { showToast } from "../app.js?v=20260329a";
+import { braindumpApi } from "../api.js?v=20260329b";
+import { showToast } from "../app.js?v=20260329b";
 
 // ===== ユーティリティ =====
 
@@ -459,53 +459,67 @@ async function refreshEntries() {
 // ===== クリップボード画像貼り付け =====
 
 async function handlePasteImage(e) {
-  const items = e.clipboardData?.items;
-  if (!items) return;
+  const clipboardData = e.clipboardData;
+  if (!clipboardData) return;
 
-  for (const item of items) {
-    if (!item.type.startsWith("image/")) continue;
-
-    e.preventDefault();
-    const file = item.getAsFile();
-    if (!file) return;
-
-    const textarea = document.getElementById("bd-new-textarea");
-    if (!textarea) return;
-
-    // カーソル位置を保存
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const before = textarea.value.substring(0, start);
-    const after = textarea.value.substring(end);
-
-    // アップロード中のプレースホルダーを挿入
-    const placeholder = `\n![アップロード中...]()\n`;
-    textarea.value = before + placeholder + after;
-    textarea.selectionStart = textarea.selectionEnd = start + placeholder.length;
-
-    // プレビューエリアに一時表示
-    const tempUrl = URL.createObjectURL(file);
-    updateImagePreview(before + `\n![画像](${tempUrl})\n` + after);
-
-    try {
-      const result = await braindumpApi.uploadImage(file);
-      const markdownImg = `\n![画像](${result.url})\n`;
-      // プレースホルダーを実際の URL に置換
-      textarea.value = textarea.value.replace(placeholder, markdownImg);
-      updateImagePreview(textarea.value);
-      // 自動保存をトリガー
-      handleNewTextareaInput();
-      showToast("画像を貼り付けました");
-    } catch (err) {
-      // アップロード失敗時はプレースホルダーを除去
-      textarea.value = textarea.value.replace(placeholder, "");
-      updateImagePreview(textarea.value);
-      showToast(`画像アップロードに失敗しました: ${err.message}`, "error");
+  // 1) clipboardData.files で画像を探す（最も互換性が高い）
+  let file = null;
+  for (let i = 0; i < clipboardData.files.length; i++) {
+    if (clipboardData.files[i].type.startsWith("image/")) {
+      file = clipboardData.files[i];
+      break;
     }
-
-    URL.revokeObjectURL(tempUrl);
-    return; // 最初の画像のみ処理
   }
+  // 2) files になければ items をインデックスで走査（for...of は DataTransferItemList 非対応環境がある）
+  if (!file && clipboardData.items) {
+    for (let i = 0; i < clipboardData.items.length; i++) {
+      const item = clipboardData.items[i];
+      if (item.kind === "file" && item.type.startsWith("image/")) {
+        file = item.getAsFile();
+        break;
+      }
+    }
+  }
+
+  if (!file) return;
+
+  e.preventDefault();
+
+  const textarea = document.getElementById("bd-new-textarea");
+  if (!textarea) return;
+
+  // カーソル位置を保存
+  const start = textarea.selectionStart;
+  const end = textarea.selectionEnd;
+  const before = textarea.value.substring(0, start);
+  const after = textarea.value.substring(end);
+
+  // アップロード中のプレースホルダーを挿入
+  const placeholder = `\n![アップロード中...]()\n`;
+  textarea.value = before + placeholder + after;
+  textarea.selectionStart = textarea.selectionEnd = start + placeholder.length;
+
+  // プレビューエリアに一時表示
+  const tempUrl = URL.createObjectURL(file);
+  updateImagePreview(before + `\n![画像](${tempUrl})\n` + after);
+
+  try {
+    const result = await braindumpApi.uploadImage(file);
+    const markdownImg = `\n![画像](${result.url})\n`;
+    // プレースホルダーを実際の URL に置換
+    textarea.value = textarea.value.replace(placeholder, markdownImg);
+    updateImagePreview(textarea.value);
+    // 自動保存をトリガー
+    handleNewTextareaInput();
+    showToast("画像を貼り付けました");
+  } catch (err) {
+    // アップロード失敗時はプレースホルダーを除去
+    textarea.value = textarea.value.replace(placeholder, "");
+    updateImagePreview(textarea.value);
+    showToast(`画像アップロードに失敗しました: ${err.message}`, "error");
+  }
+
+  URL.revokeObjectURL(tempUrl);
 }
 
 function updateImagePreview(content) {
