@@ -45,10 +45,10 @@ def upload_braindump_image(image_bytes: bytes, content_type: str = "image/png") 
         content_type: MIME タイプ
 
     Returns:
-        公開 URL
+        署名付き URL（7日間有効）
     """
     import uuid
-    from datetime import datetime
+    from datetime import datetime, timedelta
 
     bucket = get_bucket()
     ext = content_type.split("/")[-1]  # jpeg / png
@@ -57,9 +57,10 @@ def upload_braindump_image(image_bytes: bytes, content_type: str = "image/png") 
     blob_name = f"braindump-images/{timestamp}_{unique_id}.{ext}"
     blob = bucket.blob(blob_name)
     blob.upload_from_string(image_bytes, content_type=content_type)
-    blob.make_public()
 
-    return blob.public_url
+    # 署名付き URL を返す（7日間有効 = GCS の最大値）
+    url = blob.generate_signed_url(expiration=timedelta(days=7))
+    return url
 
 
 def get_screenshot_url(date: str, expiration_seconds: int = 3600) -> str | None:
