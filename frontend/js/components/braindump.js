@@ -4,8 +4,8 @@
  * 日付切替（前日/翌日 + カレンダー）、自動保存、AIタイトル自動生成。
  */
 
-import { braindumpApi } from "../api.js?v=20260329e";
-import { showToast } from "../app.js?v=20260329e";
+import { braindumpApi } from "../api.js?v=20260329f";
+import { showToast } from "../app.js?v=20260329f";
 
 // ===== ユーティリティ =====
 
@@ -509,8 +509,12 @@ async function handlePasteImage(e) {
     // プレースホルダーを実際の URL に置換
     textarea.value = textarea.value.replace(placeholder, markdownImg);
     updateImagePreview(textarea.value);
-    // 自動保存をトリガー
-    handleNewTextareaInput();
+    // 画像挿入後は即座に保存（2秒タイマーだと別エントリに切り替え時にキャンセルされ画像が失われる）
+    if (editingEntryId) {
+      await autoSaveExistingEntry(editingEntryId);
+    } else {
+      await autoSaveNewEntry();
+    }
     showToast("画像を貼り付けました");
   } catch (err) {
     // アップロード失敗時はプレースホルダーを除去

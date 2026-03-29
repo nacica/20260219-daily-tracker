@@ -3,20 +3,20 @@
  * ルーティングの設定とホーム画面の表示を担当する
  */
 
-import { addRoute, navigate, updateNavActive } from "./router.js?v=20260329e";
-import { renderInputForm } from "./components/input-form.js?v=20260329e";
-import { renderAnalysisView } from "./components/analysis-view.js?v=20260329e";
-import { renderHistoryList } from "./components/history-list.js?v=20260329e";
-import { renderWeeklyReport } from "./components/weekly-report.js?v=20260329e";
-import { renderSuggestions } from "./components/suggestions.js?v=20260329e";
-import { renderCoachingChat } from "./components/coaching-chat.js?v=20260329e";
-import { renderKnowledgeGraph } from "./components/knowledge-graph.js?v=20260329e";
-import { renderMonthlyReport } from "./components/monthly-report.js?v=20260329e";
-import { renderJournal } from "./components/journal.js?v=20260329e";
-import { renderBraindump } from "./components/braindump.js?v=20260329e";
-import { recordsApi, analysisApi, remindersApi } from "./api.js?v=20260329e";
-import { initSwipeNav } from "./swipe-nav.js?v=20260329e";
-import { buildTaskStatsCards, renderTaskStats } from "./components/task-stats.js?v=20260329e";
+import { addRoute, navigate, updateNavActive } from "./router.js?v=20260329f";
+import { renderInputForm } from "./components/input-form.js?v=20260329f";
+import { renderAnalysisView } from "./components/analysis-view.js?v=20260329f";
+import { renderHistoryList } from "./components/history-list.js?v=20260329f";
+import { renderWeeklyReport } from "./components/weekly-report.js?v=20260329f";
+import { renderSuggestions } from "./components/suggestions.js?v=20260329f";
+import { renderCoachingChat } from "./components/coaching-chat.js?v=20260329f";
+import { renderKnowledgeGraph } from "./components/knowledge-graph.js?v=20260329f";
+import { renderMonthlyReport } from "./components/monthly-report.js?v=20260329f";
+import { renderJournal } from "./components/journal.js?v=20260329f";
+import { renderBraindump } from "./components/braindump.js?v=20260329f";
+import { recordsApi, analysisApi, remindersApi } from "./api.js?v=20260329f";
+import { initSwipeNav } from "./swipe-nav.js?v=20260329f";
+import { buildTaskStatsCards, renderTaskStats } from "./components/task-stats.js?v=20260329f";
 
 // ===== ユーティリティ =====
 
