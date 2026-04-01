@@ -3,8 +3,8 @@
  * カードの追加・編集・削除 + 学習画面への遷移
  */
 
-import { flashcardsApi } from "../api.js?v=20260401j";
-import { showToast } from "../app.js?v=20260401j";
+import { flashcardsApi } from "../api.js?v=20260401k";
+import { showToast } from "../app.js?v=20260401k";
 
 const WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
 
@@ -83,85 +83,7 @@ export async function renderFlashcardList() {
         <div class="fc-bulk-help">
           <code>===</code> で表面と裏面を区切り、<code>---</code> でカード同士を区切ります。改行はそのまま反映されます。
         </div>
-        <textarea class="fc-textarea" id="fc-bulk-input" rows="14" placeholder="問題1
-===
-答え1
----
-問題2
-===
-答え2
----
-問題3
-===
-答え3
----
-問題4
-===
-答え4
----
-問題5
-===
-答え5
----
-問題6
-===
-答え6
----
-問題7
-===
-答え7
----
-問題8
-===
-答え8
----
-問題9
-===
-答え9
----
-問題10
-===
-答え10
----
-問題11
-===
-答え11
----
-問題12
-===
-答え12
----
-問題13
-===
-答え13
----
-問題14
-===
-答え14
----
-問題15
-===
-答え15
----
-問題16
-===
-答え16
----
-問題17
-===
-答え17
----
-問題18
-===
-答え18
----
-問題19
-===
-答え19
----
-問題20
-===
-答え20"></textarea>
+        <textarea class="fc-textarea" id="fc-bulk-input" rows="14"></textarea>
         <div class="fc-bulk-preview" id="fc-bulk-preview"></div>
         <div class="fc-form-btns">
           <button class="btn btn-primary btn-sm" id="fc-bulk-save">一括登録</button>
@@ -257,12 +179,29 @@ function attachEvents(cards) {
     }
   });
 
+  // 一括追加テンプレート生成
+  function buildBulkTemplate() {
+    const lines = [];
+    for (let i = 1; i <= 20; i++) {
+      if (i > 1) lines.push("---");
+      lines.push("");
+      lines.push("===");
+      lines.push("");
+    }
+    return lines.join("\n");
+  }
+
   // 一括追加フォーム表示
   bulkBtn.addEventListener("click", () => {
     addForm.style.display = "none";
     bulkForm.style.display = bulkForm.style.display === "none" ? "block" : "none";
     if (bulkForm.style.display === "block") {
-      document.getElementById("fc-bulk-input").focus();
+      const input = document.getElementById("fc-bulk-input");
+      if (!input.value.trim()) {
+        input.value = buildBulkTemplate();
+      }
+      input.focus();
+      input.setSelectionRange(0, 0);
     }
   });
 
@@ -293,7 +232,7 @@ function attachEvents(cards) {
   // 一括追加 — キャンセル
   document.getElementById("fc-bulk-cancel").addEventListener("click", () => {
     bulkForm.style.display = "none";
-    document.getElementById("fc-bulk-input").value = "";
+    document.getElementById("fc-bulk-input").value = buildBulkTemplate();
     document.getElementById("fc-bulk-preview").innerHTML = "";
   });
 
