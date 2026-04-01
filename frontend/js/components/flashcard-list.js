@@ -3,8 +3,8 @@
  * カードの追加・編集・削除 + 学習画面への遷移
  */
 
-import { flashcardsApi } from "../api.js?v=20260401i";
-import { showToast } from "../app.js?v=20260401i";
+import { flashcardsApi } from "../api.js?v=20260401j";
+import { showToast } from "../app.js?v=20260401j";
 
 const WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
 
@@ -83,9 +83,9 @@ export async function renderFlashcardList() {
         <div class="fc-bulk-help">
           <code>===</code> で表面と裏面を区切り、<code>---</code> でカード同士を区切ります。改行はそのまま反映されます。
         </div>
-        <textarea class="fc-textarea" id="fc-bulk-input" rows="12" placeholder="問題1（改行OK）
+        <textarea class="fc-textarea" id="fc-bulk-input" rows="14" placeholder="問題1
 ===
-答え1（改行OK）
+答え1
 ---
 問題2
 ===
@@ -93,7 +93,75 @@ export async function renderFlashcardList() {
 ---
 問題3
 ===
-答え3"></textarea>
+答え3
+---
+問題4
+===
+答え4
+---
+問題5
+===
+答え5
+---
+問題6
+===
+答え6
+---
+問題7
+===
+答え7
+---
+問題8
+===
+答え8
+---
+問題9
+===
+答え9
+---
+問題10
+===
+答え10
+---
+問題11
+===
+答え11
+---
+問題12
+===
+答え12
+---
+問題13
+===
+答え13
+---
+問題14
+===
+答え14
+---
+問題15
+===
+答え15
+---
+問題16
+===
+答え16
+---
+問題17
+===
+答え17
+---
+問題18
+===
+答え18
+---
+問題19
+===
+答え19
+---
+問題20
+===
+答え20"></textarea>
         <div class="fc-bulk-preview" id="fc-bulk-preview"></div>
         <div class="fc-form-btns">
           <button class="btn btn-primary btn-sm" id="fc-bulk-save">一括登録</button>
