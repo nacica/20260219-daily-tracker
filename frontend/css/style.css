@@ -5871,7 +5871,6 @@ main.swipe-enter-right {
 
 /* モバイルオーバーレイ */
 .fc-mobile-overlay {
-  display: none;
   position: fixed;
   inset: 0;
   z-index: 1000;
@@ -5880,11 +5879,14 @@ main.swipe-enter-right {
   -webkit-overflow-scrolling: touch;
   transform: translateX(100%);
   transition: transform 0.25s ease;
+  visibility: hidden;
+  pointer-events: none;
 }
 
 .fc-mobile-overlay.open {
-  display: block;
   transform: translateX(0);
+  visibility: visible;
+  pointer-events: auto;
 }
 
 .fc-mobile-overlay-inner {
