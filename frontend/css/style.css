@@ -5597,6 +5597,13 @@ main.swipe-enter-right {
   margin-bottom: 8px;
 }
 
+.fc-item-num {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--cyan);
+  margin-right: 6px;
+}
+
 .fc-item-status {
   font-size: 0.75rem;
   padding: 2px 8px;

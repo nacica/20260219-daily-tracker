@@ -4,8 +4,8 @@
  * 学習中のカード編集にも対応
  */
 
-import { flashcardsApi } from "../api.js?v=20260401e";
-import { showToast } from "../app.js?v=20260401e";
+import { flashcardsApi } from "../api.js?v=20260401f";
+import { showToast } from "../app.js?v=20260401f";
 
 let allCards = [];
 let deck = [];       // シャッフル済み出題リスト
@@ -61,6 +61,9 @@ export async function renderFlashcardStudy() {
     return;
   }
 
+  // 作成順に番号を振る（APIは降順なので逆順）
+  allCards.forEach((c, i) => { c._num = allCards.length - i; });
+
   deck = shuffle(allCards);
   currentIndex = 0;
   isFlipped = false;
@@ -78,7 +81,7 @@ function renderStudyUI(main) {
     <div class="fcs-container">
       <div class="fcs-top-bar">
         <button class="btn btn-outline btn-sm fcs-back-btn" id="fcs-back">← 一覧に戻る</button>
-        <span class="fcs-progress">${progress} / ${total}</span>
+        <span class="fcs-progress">#${card._num}　${progress} / ${total}</span>
       </div>
 
       <div class="fcs-card-wrapper" id="fcs-card-wrapper">

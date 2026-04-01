@@ -3,8 +3,8 @@
  * カードの追加・編集・削除 + 学習画面への遷移
  */
 
-import { flashcardsApi } from "../api.js?v=20260401e";
-import { showToast } from "../app.js?v=20260401e";
+import { flashcardsApi } from "../api.js?v=20260401f";
+import { showToast } from "../app.js?v=20260401f";
 
 const WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
 
@@ -40,6 +40,9 @@ export async function renderFlashcardList() {
   } catch (e) {
     showToast(`読み込みに失敗: ${e.message}`, "error");
   }
+
+  // 作成順に番号を振る（APIは降順なので逆順に番号付け）
+  cards.forEach((c, i) => { c._num = cards.length - i; });
 
   const totalCount = cards.length;
   const rememberedCount = cards.filter((c) => c.remembered).length;
@@ -94,6 +97,7 @@ function buildCardItem(card) {
   return `
     <div class="fc-item card" data-id="${card.id}">
       <div class="fc-item-header">
+        <span class="fc-item-num">#${card._num}</span>
         <span class="fc-item-status ${statusClass}">${statusLabel}</span>
         <span class="fc-item-date">${formatDateTime(card.created_at)}</span>
       </div>
