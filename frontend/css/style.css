@@ -5583,6 +5583,75 @@ main.swipe-enter-right {
   margin-top: 10px;
 }
 
+/* 一括追加 */
+
+.fc-bulk-help {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin-bottom: 10px;
+}
+
+.fc-bulk-help code {
+  background: rgba(0, 212, 255, 0.1);
+  color: var(--cyan);
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 0.82rem;
+}
+
+.fc-bulk-preview {
+  margin-top: 10px;
+}
+
+.fc-bulk-preview-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--cyan);
+  margin-bottom: 8px;
+}
+
+.fc-bulk-preview-empty {
+  font-size: 0.82rem;
+  color: var(--neon-red);
+}
+
+.fc-bulk-preview-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  padding: 10px;
+  margin-bottom: 6px;
+}
+
+.fc-bulk-preview-num {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--cyan);
+  margin-bottom: 4px;
+}
+
+.fc-bulk-preview-front {
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 0.85rem;
+}
+
+.fc-bulk-preview-sep {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  margin: 2px 0;
+}
+
+.fc-bulk-preview-back {
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 0.85rem;
+}
+
 /* カード一覧アイテム */
 
 .fc-item {

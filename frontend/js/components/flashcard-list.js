@@ -3,8 +3,8 @@
  * カードの追加・編集・削除 + 学習画面への遷移
  */
 
-import { flashcardsApi } from "../api.js?v=20260401h";
-import { showToast } from "../app.js?v=20260401h";
+import { flashcardsApi } from "../api.js?v=20260401i";
+import { showToast } from "../app.js?v=20260401i";
 
 const WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
 
@@ -60,6 +60,7 @@ export async function renderFlashcardList() {
 
       <div class="fc-actions-row">
         <button class="btn btn-primary fc-btn-add" id="fc-btn-add">＋ カード追加</button>
+        <button class="btn btn-outline fc-btn-bulk" id="fc-btn-bulk">一括追加</button>
         ${totalCount > 0 ? `<button class="btn btn-outline fc-btn-study" id="fc-btn-study">学習を開始</button>` : ""}
       </div>
 
@@ -73,6 +74,31 @@ export async function renderFlashcardList() {
         <div class="fc-form-btns">
           <button class="btn btn-primary btn-sm" id="fc-save-new">保存</button>
           <button class="btn btn-outline btn-sm" id="fc-cancel-new">キャンセル</button>
+        </div>
+      </div>
+
+      <!-- 一括追加フォーム（非表示） -->
+      <div class="fc-add-form card" id="fc-bulk-form" style="display:none;">
+        <div class="fc-form-title">一括追加</div>
+        <div class="fc-bulk-help">
+          <code>===</code> で表面と裏面を区切り、<code>---</code> でカード同士を区切ります。改行はそのまま反映されます。
+        </div>
+        <textarea class="fc-textarea" id="fc-bulk-input" rows="12" placeholder="問題1（改行OK）
+===
+答え1（改行OK）
+---
+問題2
+===
+答え2
+---
+問題3
+===
+答え3"></textarea>
+        <div class="fc-bulk-preview" id="fc-bulk-preview"></div>
+        <div class="fc-form-btns">
+          <button class="btn btn-primary btn-sm" id="fc-bulk-save">一括登録</button>
+          <button class="btn btn-outline btn-sm" id="fc-bulk-preview-btn">プレビュー</button>
+          <button class="btn btn-outline btn-sm" id="fc-bulk-cancel">キャンセル</button>
         </div>
       </div>
 
@@ -124,9 +150,27 @@ function buildCardItem(card) {
     </div>`;
 }
 
+/** 一括入力テキストをパースしてカード配列を返す */
+function parseBulkInput(text) {
+  const cards = [];
+  const rawCards = text.split(/^---$/m);
+  for (const block of rawCards) {
+    const parts = block.split(/^===$/m);
+    if (parts.length < 2) continue;
+    const front = parts[0].trim();
+    const back = parts.slice(1).join("===").trim();
+    if (front && back) {
+      cards.push({ front, back });
+    }
+  }
+  return cards;
+}
+
 function attachEvents(cards) {
   const addBtn = document.getElementById("fc-btn-add");
   const addForm = document.getElementById("fc-add-form");
+  const bulkBtn = document.getElementById("fc-btn-bulk");
+  const bulkForm = document.getElementById("fc-bulk-form");
   const studyBtn = document.getElementById("fc-btn-study");
 
   // 学習開始
@@ -138,9 +182,19 @@ function attachEvents(cards) {
 
   // 追加フォーム表示
   addBtn.addEventListener("click", () => {
+    bulkForm.style.display = "none";
     addForm.style.display = addForm.style.display === "none" ? "block" : "none";
     if (addForm.style.display === "block") {
       document.getElementById("fc-new-front").focus();
+    }
+  });
+
+  // 一括追加フォーム表示
+  bulkBtn.addEventListener("click", () => {
+    addForm.style.display = "none";
+    bulkForm.style.display = bulkForm.style.display === "none" ? "block" : "none";
+    if (bulkForm.style.display === "block") {
+      document.getElementById("fc-bulk-input").focus();
     }
   });
 
@@ -166,6 +220,59 @@ function attachEvents(cards) {
     } catch (e) {
       showToast(`追加に失敗: ${e.message}`, "error");
     }
+  });
+
+  // 一括追加 — キャンセル
+  document.getElementById("fc-bulk-cancel").addEventListener("click", () => {
+    bulkForm.style.display = "none";
+    document.getElementById("fc-bulk-input").value = "";
+    document.getElementById("fc-bulk-preview").innerHTML = "";
+  });
+
+  // 一括追加 — プレビュー
+  document.getElementById("fc-bulk-preview-btn").addEventListener("click", () => {
+    const text = document.getElementById("fc-bulk-input").value;
+    const parsed = parseBulkInput(text);
+    const previewEl = document.getElementById("fc-bulk-preview");
+    if (parsed.length === 0) {
+      previewEl.innerHTML = `<div class="fc-bulk-preview-empty">カードが検出されませんでした。形式を確認してください。</div>`;
+      return;
+    }
+    previewEl.innerHTML = `
+      <div class="fc-bulk-preview-title">${parsed.length} 枚のカードを検出</div>
+      ${parsed.map((c, i) => `
+        <div class="fc-bulk-preview-card">
+          <div class="fc-bulk-preview-num">#${i + 1}</div>
+          <div class="fc-bulk-preview-front">${escapeHtml(c.front)}</div>
+          <div class="fc-bulk-preview-sep">↓</div>
+          <div class="fc-bulk-preview-back">${escapeHtml(c.back)}</div>
+        </div>
+      `).join("")}`;
+  });
+
+  // 一括追加 — 保存
+  document.getElementById("fc-bulk-save").addEventListener("click", async () => {
+    const text = document.getElementById("fc-bulk-input").value;
+    const parsed = parseBulkInput(text);
+    if (parsed.length === 0) {
+      showToast("カードが検出されませんでした。=== と --- の形式を確認してください", "error");
+      return;
+    }
+    const saveBtn = document.getElementById("fc-bulk-save");
+    saveBtn.disabled = true;
+    saveBtn.textContent = `登録中... (0/${parsed.length})`;
+    let successCount = 0;
+    for (let i = 0; i < parsed.length; i++) {
+      try {
+        await flashcardsApi.create(parsed[i].front, parsed[i].back);
+        successCount++;
+        saveBtn.textContent = `登録中... (${successCount}/${parsed.length})`;
+      } catch (e) {
+        showToast(`カード${i + 1}の登録に失敗: ${e.message}`, "error");
+      }
+    }
+    showToast(`${successCount} 枚のカードを登録しました`, "success");
+    renderFlashcardList();
   });
 
   // カード一覧のイベント委任
