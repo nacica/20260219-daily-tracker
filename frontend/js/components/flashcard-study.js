@@ -4,8 +4,8 @@
  * 学習中のカード編集にも対応
  */
 
-import { flashcardsApi } from "../api.js?v=20260401c";
-import { showToast } from "../app.js?v=20260401c";
+import { flashcardsApi } from "../api.js?v=20260401d";
+import { showToast } from "../app.js?v=20260401d";
 
 let allCards = [];
 let deck = [];       // シャッフル済み出題リスト

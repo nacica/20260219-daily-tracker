@@ -5661,7 +5661,7 @@ main.swipe-enter-right {
    =================================================== */
 
 .fcs-container {
-  max-width: 500px;
+  max-width: 800px;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
@@ -5887,7 +5887,7 @@ main.swipe-enter-right {
 
 @media (min-width: 1024px) {
   .fcs-container {
-    max-width: 600px;
+    max-width: 800px;
     min-height: auto;
     padding: 20px 0;
   }
