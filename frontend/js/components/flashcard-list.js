@@ -5,8 +5,8 @@
  * カードの追加・編集・削除 + 学習画面への遷移
  */
 
-import { flashcardsApi } from "../api.js?v=20260401m";
-import { showToast } from "../app.js?v=20260401m";
+import { flashcardsApi } from "../api.js?v=20260401n";
+import { showToast } from "../app.js?v=20260401n";
 
 const WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
 
@@ -32,6 +32,16 @@ let cards = [];
 let selectedId = null;
 let keyHandler = null;
 
+// ページ遷移時にオーバーレイとキーハンドラを除去
+window.addEventListener("hashchange", () => {
+  const ov = document.getElementById("fc-mobile-overlay");
+  if (ov) ov.remove();
+  if (keyHandler) {
+    document.removeEventListener("keydown", keyHandler);
+    keyHandler = null;
+  }
+});
+
 export async function renderFlashcardList() {
   const main = document.querySelector("main");
   main.innerHTML = `
@@ -45,6 +55,10 @@ export async function renderFlashcardList() {
     document.removeEventListener("keydown", keyHandler);
     keyHandler = null;
   }
+
+  // 前回のオーバーレイを除去
+  const oldOverlay = document.getElementById("fc-mobile-overlay");
+  if (oldOverlay) oldOverlay.remove();
 
   cards = [];
   try {
@@ -123,21 +137,28 @@ export async function renderFlashcardList() {
                 ${cards.map((c) => buildListRow(c)).join("")}
               </div>
             </div>
-            <!-- 右ペイン: 回答表示 -->
+            <!-- 右ペイン: 回答表示（PC のみ表示） -->
             <div class="fc-pane-right" id="fc-pane-right">
               <div class="fc-pane-detail" id="fc-pane-detail">
                 <div class="fc-detail-placeholder">← 問題を選択してください</div>
               </div>
             </div>
-          </div>
-          <!-- モバイル: 回答オーバーレイ -->
-          <div class="fc-mobile-overlay" id="fc-mobile-overlay">
-            <div class="fc-mobile-overlay-inner" id="fc-mobile-overlay-inner"></div>
           </div>`
       }
     </div>`;
 
+  // モバイルオーバーレイを body 直下に配置（既存があれば再利用）
+  let overlay = document.getElementById("fc-mobile-overlay");
+  if (overlay) overlay.remove();
   if (cards.length > 0) {
+    overlay = document.createElement("div");
+    overlay.className = "fc-mobile-overlay";
+    overlay.id = "fc-mobile-overlay";
+    overlay.innerHTML = `<div class="fc-mobile-overlay-inner" id="fc-mobile-overlay-inner"></div>`;
+    document.body.appendChild(overlay);
+  }
+
+  if (cards.length > 0 && !isMobile()) {
     selectCard(selectedId);
   }
   attachEvents(cards);
