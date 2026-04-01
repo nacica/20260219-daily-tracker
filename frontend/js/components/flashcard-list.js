@@ -5,8 +5,8 @@
  * カードの追加・編集・削除 + 学習画面への遷移
  */
 
-import { flashcardsApi } from "../api.js?v=20260401n";
-import { showToast } from "../app.js?v=20260401n";
+import { flashcardsApi } from "../api.js?v=20260401o";
+import { showToast } from "../app.js?v=20260401o";
 
 const WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
 
@@ -186,6 +186,10 @@ function buildDetailView(card) {
       <span class="fc-item-status ${statusClass}">${statusLabel}</span>
       <span class="fc-detail-date">${formatDateTime(card.created_at)}</span>
     </div>
+    <div class="fc-detail-actions-top">
+      <button class="btn btn-outline btn-sm fc-detail-edit" data-id="${card.id}">編集</button>
+      <button class="btn btn-outline btn-sm fc-detail-delete" data-id="${card.id}" style="color: var(--neon-red); border-color: rgba(255,51,102,0.3);">削除</button>
+    </div>
     <div class="fc-detail-section">
       <div class="fc-detail-label">表面</div>
       <div class="fc-detail-front">${escapeHtml(card.front)}</div>
@@ -298,7 +302,7 @@ function attachDetailEvents(container) {
     editBtn.addEventListener("click", () => {
       const id = editBtn.dataset.id;
       const form = root.querySelector(`.fc-detail-edit-form[data-id="${id}"]`);
-      const sections = root.querySelectorAll(".fc-detail-section, .fc-detail-divider, .fc-detail-actions");
+      const sections = root.querySelectorAll(".fc-detail-section, .fc-detail-divider, .fc-detail-actions, .fc-detail-actions-top");
       sections.forEach((s) => (s.style.display = "none"));
       form.style.display = "block";
       form.querySelector(".fc-edit-front").focus();
@@ -309,7 +313,7 @@ function attachDetailEvents(container) {
   const cancelBtn = root.querySelector(".fc-detail-cancel-edit");
   if (cancelBtn) {
     cancelBtn.addEventListener("click", () => {
-      const sections = root.querySelectorAll(".fc-detail-section, .fc-detail-divider, .fc-detail-actions");
+      const sections = root.querySelectorAll(".fc-detail-section, .fc-detail-divider, .fc-detail-actions, .fc-detail-actions-top");
       sections.forEach((s) => (s.style.display = ""));
       root.querySelector(".fc-detail-edit-form").style.display = "none";
     });

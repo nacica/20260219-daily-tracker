@@ -5859,10 +5859,25 @@ main.swipe-enter-right {
   border-radius: var(--radius-xs);
 }
 
+.fc-detail-actions-top {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
 .fc-detail-actions {
   display: flex;
   gap: 8px;
   margin-top: 16px;
+}
+
+/* モバイル: 上にボタン表示、下は非表示 / PC: 上は非表示、下にボタン表示 */
+@media (max-width: 767px) {
+  .fc-detail-actions { display: none; }
+}
+
+@media (min-width: 768px) {
+  .fc-detail-actions-top { display: none; }
 }
 
 .fc-detail-edit-form {
