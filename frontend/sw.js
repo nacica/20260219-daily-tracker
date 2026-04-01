@@ -5,7 +5,7 @@
  *   - API リクエスト: Network First（オフライン時はキャッシュ）
  */
 
-const CACHE_NAME = "daily-tracker-v174";
+const CACHE_NAME = "daily-tracker-v175";
 const STATIC_ASSETS = [
   "/",
   "/index.html",
@@ -26,6 +26,8 @@ const STATIC_ASSETS = [
   "/js/components/journal.js",
   "/js/components/task-stats.js",
   "/js/components/braindump.js",
+  "/js/components/flashcard-list.js",
+  "/js/components/flashcard-study.js",
   "/manifest.json",
   "/icons/icon-192.png",
   "/icons/icon-512.png",

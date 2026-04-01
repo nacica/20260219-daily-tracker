@@ -3,20 +3,22 @@
  * ルーティングの設定とホーム画面の表示を担当する
  */
 
-import { addRoute, navigate, updateNavActive } from "./router.js?v=20260329i";
-import { renderInputForm } from "./components/input-form.js?v=20260329i";
-import { renderAnalysisView } from "./components/analysis-view.js?v=20260329i";
-import { renderHistoryList } from "./components/history-list.js?v=20260329i";
-import { renderWeeklyReport } from "./components/weekly-report.js?v=20260329i";
-import { renderSuggestions } from "./components/suggestions.js?v=20260329i";
-import { renderCoachingChat } from "./components/coaching-chat.js?v=20260329i";
-import { renderKnowledgeGraph } from "./components/knowledge-graph.js?v=20260329i";
-import { renderMonthlyReport } from "./components/monthly-report.js?v=20260329i";
-import { renderJournal } from "./components/journal.js?v=20260329i";
-import { renderBraindump } from "./components/braindump.js?v=20260329i";
-import { recordsApi, analysisApi, remindersApi } from "./api.js?v=20260329i";
-import { initSwipeNav } from "./swipe-nav.js?v=20260329i";
-import { buildTaskStatsCards, renderTaskStats } from "./components/task-stats.js?v=20260329i";
+import { addRoute, navigate, updateNavActive } from "./router.js?v=20260401a";
+import { renderInputForm } from "./components/input-form.js?v=20260401a";
+import { renderAnalysisView } from "./components/analysis-view.js?v=20260401a";
+import { renderHistoryList } from "./components/history-list.js?v=20260401a";
+import { renderWeeklyReport } from "./components/weekly-report.js?v=20260401a";
+import { renderSuggestions } from "./components/suggestions.js?v=20260401a";
+import { renderCoachingChat } from "./components/coaching-chat.js?v=20260401a";
+import { renderKnowledgeGraph } from "./components/knowledge-graph.js?v=20260401a";
+import { renderMonthlyReport } from "./components/monthly-report.js?v=20260401a";
+import { renderJournal } from "./components/journal.js?v=20260401a";
+import { renderBraindump } from "./components/braindump.js?v=20260401a";
+import { recordsApi, analysisApi, remindersApi } from "./api.js?v=20260401a";
+import { initSwipeNav } from "./swipe-nav.js?v=20260401a";
+import { buildTaskStatsCards, renderTaskStats } from "./components/task-stats.js?v=20260401a";
+import { renderFlashcardList } from "./components/flashcard-list.js?v=20260401a";
+import { renderFlashcardStudy } from "./components/flashcard-study.js?v=20260401a";
 
 // ===== ユーティリティ =====
 
@@ -52,6 +54,7 @@ const ROUTE_TITLES = {
   "/journal": { title: "フリージャーナル", breadcrumb: "ジャーナル" },
   "/braindump": { title: "ブレインダンプ", breadcrumb: "頭の整理メモ" },
   "/task-stats": { title: "タスク実績", breadcrumb: "タスク実績" },
+  "/flashcards": { title: "単語帳", breadcrumb: "単語帳カード" },
 };
 
 /** デスクトップヘッダーのタイトルと日付を更新 */
@@ -521,6 +524,8 @@ addRoute("/journal/:date", ({ date }) => renderJournal(date));
 addRoute("/braindump", () => renderBraindump(today()));
 addRoute("/braindump/:date", ({ date }) => renderBraindump(date));
 addRoute("/task-stats", () => renderTaskStats());
+addRoute("/flashcards", () => renderFlashcardList());
+addRoute("/flashcards/study", () => renderFlashcardStudy());
 
 // ===== 初期化 =====
 

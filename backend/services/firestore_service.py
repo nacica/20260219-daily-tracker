@@ -581,3 +581,48 @@ def save_categories(categories: list[dict]) -> list[dict]:
     db = get_db()
     db.collection("categories").document("global").set({"categories": categories})
     return categories
+
+
+# ---- flashcards (単語帳カード) ----
+
+def list_flashcards() -> list[dict]:
+    """全カードを作成日降順で取得"""
+    db = get_db()
+    query = db.collection("flashcards").order_by("created_at", direction=firestore.Query.DESCENDING)
+    return [doc.to_dict() for doc in query.stream()]
+
+
+def get_flashcard(card_id: str) -> Optional[dict]:
+    """指定IDのカードを取得"""
+    db = get_db()
+    doc = db.collection("flashcards").document(card_id).get()
+    if doc.exists:
+        return doc.to_dict()
+    return None
+
+
+def create_flashcard(card_id: str, data: dict) -> dict:
+    """カードを作成"""
+    db = get_db()
+    db.collection("flashcards").document(card_id).set(data)
+    return data
+
+
+def update_flashcard(card_id: str, data: dict) -> Optional[dict]:
+    """カードを更新"""
+    db = get_db()
+    ref = db.collection("flashcards").document(card_id)
+    if not ref.get().exists:
+        return None
+    ref.update(data)
+    return ref.get().to_dict()
+
+
+def delete_flashcard(card_id: str) -> bool:
+    """カードを削除"""
+    db = get_db()
+    ref = db.collection("flashcards").document(card_id)
+    if not ref.get().exists:
+        return False
+    ref.delete()
+    return True

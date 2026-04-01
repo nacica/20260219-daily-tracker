@@ -327,6 +327,38 @@ export const braindumpApi = {
   },
 };
 
+// ---- 単語帳カード ----
+
+export const flashcardsApi = {
+  /** カード作成 */
+  create: (front, back) =>
+    apiFetch("/flashcards", {
+      method: "POST",
+      body: { front, back },
+    }),
+
+  /** 全カード取得（作成日降順） */
+  list: () => apiFetch("/flashcards"),
+
+  /** 単一カード取得 */
+  get: (cardId) => apiFetch(`/flashcards/${cardId}`),
+
+  /** カード更新 */
+  update: (cardId, data) =>
+    apiFetch(`/flashcards/${cardId}`, { method: "PUT", body: data }),
+
+  /** カード削除 */
+  delete: (cardId) =>
+    apiFetch(`/flashcards/${cardId}`, { method: "DELETE" }),
+
+  /** 覚えた/まだ マーク */
+  mark: (cardId, remembered) =>
+    apiFetch(`/flashcards/${cardId}/mark`, {
+      method: "PUT",
+      body: { remembered },
+    }),
+};
+
 // ---- カテゴリ ----
 
 export const categoriesApi = {
