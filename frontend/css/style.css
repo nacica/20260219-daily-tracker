@@ -5687,13 +5687,15 @@ main.swipe-enter-right {
   perspective: 1000px;
   margin-bottom: 20px;
   border-radius: var(--radius);
-  min-height: 250px;
+  height: 55vh;
+  min-height: 220px;
+  max-height: 400px;
 }
 
 .fcs-card {
   position: relative;
   width: 100%;
-  min-height: 250px;
+  height: 100%;
   transform-style: preserve-3d;
   transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
   cursor: pointer;
@@ -5708,13 +5710,15 @@ main.swipe-enter-right {
   inset: 0;
   backface-visibility: hidden;
   border-radius: var(--radius);
-  padding: 24px 20px;
+  padding: 40px 20px 40px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   border: 1px solid var(--border-bright);
   background: var(--bg-card);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .fcs-front {
@@ -5729,30 +5733,41 @@ main.swipe-enter-right {
 }
 
 .fcs-face-label {
-  position: absolute;
-  top: 10px;
-  left: 14px;
+  position: sticky;
+  top: -40px;
+  align-self: flex-start;
   font-size: 0.7rem;
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 1px;
+  margin-bottom: 8px;
+  background: var(--bg-card);
+  padding: 2px 4px;
+  z-index: 1;
 }
 
 .fcs-face-content {
-  font-size: 1.2rem;
-  text-align: center;
+  font-size: 1.05rem;
+  text-align: left;
   color: var(--text-primary);
-  line-height: 1.6;
+  line-height: 1.7;
   white-space: pre-wrap;
   word-break: break-word;
   max-width: 100%;
+  width: 100%;
 }
 
 .fcs-tap-hint {
   position: absolute;
-  bottom: 12px;
+  bottom: 8px;
+  left: 0;
+  right: 0;
+  text-align: center;
   font-size: 0.72rem;
   color: var(--text-muted);
+  background: linear-gradient(transparent, var(--bg-card) 40%);
+  padding: 16px 0 4px;
+  pointer-events: none;
   animation: fcs-pulse 2s ease-in-out infinite;
 }
 
