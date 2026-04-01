@@ -4,8 +4,8 @@
  * 学習中のカード編集にも対応
  */
 
-import { flashcardsApi } from "../api.js?v=20260401d";
-import { showToast } from "../app.js?v=20260401d";
+import { flashcardsApi } from "../api.js?v=20260401e";
+import { showToast } from "../app.js?v=20260401e";
 
 let allCards = [];
 let deck = [];       // シャッフル済み出題リスト
@@ -116,7 +116,7 @@ function renderStudyUI(main) {
 
       <!-- スワイプヒント -->
       <div class="fcs-swipe-hint" id="fcs-swipe-hint" style="${isFlipped ? '' : 'visibility:hidden;'}">
-        ← まだ　|　覚えた →
+        タップ=まだ　|　右スワイプ=覚えた
       </div>
     </div>`;
 
@@ -133,7 +133,7 @@ function attachStudyEvents() {
     window.location.hash = "/flashcards";
   });
 
-  // タップで裏返し
+  // タップ: 表面→裏返し、裏面→「まだ」で次へ
   cardEl.addEventListener("click", (e) => {
     if (isEditing) return;
     if (!isFlipped) {
@@ -141,6 +141,8 @@ function attachStudyEvents() {
       cardEl.classList.add("flipped");
       document.getElementById("fcs-actions").style.visibility = "";
       document.getElementById("fcs-swipe-hint").style.visibility = "";
+    } else {
+      markAndNext(false);
     }
   });
 
