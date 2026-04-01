@@ -5689,9 +5689,17 @@ main.swipe-enter-right {
 }
 
 .fcs-edit-bar {
-  display: flex;
+  display: flex !important;
   justify-content: flex-end;
   margin-bottom: 8px;
+}
+
+.fcs-edit-bar .fcs-btn-edit {
+  display: inline-flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  padding: 8px 16px;
+  font-size: 0.85rem;
 }
 
 /* カードフリップ */
