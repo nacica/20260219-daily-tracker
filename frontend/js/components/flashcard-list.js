@@ -1,10 +1,12 @@
 /**
  * 単語帳カード一覧画面
+ * 2ペインレイアウト: 左に問題リスト、右に回答表示
+ * キーボード↑↓ / タップで問題を切り替え
  * カードの追加・編集・削除 + 学習画面への遷移
  */
 
-import { flashcardsApi } from "../api.js?v=20260401k";
-import { showToast } from "../app.js?v=20260401k";
+import { flashcardsApi } from "../api.js?v=20260401l";
+import { showToast } from "../app.js?v=20260401l";
 
 const WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
 
@@ -26,6 +28,10 @@ function escapeHtml(str) {
   );
 }
 
+let cards = [];
+let selectedId = null;
+let keyHandler = null;
+
 export async function renderFlashcardList() {
   const main = document.querySelector("main");
   main.innerHTML = `
@@ -34,7 +40,13 @@ export async function renderFlashcardList() {
       <p>カードを読み込み中...</p>
     </div>`;
 
-  let cards = [];
+  // 前回のキーハンドラを除去
+  if (keyHandler) {
+    document.removeEventListener("keydown", keyHandler);
+    keyHandler = null;
+  }
+
+  cards = [];
   try {
     cards = await flashcardsApi.list();
   } catch (e) {
@@ -46,6 +58,8 @@ export async function renderFlashcardList() {
 
   const totalCount = cards.length;
   const rememberedCount = cards.filter((c) => c.remembered).length;
+
+  selectedId = cards.length > 0 ? cards[0].id : null;
 
   main.innerHTML = `
     <div class="fc-list-container">
@@ -92,57 +106,154 @@ export async function renderFlashcardList() {
         </div>
       </div>
 
-      <!-- カード一覧 -->
-      <div class="fc-card-list" id="fc-card-list">
-        ${cards.length === 0
-          ? `<div class="empty-state">
-              <div class="icon">🃏</div>
-              <p>まだカードがありません。<br>「＋ カード追加」で最初の1枚を作りましょう。</p>
-            </div>`
-          : cards.map((c) => buildCardItem(c)).join("")
-        }
-      </div>
+      <!-- 2ペインレイアウト -->
+      ${cards.length === 0
+        ? `<div class="empty-state">
+            <div class="icon">🃏</div>
+            <p>まだカードがありません。<br>「＋ カード追加」で最初の1枚を作りましょう。</p>
+          </div>`
+        : `<div class="fc-pane-wrap">
+            <!-- 左ペイン: 問題リスト -->
+            <div class="fc-pane-left" id="fc-pane-left">
+              <div class="fc-pane-left-header">
+                <span class="fc-pane-left-label">問題一覧</span>
+                <span class="fc-pane-left-hint">↑↓キーで移動</span>
+              </div>
+              <div class="fc-pane-list" id="fc-pane-list">
+                ${cards.map((c) => buildListRow(c)).join("")}
+              </div>
+            </div>
+            <!-- 右ペイン: 回答表示 -->
+            <div class="fc-pane-right" id="fc-pane-right">
+              <div class="fc-pane-detail" id="fc-pane-detail">
+                <div class="fc-detail-placeholder">← 問題を選択してください</div>
+              </div>
+            </div>
+          </div>
+          <!-- モバイル: 回答オーバーレイ -->
+          <div class="fc-mobile-overlay" id="fc-mobile-overlay">
+            <div class="fc-mobile-overlay-inner" id="fc-mobile-overlay-inner"></div>
+          </div>`
+      }
     </div>`;
 
+  if (cards.length > 0) {
+    selectCard(selectedId);
+  }
   attachEvents(cards);
 }
 
-function buildCardItem(card) {
+function buildListRow(card) {
+  const statusClass = card.remembered ? "remembered" : "not-yet";
+  const statusIcon = card.remembered ? "✓" : "✗";
+  // 表面テキストを1行に切り詰め
+  const frontText = card.front.length > 60 ? card.front.substring(0, 60) + "…" : card.front;
+  return `
+    <div class="fc-row ${card.id === selectedId ? 'active' : ''}" data-id="${card.id}">
+      <span class="fc-row-num">#${card._num}</span>
+      <span class="fc-row-status ${statusClass}">${statusIcon}</span>
+      <span class="fc-row-front">${escapeHtml(frontText)}</span>
+    </div>`;
+}
+
+function buildDetailView(card) {
   const statusClass = card.remembered ? "remembered" : "not-yet";
   const statusLabel = card.remembered ? "覚えた" : "まだ";
   return `
-    <div class="fc-item card" data-id="${card.id}">
-      <div class="fc-item-header">
-        <span class="fc-item-num">#${card._num}</span>
-        <span class="fc-item-status ${statusClass}">${statusLabel}</span>
-        <span class="fc-item-date">${formatDateTime(card.created_at)}</span>
-      </div>
-      <div class="fc-item-body">
-        <div class="fc-item-front">${escapeHtml(card.front)}</div>
-        <div class="fc-item-divider">↓</div>
-        <div class="fc-item-back">${escapeHtml(card.back)}</div>
-      </div>
-      <div class="fc-item-actions">
-        <button class="btn btn-outline btn-sm fc-edit-btn" data-id="${card.id}">編集</button>
-        <button class="btn btn-outline btn-sm fc-delete-btn" data-id="${card.id}" style="color: var(--neon-red); border-color: rgba(255,51,102,0.3);">削除</button>
-      </div>
-      <!-- 編集フォーム（非表示） -->
-      <div class="fc-edit-form" data-id="${card.id}" style="display:none;">
-        <label class="fc-label">表面</label>
-        <textarea class="fc-textarea fc-edit-front" rows="2">${escapeHtml(card.front)}</textarea>
-        <label class="fc-label">裏面</label>
-        <textarea class="fc-textarea fc-edit-back" rows="2">${escapeHtml(card.back)}</textarea>
-        <div class="fc-form-btns">
-          <button class="btn btn-primary btn-sm fc-save-edit" data-id="${card.id}">保存</button>
-          <button class="btn btn-outline btn-sm fc-cancel-edit" data-id="${card.id}">キャンセル</button>
-        </div>
+    <div class="fc-detail-header">
+      <span class="fc-detail-num">#${card._num}</span>
+      <span class="fc-item-status ${statusClass}">${statusLabel}</span>
+      <span class="fc-detail-date">${formatDateTime(card.created_at)}</span>
+    </div>
+    <div class="fc-detail-section">
+      <div class="fc-detail-label">表面</div>
+      <div class="fc-detail-front">${escapeHtml(card.front)}</div>
+    </div>
+    <div class="fc-detail-divider"></div>
+    <div class="fc-detail-section">
+      <div class="fc-detail-label">裏面</div>
+      <div class="fc-detail-back">${escapeHtml(card.back)}</div>
+    </div>
+    <div class="fc-detail-actions">
+      <button class="btn btn-outline btn-sm fc-detail-edit" data-id="${card.id}">編集</button>
+      <button class="btn btn-outline btn-sm fc-detail-delete" data-id="${card.id}" style="color: var(--neon-red); border-color: rgba(255,51,102,0.3);">削除</button>
+    </div>
+    <!-- 編集フォーム（非表示） -->
+    <div class="fc-detail-edit-form" data-id="${card.id}" style="display:none;">
+      <label class="fc-label">表面</label>
+      <textarea class="fc-textarea fc-edit-front" rows="2">${escapeHtml(card.front)}</textarea>
+      <label class="fc-label">裏面</label>
+      <textarea class="fc-textarea fc-edit-back" rows="3">${escapeHtml(card.back)}</textarea>
+      <div class="fc-form-btns">
+        <button class="btn btn-primary btn-sm fc-detail-save-edit" data-id="${card.id}">保存</button>
+        <button class="btn btn-outline btn-sm fc-detail-cancel-edit" data-id="${card.id}">キャンセル</button>
       </div>
     </div>`;
+}
+
+function selectCard(id) {
+  selectedId = id;
+  const card = cards.find((c) => c.id === id);
+  if (!card) return;
+
+  // 左ペインのアクティブ行を更新
+  const rows = document.querySelectorAll(".fc-row");
+  rows.forEach((r) => r.classList.toggle("active", r.dataset.id === id));
+
+  // アクティブ行をスクロールに収める
+  const activeRow = document.querySelector(`.fc-row[data-id="${id}"]`);
+  if (activeRow) {
+    activeRow.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }
+
+  // 右ペインに詳細を表示
+  const detail = document.getElementById("fc-pane-detail");
+  if (detail) {
+    detail.innerHTML = buildDetailView(card);
+    attachDetailEvents();
+  }
+}
+
+function selectCardMobile(id) {
+  selectCard(id);
+  const overlay = document.getElementById("fc-mobile-overlay");
+  const inner = document.getElementById("fc-mobile-overlay-inner");
+  const card = cards.find((c) => c.id === id);
+  if (!overlay || !inner || !card) return;
+
+  inner.innerHTML = `
+    <button class="btn btn-outline btn-sm fc-mobile-back" id="fc-mobile-back">← 一覧に戻る</button>
+    ${buildDetailView(card)}`;
+  overlay.classList.add("open");
+
+  document.getElementById("fc-mobile-back").addEventListener("click", () => {
+    overlay.classList.remove("open");
+  });
+  attachDetailEvents(inner);
+}
+
+function isMobile() {
+  return window.innerWidth < 768;
+}
+
+function moveTo(direction) {
+  if (cards.length === 0) return;
+  const idx = cards.findIndex((c) => c.id === selectedId);
+  let newIdx = idx + direction;
+  if (newIdx < 0) newIdx = 0;
+  if (newIdx >= cards.length) newIdx = cards.length - 1;
+  if (newIdx !== idx) {
+    if (isMobile()) {
+      selectCardMobile(cards[newIdx].id);
+    } else {
+      selectCard(cards[newIdx].id);
+    }
+  }
 }
 
 /** 一括入力テキストをパースしてカード配列を返す */
 function parseBulkInput(text) {
-  const cards = [];
+  const result = [];
   const rawCards = text.split(/^---$/m);
   for (const block of rawCards) {
     const parts = block.split(/^===$/m);
@@ -150,13 +261,78 @@ function parseBulkInput(text) {
     const front = parts[0].trim();
     const back = parts.slice(1).join("===").trim();
     if (front && back) {
-      cards.push({ front, back });
+      result.push({ front, back });
     }
   }
-  return cards;
+  return result;
 }
 
-function attachEvents(cards) {
+function attachDetailEvents(container) {
+  const root = container || document.getElementById("fc-pane-detail");
+  if (!root) return;
+
+  // 編集ボタン
+  const editBtn = root.querySelector(".fc-detail-edit");
+  if (editBtn) {
+    editBtn.addEventListener("click", () => {
+      const id = editBtn.dataset.id;
+      const form = root.querySelector(`.fc-detail-edit-form[data-id="${id}"]`);
+      const sections = root.querySelectorAll(".fc-detail-section, .fc-detail-divider, .fc-detail-actions");
+      sections.forEach((s) => (s.style.display = "none"));
+      form.style.display = "block";
+      form.querySelector(".fc-edit-front").focus();
+    });
+  }
+
+  // 編集キャンセル
+  const cancelBtn = root.querySelector(".fc-detail-cancel-edit");
+  if (cancelBtn) {
+    cancelBtn.addEventListener("click", () => {
+      const sections = root.querySelectorAll(".fc-detail-section, .fc-detail-divider, .fc-detail-actions");
+      sections.forEach((s) => (s.style.display = ""));
+      root.querySelector(".fc-detail-edit-form").style.display = "none";
+    });
+  }
+
+  // 編集保存
+  const saveBtn = root.querySelector(".fc-detail-save-edit");
+  if (saveBtn) {
+    saveBtn.addEventListener("click", async () => {
+      const id = saveBtn.dataset.id;
+      const front = root.querySelector(".fc-edit-front").value.trim();
+      const back = root.querySelector(".fc-edit-back").value.trim();
+      if (!front || !back) {
+        showToast("表面と裏面の両方を入力してください", "error");
+        return;
+      }
+      try {
+        await flashcardsApi.update(id, { front, back });
+        showToast("カードを更新しました", "success");
+        renderFlashcardList();
+      } catch (e) {
+        showToast(`更新に失敗: ${e.message}`, "error");
+      }
+    });
+  }
+
+  // 削除ボタン
+  const deleteBtn = root.querySelector(".fc-detail-delete");
+  if (deleteBtn) {
+    deleteBtn.addEventListener("click", async () => {
+      const id = deleteBtn.dataset.id;
+      if (!confirm("このカードを削除しますか？")) return;
+      try {
+        await flashcardsApi.delete(id);
+        showToast("カードを削除しました", "success");
+        renderFlashcardList();
+      } catch (e) {
+        showToast(`削除に失敗: ${e.message}`, "error");
+      }
+    });
+  }
+}
+
+function attachEvents() {
   const addBtn = document.getElementById("fc-btn-add");
   const addForm = document.getElementById("fc-add-form");
   const bulkBtn = document.getElementById("fc-btn-bulk");
@@ -282,61 +458,32 @@ function attachEvents(cards) {
     renderFlashcardList();
   });
 
-  // カード一覧のイベント委任
-  const listEl = document.getElementById("fc-card-list");
-  listEl.addEventListener("click", async (e) => {
-    const editBtn = e.target.closest(".fc-edit-btn");
-    const deleteBtn = e.target.closest(".fc-delete-btn");
-    const saveEditBtn = e.target.closest(".fc-save-edit");
-    const cancelEditBtn = e.target.closest(".fc-cancel-edit");
-
-    if (editBtn) {
-      const id = editBtn.dataset.id;
-      const item = listEl.querySelector(`.fc-item[data-id="${id}"]`);
-      const form = item.querySelector(".fc-edit-form");
-      const body = item.querySelector(".fc-item-body");
-      const actions = item.querySelector(".fc-item-actions");
-      form.style.display = "block";
-      body.style.display = "none";
-      actions.style.display = "none";
-    }
-
-    if (cancelEditBtn) {
-      const id = cancelEditBtn.dataset.id;
-      const item = listEl.querySelector(`.fc-item[data-id="${id}"]`);
-      item.querySelector(".fc-edit-form").style.display = "none";
-      item.querySelector(".fc-item-body").style.display = "";
-      item.querySelector(".fc-item-actions").style.display = "";
-    }
-
-    if (saveEditBtn) {
-      const id = saveEditBtn.dataset.id;
-      const item = listEl.querySelector(`.fc-item[data-id="${id}"]`);
-      const front = item.querySelector(".fc-edit-front").value.trim();
-      const back = item.querySelector(".fc-edit-back").value.trim();
-      if (!front || !back) {
-        showToast("表面と裏面の両方を入力してください", "error");
-        return;
+  // 左ペインのクリックイベント
+  const listEl = document.getElementById("fc-pane-list");
+  if (listEl) {
+    listEl.addEventListener("click", (e) => {
+      const row = e.target.closest(".fc-row");
+      if (!row) return;
+      const id = row.dataset.id;
+      if (isMobile()) {
+        selectCardMobile(id);
+      } else {
+        selectCard(id);
       }
-      try {
-        await flashcardsApi.update(id, { front, back });
-        showToast("カードを更新しました", "success");
-        renderFlashcardList();
-      } catch (e) {
-        showToast(`更新に失敗: ${e.message}`, "error");
-      }
-    }
+    });
+  }
 
-    if (deleteBtn) {
-      const id = deleteBtn.dataset.id;
-      if (!confirm("このカードを削除しますか？")) return;
-      try {
-        await flashcardsApi.delete(id);
-        showToast("カードを削除しました", "success");
-        renderFlashcardList();
-      } catch (e) {
-        showToast(`削除に失敗: ${e.message}`, "error");
-      }
+  // キーボード ↑↓ 操作
+  keyHandler = (e) => {
+    // テキスト入力中は無視
+    if (e.target.tagName === "TEXTAREA" || e.target.tagName === "INPUT") return;
+    if (e.key === "ArrowDown" || e.key === "j") {
+      e.preventDefault();
+      moveTo(1);
+    } else if (e.key === "ArrowUp" || e.key === "k") {
+      e.preventDefault();
+      moveTo(-1);
     }
-  });
+  };
+  document.addEventListener("keydown", keyHandler);
 }

@@ -5652,25 +5652,149 @@ main.swipe-enter-right {
   font-size: 0.85rem;
 }
 
-/* カード一覧アイテム */
+/* ===================================================
+   単語帳 — 2ペインレイアウト
+   =================================================== */
 
-.fc-item {
-  margin-bottom: 10px;
-  padding: 14px;
+.fc-pane-wrap {
+  display: flex;
+  gap: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  height: 65vh;
+  min-height: 320px;
+  max-height: 700px;
+  background: var(--bg-card);
 }
 
-.fc-item-header {
+/* 左ペイン: 問題リスト */
+.fc-pane-left {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  border-right: none;
+  background: var(--bg-secondary);
+}
+
+.fc-pane-left-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
 }
 
-.fc-item-num {
-  font-size: 0.75rem;
+.fc-pane-left-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.fc-pane-left-hint {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  display: none;
+}
+
+.fc-pane-list {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* 問題行 */
+.fc-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--border);
+  transition: background 0.15s;
+}
+
+.fc-row:hover {
+  background: rgba(0, 212, 255, 0.05);
+}
+
+.fc-row.active {
+  background: rgba(0, 212, 255, 0.1);
+  border-left: 3px solid var(--cyan);
+  padding-left: 11px;
+}
+
+.fc-row-num {
+  font-size: 0.7rem;
   font-weight: 600;
   color: var(--cyan);
-  margin-right: 6px;
+  flex-shrink: 0;
+  min-width: 28px;
+}
+
+.fc-row-status {
+  font-size: 0.72rem;
+  flex-shrink: 0;
+  width: 18px;
+  text-align: center;
+}
+
+.fc-row-status.remembered {
+  color: var(--neon-green);
+}
+
+.fc-row-status.not-yet {
+  color: var(--neon-red);
+}
+
+.fc-row-front {
+  font-size: 0.85rem;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+}
+
+/* 右ペイン: 回答詳細 */
+.fc-pane-right {
+  display: none;
+}
+
+.fc-pane-detail {
+  padding: 20px;
+  height: 100%;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.fc-detail-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.fc-detail-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.fc-detail-num {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--cyan);
+}
+
+.fc-detail-date {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  margin-left: auto;
 }
 
 .fc-item-status {
@@ -5692,44 +5816,115 @@ main.swipe-enter-right {
   border: 1px solid rgba(255, 51, 102, 0.2);
 }
 
-.fc-item-date {
+.fc-detail-section {
+  margin-bottom: 12px;
+}
+
+.fc-detail-label {
   font-size: 0.72rem;
   color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 6px;
 }
 
-.fc-item-front {
+.fc-detail-front {
+  font-size: 1rem;
   font-weight: 600;
   color: var(--text-primary);
-  margin-bottom: 4px;
+  line-height: 1.6;
   white-space: pre-wrap;
   word-break: break-word;
+  padding: 12px;
+  background: rgba(0, 212, 255, 0.04);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
 }
 
-.fc-item-divider {
-  color: var(--text-muted);
-  font-size: 0.8rem;
-  margin: 2px 0;
+.fc-detail-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 16px 0;
 }
 
-.fc-item-back {
-  color: var(--text-secondary);
-  font-size: 0.9rem;
+.fc-detail-back {
+  font-size: 0.95rem;
+  color: var(--text-primary);
+  line-height: 1.7;
   white-space: pre-wrap;
   word-break: break-word;
+  padding: 12px;
+  background: rgba(138, 43, 226, 0.04);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
 }
 
-.fc-item-actions {
+.fc-detail-actions {
   display: flex;
   gap: 8px;
-  margin-top: 10px;
+  margin-top: 16px;
 }
 
-.fc-edit-form {
-  margin-top: 10px;
-  padding: 0;
-  border: none;
-  background: none;
-  box-shadow: none;
+.fc-detail-edit-form {
+  margin-top: 12px;
+}
+
+/* モバイルオーバーレイ */
+.fc-mobile-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: var(--bg-primary);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  transform: translateX(100%);
+  transition: transform 0.25s ease;
+}
+
+.fc-mobile-overlay.open {
+  display: block;
+  transform: translateX(0);
+}
+
+.fc-mobile-overlay-inner {
+  padding: 20px;
+  padding-top: calc(env(safe-area-inset-top, 48px) + 20px);
+}
+
+.fc-mobile-back {
+  margin-bottom: 16px;
+}
+
+/* ===================================================
+   単語帳 — デスクトップ2ペイン
+   =================================================== */
+
+@media (min-width: 768px) {
+  .fc-list-container {
+    max-width: 1000px;
+  }
+
+  .fc-pane-left {
+    width: 38%;
+    min-width: 260px;
+    flex-shrink: 0;
+    border-right: 1px solid var(--border);
+  }
+
+  .fc-pane-left-hint {
+    display: inline;
+  }
+
+  .fc-pane-right {
+    display: block;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .fc-mobile-overlay {
+    display: none !important;
+  }
 }
 
 /* ===================================================
@@ -6017,6 +6212,6 @@ main.swipe-enter-right {
   }
 
   .fc-list-container {
-    max-width: 700px;
+    max-width: 1100px;
   }
 }
