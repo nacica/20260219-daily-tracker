@@ -5880,3 +5880,53 @@ main.swipe-enter-right {
   margin-bottom: 16px;
   padding: 16px;
 }
+
+/* ===================================================
+   単語帳カード — デスクトップ対応
+   =================================================== */
+
+@media (min-width: 1024px) {
+  .fcs-container {
+    max-width: 600px;
+    min-height: auto;
+    padding: 20px 0;
+  }
+
+  .fcs-card-wrapper {
+    height: 50vh;
+    min-height: 280px;
+    max-height: 500px;
+  }
+
+  .fcs-card-face {
+    padding: 44px 32px 40px;
+  }
+
+  .fcs-face-content {
+    font-size: 1.1rem;
+    line-height: 1.8;
+  }
+
+  .fcs-actions {
+    gap: 16px;
+    margin-bottom: 14px;
+  }
+
+  .fcs-btn-forgot,
+  .fcs-btn-remembered {
+    padding: 14px 24px;
+    font-size: 1.05rem;
+  }
+
+  .fcs-btn-forgot:hover {
+    background: rgba(255, 51, 102, 0.2);
+  }
+
+  .fcs-btn-remembered:hover {
+    background: rgba(0, 255, 148, 0.2);
+  }
+
+  .fc-list-container {
+    max-width: 700px;
+  }
+}
