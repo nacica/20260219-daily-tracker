@@ -5688,6 +5688,12 @@ main.swipe-enter-right {
   font-weight: 500;
 }
 
+.fcs-edit-bar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 8px;
+}
+
 /* カードフリップ */
 
 .fcs-card-wrapper {

@@ -4,8 +4,8 @@
  * 学習中のカード編集にも対応
  */
 
-import { flashcardsApi } from "../api.js?v=20260401f";
-import { showToast } from "../app.js?v=20260401f";
+import { flashcardsApi } from "../api.js?v=20260401g";
+import { showToast } from "../app.js?v=20260401g";
 
 let allCards = [];
 let deck = [];       // シャッフル済み出題リスト
@@ -84,6 +84,10 @@ function renderStudyUI(main) {
         <span class="fcs-progress">#${card._num}　${progress} / ${total}</span>
       </div>
 
+      <div class="fcs-edit-bar">
+        <button class="btn btn-outline btn-sm fcs-btn-edit" id="fcs-edit">✏️ 編集</button>
+      </div>
+
       <div class="fcs-card-wrapper" id="fcs-card-wrapper">
         <div class="fcs-card ${isFlipped ? 'flipped' : ''}" id="fcs-card">
           <div class="fcs-card-face fcs-front">
@@ -113,7 +117,6 @@ function renderStudyUI(main) {
       <!-- 評価ボタン -->
       <div class="fcs-actions" id="fcs-actions" style="${isFlipped ? '' : 'visibility:hidden;'}">
         <button class="btn fcs-btn-forgot" id="fcs-forgot">まだ ✗</button>
-        <button class="btn btn-outline btn-sm fcs-btn-edit" id="fcs-edit">編集</button>
         <button class="btn fcs-btn-remembered" id="fcs-remembered">覚えた ✓</button>
       </div>
 
@@ -195,12 +198,14 @@ function attachStudyEvents() {
   document.getElementById("fcs-forgot").addEventListener("click", () => markAndNext(false));
 
   // 編集
+  const editBar = document.querySelector(".fcs-edit-bar");
   document.getElementById("fcs-edit").addEventListener("click", () => {
     isEditing = true;
     document.getElementById("fcs-edit-form").style.display = "block";
     document.getElementById("fcs-card-wrapper").style.display = "none";
     document.getElementById("fcs-actions").style.display = "none";
     document.getElementById("fcs-swipe-hint").style.display = "none";
+    editBar.style.display = "none";
     document.getElementById("fcs-edit-front").focus();
   });
 
@@ -210,6 +215,7 @@ function attachStudyEvents() {
     document.getElementById("fcs-card-wrapper").style.display = "";
     document.getElementById("fcs-actions").style.display = "";
     document.getElementById("fcs-swipe-hint").style.display = "";
+    editBar.style.display = "";
   });
 
   document.getElementById("fcs-save-edit").addEventListener("click", async () => {
@@ -230,13 +236,13 @@ function attachStudyEvents() {
 
       showToast("カードを更新しました", "success");
       isEditing = false;
-      // 画面を再描画
       document.getElementById("fcs-front-content").textContent = front;
       document.getElementById("fcs-back-content").textContent = back;
       document.getElementById("fcs-edit-form").style.display = "none";
       document.getElementById("fcs-card-wrapper").style.display = "";
       document.getElementById("fcs-actions").style.display = "";
       document.getElementById("fcs-swipe-hint").style.display = "";
+      editBar.style.display = "";
     } catch (e) {
       showToast(`更新に失敗: ${e.message}`, "error");
     }
