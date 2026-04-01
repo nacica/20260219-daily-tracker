@@ -4,17 +4,14 @@
  * 学習中のカード編集にも対応
  */
 
-import { flashcardsApi } from "../api.js?v=20260401o";
-import { showToast } from "../app.js?v=20260401o";
+import { flashcardsApi } from "../api.js?v=20260401p";
+import { showToast } from "../app.js?v=20260401p";
 
 let allCards = [];
 let deck = [];       // シャッフル済み出題リスト
 let currentIndex = 0;
 let isFlipped = false;
 let isEditing = false;
-let touchStartX = 0;
-let touchStartY = 0;
-let touchDeltaX = 0;
 
 function shuffle(arr) {
   const a = [...arr];
@@ -120,10 +117,6 @@ function renderStudyUI(main) {
         <button class="btn fcs-btn-remembered" id="fcs-remembered">覚えた ✓</button>
       </div>
 
-      <!-- スワイプヒント -->
-      <div class="fcs-swipe-hint" id="fcs-swipe-hint" style="${isFlipped ? '' : 'visibility:hidden;'}">
-        タップ=まだ　|　右スワイプ=覚えた
-      </div>
     </div>`;
 
   attachStudyEvents();
@@ -132,7 +125,6 @@ function renderStudyUI(main) {
 function attachStudyEvents() {
   const main = document.querySelector("main");
   const cardEl = document.getElementById("fcs-card");
-  const wrapper = document.getElementById("fcs-card-wrapper");
 
   // 一覧に戻る
   document.getElementById("fcs-back").addEventListener("click", () => {
@@ -146,51 +138,9 @@ function attachStudyEvents() {
       isFlipped = true;
       cardEl.classList.add("flipped");
       document.getElementById("fcs-actions").style.visibility = "";
-      document.getElementById("fcs-swipe-hint").style.visibility = "";
     } else {
       markAndNext(false);
     }
-  });
-
-  // スワイプ
-  wrapper.addEventListener("touchstart", (e) => {
-    if (isEditing) return;
-    touchStartX = e.touches[0].clientX;
-    touchStartY = e.touches[0].clientY;
-    touchDeltaX = 0;
-  }, { passive: true });
-
-  wrapper.addEventListener("touchmove", (e) => {
-    if (isEditing || !isFlipped) return;
-    touchDeltaX = e.touches[0].clientX - touchStartX;
-    const deltaY = Math.abs(e.touches[0].clientY - touchStartY);
-    // 横方向の動きが大きい場合のみカードを動かす
-    if (Math.abs(touchDeltaX) > deltaY) {
-      cardEl.style.transform = `rotateY(180deg) translateX(${touchDeltaX}px) rotate(${touchDeltaX * 0.05}deg)`;
-      cardEl.style.transition = "none";
-      // 色でフィードバック
-      if (touchDeltaX > 50) {
-        wrapper.style.boxShadow = "inset 0 0 40px rgba(0,255,148,0.15)";
-      } else if (touchDeltaX < -50) {
-        wrapper.style.boxShadow = "inset 0 0 40px rgba(255,51,102,0.15)";
-      } else {
-        wrapper.style.boxShadow = "";
-      }
-    }
-  }, { passive: true });
-
-  wrapper.addEventListener("touchend", () => {
-    if (isEditing || !isFlipped) return;
-    wrapper.style.boxShadow = "";
-    cardEl.style.transition = "";
-    cardEl.style.transform = "";
-
-    if (touchDeltaX > 80) {
-      markAndNext(true);  // 右スワイプ = 覚えた
-    } else if (touchDeltaX < -80) {
-      markAndNext(false); // 左スワイプ = まだ
-    }
-    touchDeltaX = 0;
   });
 
   // ボタン
@@ -204,7 +154,6 @@ function attachStudyEvents() {
     document.getElementById("fcs-edit-form").style.display = "block";
     document.getElementById("fcs-card-wrapper").style.display = "none";
     document.getElementById("fcs-actions").style.display = "none";
-    document.getElementById("fcs-swipe-hint").style.display = "none";
     editBar.style.display = "none";
     document.getElementById("fcs-edit-front").focus();
   });
@@ -214,7 +163,6 @@ function attachStudyEvents() {
     document.getElementById("fcs-edit-form").style.display = "none";
     document.getElementById("fcs-card-wrapper").style.display = "";
     document.getElementById("fcs-actions").style.display = "";
-    document.getElementById("fcs-swipe-hint").style.display = "";
     editBar.style.display = "";
   });
 
@@ -241,8 +189,7 @@ function attachStudyEvents() {
       document.getElementById("fcs-edit-form").style.display = "none";
       document.getElementById("fcs-card-wrapper").style.display = "";
       document.getElementById("fcs-actions").style.display = "";
-      document.getElementById("fcs-swipe-hint").style.display = "";
-      editBar.style.display = "";
+        editBar.style.display = "";
     } catch (e) {
       showToast(`更新に失敗: ${e.message}`, "error");
     }

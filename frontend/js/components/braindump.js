@@ -4,8 +4,8 @@
  * 日付切替（前日/翌日 + カレンダー）、自動保存、AIタイトル自動生成。
  */
 
-import { braindumpApi } from "../api.js?v=20260401o";
-import { showToast } from "../app.js?v=20260401o";
+import { braindumpApi } from "../api.js?v=20260401p";
+import { showToast } from "../app.js?v=20260401p";
 
 // ===== ユーティリティ =====
 

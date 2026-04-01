@@ -6126,11 +6126,6 @@ main.swipe-enter-right {
   flex-shrink: 0;
 }
 
-.fcs-swipe-hint {
-  text-align: center;
-  font-size: 0.72rem;
-  color: var(--text-muted);
-}
 
 /* 学習完了画面 */
 
