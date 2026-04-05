@@ -5988,17 +5988,15 @@ main.swipe-enter-right {
 .fcs-card-wrapper {
   margin-bottom: 20px;
   border-radius: var(--radius);
-  min-height: 220px;
 }
 
 .fcs-card {
-  display: grid;
+  position: relative;
   width: 100%;
   cursor: pointer;
 }
 
 .fcs-card-face {
-  grid-area: 1 / 1;
   border-radius: var(--radius);
   padding: 40px 20px 40px;
   display: flex;
@@ -6053,15 +6051,22 @@ main.swipe-enter-right {
 }
 
 /* 非アクティブ面を非表示にして重なりを防ぐ */
+/* 表面がデフォルトでフロー内、裏面は絶対配置 */
 .fcs-back {
+  position: absolute;
+  inset: 0;
   visibility: hidden;
   pointer-events: none;
 }
+/* フリップ時: 裏面をフロー内に、表面を絶対配置に */
 .fcs-card.flipped .fcs-front {
+  position: absolute;
+  inset: 0;
   visibility: hidden;
   pointer-events: none;
 }
 .fcs-card.flipped .fcs-back {
+  position: relative;
   visibility: visible;
   pointer-events: auto;
 }
@@ -6281,7 +6286,7 @@ main.swipe-enter-right {
   }
 
   .fcs-card-wrapper {
-    min-height: 280px;
+    min-height: auto;
   }
 
   .fcs-card-face {
