@@ -6100,6 +6100,11 @@ main.swipe-enter-right {
   text-align: left;
   color: var(--text-primary);
   line-height: 1.7;
+}
+
+.fcs-front .fcs-face-content {
+  color: var(--cyan);
+  font-weight: 700;
   white-space: pre-wrap;
   word-break: break-word;
   max-width: 100%;
