@@ -6058,14 +6058,17 @@ main.swipe-enter-right {
   transform: translateY(0);
 }
 
-/* flipped時: front非表示、back表示（pointer-events制御） */
+/* 非アクティブ面を非表示にして重なりを防ぐ */
 .fcs-back {
+  visibility: hidden;
   pointer-events: none;
 }
 .fcs-card.flipped .fcs-front {
+  visibility: hidden;
   pointer-events: none;
 }
 .fcs-card.flipped .fcs-back {
+  visibility: visible;
   pointer-events: auto;
 }
 
