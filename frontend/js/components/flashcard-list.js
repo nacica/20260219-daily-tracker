@@ -5,8 +5,8 @@
  * カードの追加・編集・削除 + 学習画面への遷移
  */
 
-import { flashcardsApi } from "../api.js?v=20260401p";
-import { showToast } from "../app.js?v=20260401p";
+import { flashcardsApi } from "../api.js?v=20260405a";
+import { showToast } from "../app.js?v=20260405a";
 
 const WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
 
@@ -187,6 +187,7 @@ function buildDetailView(card) {
       <span class="fc-detail-date">${formatDateTime(card.created_at)}</span>
     </div>
     <div class="fc-detail-actions-top">
+      <button class="btn btn-outline btn-sm fc-detail-toggle-status" data-id="${card.id}" style="color: ${card.remembered ? 'var(--neon-red)' : 'var(--neon-green)'}; border-color: ${card.remembered ? 'rgba(255,51,102,0.3)' : 'rgba(0,255,148,0.3)'};">${card.remembered ? '「まだ」に戻す' : '「覚えた」にする'}</button>
       <button class="btn btn-outline btn-sm fc-detail-edit" data-id="${card.id}">編集</button>
       <button class="btn btn-outline btn-sm fc-detail-delete" data-id="${card.id}" style="color: var(--neon-red); border-color: rgba(255,51,102,0.3);">削除</button>
     </div>
@@ -200,6 +201,7 @@ function buildDetailView(card) {
       <div class="fc-detail-back">${escapeHtml(card.back)}</div>
     </div>
     <div class="fc-detail-actions">
+      <button class="btn btn-outline btn-sm fc-detail-toggle-status" data-id="${card.id}" style="color: ${card.remembered ? 'var(--neon-red)' : 'var(--neon-green)'}; border-color: ${card.remembered ? 'rgba(255,51,102,0.3)' : 'rgba(0,255,148,0.3)'};">${card.remembered ? '「まだ」に戻す' : '「覚えた」にする'}</button>
       <button class="btn btn-outline btn-sm fc-detail-edit" data-id="${card.id}">編集</button>
       <button class="btn btn-outline btn-sm fc-detail-delete" data-id="${card.id}" style="color: var(--neon-red); border-color: rgba(255,51,102,0.3);">削除</button>
     </div>
@@ -339,6 +341,25 @@ function attachDetailEvents(container) {
       }
     });
   }
+
+  // ステータス切り替えボタン
+  const toggleBtns = root.querySelectorAll(".fc-detail-toggle-status");
+  toggleBtns.forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const id = btn.dataset.id;
+      const card = cards.find((c) => c.id === id);
+      if (!card) return;
+      const newStatus = !card.remembered;
+      try {
+        await flashcardsApi.mark(id, newStatus);
+        card.remembered = newStatus;
+        showToast(newStatus ? "「覚えた」に変更しました" : "「まだ」に戻しました", "success");
+        renderFlashcardList();
+      } catch (e) {
+        showToast(`変更に失敗: ${e.message}`, "error");
+      }
+    });
+  });
 
   // 削除ボタン
   const deleteBtn = root.querySelector(".fc-detail-delete");

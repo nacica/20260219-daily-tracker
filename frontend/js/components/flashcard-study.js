@@ -4,8 +4,8 @@
  * 学習中のカード編集にも対応
  */
 
-import { flashcardsApi } from "../api.js?v=20260401p";
-import { showToast } from "../app.js?v=20260401p";
+import { flashcardsApi } from "../api.js?v=20260405a";
+import { showToast } from "../app.js?v=20260405a";
 
 let allCards = [];
 let deck = [];       // シャッフル済み出題リスト
@@ -61,11 +61,53 @@ export async function renderFlashcardStudy() {
   // 作成順に番号を振る（APIは降順なので逆順）
   allCards.forEach((c, i) => { c._num = allCards.length - i; });
 
-  deck = shuffle(allCards);
+  const notYetCards = allCards.filter((c) => !c.remembered);
+
+  // 未記憶カードがある場合はモード選択画面を表示
+  if (notYetCards.length > 0 && notYetCards.length < allCards.length) {
+    renderModeSelect(main, notYetCards.length, allCards.length);
+  } else {
+    // 全部覚えた or 全部未記憶 → そのまま開始
+    startStudy(main, allCards);
+  }
+}
+
+function renderModeSelect(main, notYetCount, totalCount) {
+  main.innerHTML = `
+    <div class="fcs-mode-select">
+      <div class="fcs-mode-title">学習モードを選択</div>
+      <div class="fcs-mode-stats">
+        <span class="fc-stat">全 ${totalCount} 枚</span>
+        <span class="fc-stat not-yet">✗ 未記憶 ${notYetCount}</span>
+        <span class="fc-stat remembered">✓ 覚えた ${totalCount - notYetCount}</span>
+      </div>
+      <div class="fcs-mode-buttons">
+        <button class="btn btn-primary fcs-mode-btn" id="fcs-mode-notyet">
+          未記憶のみ（${notYetCount} 枚）
+        </button>
+        <button class="btn btn-outline fcs-mode-btn" id="fcs-mode-all">
+          全カード（${totalCount} 枚）
+        </button>
+      </div>
+      <button class="btn btn-outline btn-sm" id="fcs-mode-back" style="margin-top: 20px;">← 一覧に戻る</button>
+    </div>`;
+
+  document.getElementById("fcs-mode-notyet").addEventListener("click", () => {
+    startStudy(main, allCards.filter((c) => !c.remembered));
+  });
+  document.getElementById("fcs-mode-all").addEventListener("click", () => {
+    startStudy(main, allCards);
+  });
+  document.getElementById("fcs-mode-back").addEventListener("click", () => {
+    window.location.hash = "/flashcards";
+  });
+}
+
+function startStudy(main, cards) {
+  deck = shuffle(cards);
   currentIndex = 0;
   isFlipped = false;
   isEditing = false;
-
   renderStudyUI(main);
 }
 
@@ -238,16 +280,20 @@ function showComplete() {
         </div>
       </div>
       <div class="fcs-complete-actions">
-        <button class="btn btn-primary" id="fcs-retry">もう一度</button>
+        ${total - remembered > 0 ? `<button class="btn btn-primary" id="fcs-retry-notyet">まだのカードだけ再学習（${total - remembered} 枚）</button>` : ""}
+        <button class="btn btn-outline" id="fcs-retry">全カードでもう一度</button>
         <button class="btn btn-outline" id="fcs-to-list">一覧に戻る</button>
       </div>
     </div>`;
 
+  const retryNotYet = document.getElementById("fcs-retry-notyet");
+  if (retryNotYet) {
+    retryNotYet.addEventListener("click", () => {
+      startStudy(main, allCards.filter((c) => !c.remembered));
+    });
+  }
   document.getElementById("fcs-retry").addEventListener("click", () => {
-    deck = shuffle(allCards);
-    currentIndex = 0;
-    isFlipped = false;
-    renderStudyUI(main);
+    startStudy(main, allCards);
   });
   document.getElementById("fcs-to-list").addEventListener("click", () => {
     window.location.hash = "/flashcards";

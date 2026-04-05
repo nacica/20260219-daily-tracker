@@ -6173,6 +6173,41 @@ main.swipe-enter-right {
   justify-content: center;
 }
 
+/* 学習モード選択画面 */
+
+.fcs-mode-select {
+  text-align: center;
+  padding: 40px 20px;
+  max-width: 400px;
+  margin: 0 auto;
+}
+
+.fcs-mode-title {
+  font-size: 1.3rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 16px;
+}
+
+.fcs-mode-stats {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.fcs-mode-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.fcs-mode-btn {
+  width: 100%;
+  padding: 14px 20px;
+  font-size: 1rem;
+}
+
 .fcs-edit-form {
   margin-bottom: 16px;
   padding: 16px;
