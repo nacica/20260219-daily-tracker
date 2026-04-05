@@ -6103,7 +6103,7 @@ main.swipe-enter-right {
 }
 
 .fcs-front .fcs-face-content {
-  color: var(--cyan);
+  color: var(--blue, #2563eb);
   font-weight: 700;
   white-space: pre-wrap;
   word-break: break-word;
