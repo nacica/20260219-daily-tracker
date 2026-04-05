@@ -5988,21 +5988,17 @@ main.swipe-enter-right {
 .fcs-card-wrapper {
   margin-bottom: 20px;
   border-radius: var(--radius);
-  height: 55vh;
   min-height: 220px;
-  max-height: 400px;
 }
 
 .fcs-card {
-  position: relative;
+  display: grid;
   width: 100%;
-  height: 100%;
   cursor: pointer;
 }
 
 .fcs-card-face {
-  position: absolute;
-  inset: 0;
+  grid-area: 1 / 1;
   border-radius: var(--radius);
   padding: 40px 20px 40px;
   display: flex;
@@ -6011,8 +6007,6 @@ main.swipe-enter-right {
   justify-content: flex-start;
   border: 1px solid var(--border-bright);
   background: var(--bg-card);
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
 }
 
 .fcs-front {
@@ -6147,7 +6141,7 @@ main.swipe-enter-right {
   justify-content: center;
   align-items: center;
   gap: 12px;
-  margin-bottom: 10px;
+  margin-bottom: 12px;
 }
 
 .fcs-btn-forgot {
@@ -6287,9 +6281,7 @@ main.swipe-enter-right {
   }
 
   .fcs-card-wrapper {
-    height: 50vh;
     min-height: 280px;
-    max-height: 500px;
   }
 
   .fcs-card-face {

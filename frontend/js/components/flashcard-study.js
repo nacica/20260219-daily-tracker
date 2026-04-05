@@ -127,6 +127,12 @@ function renderStudyUI(main) {
         <button class="btn btn-outline btn-sm fcs-btn-edit" id="fcs-edit">✏️ 編集</button>
       </div>
 
+      <!-- 評価ボタン（カードの上に配置） -->
+      <div class="fcs-actions" id="fcs-actions" style="${isFlipped ? '' : 'visibility:hidden;'}">
+        <button class="btn fcs-btn-forgot" id="fcs-forgot">まだ ✗</button>
+        <button class="btn fcs-btn-remembered" id="fcs-remembered">覚えた ✓</button>
+      </div>
+
       <div class="fcs-card-wrapper" id="fcs-card-wrapper">
         <div class="fcs-card ${isFlipped ? 'flipped' : ''}" id="fcs-card">
           <div class="fcs-card-face fcs-front">
@@ -151,12 +157,6 @@ function renderStudyUI(main) {
           <button class="btn btn-primary btn-sm" id="fcs-save-edit">保存</button>
           <button class="btn btn-outline btn-sm" id="fcs-cancel-edit">キャンセル</button>
         </div>
-      </div>
-
-      <!-- 評価ボタン -->
-      <div class="fcs-actions" id="fcs-actions" style="${isFlipped ? '' : 'visibility:hidden;'}">
-        <button class="btn fcs-btn-forgot" id="fcs-forgot">まだ ✗</button>
-        <button class="btn fcs-btn-remembered" id="fcs-remembered">覚えた ✓</button>
       </div>
 
     </div>`;
