@@ -3,22 +3,22 @@
  * ルーティングの設定とホーム画面の表示を担当する
  */
 
-import { addRoute, navigate, updateNavActive } from "./router.js?v=20260405a";
-import { renderInputForm } from "./components/input-form.js?v=20260405a";
-import { renderAnalysisView } from "./components/analysis-view.js?v=20260405a";
-import { renderHistoryList } from "./components/history-list.js?v=20260405a";
-import { renderWeeklyReport } from "./components/weekly-report.js?v=20260405a";
-import { renderSuggestions } from "./components/suggestions.js?v=20260405a";
-import { renderCoachingChat } from "./components/coaching-chat.js?v=20260405a";
-import { renderKnowledgeGraph } from "./components/knowledge-graph.js?v=20260405a";
-import { renderMonthlyReport } from "./components/monthly-report.js?v=20260405a";
-import { renderJournal } from "./components/journal.js?v=20260405a";
-import { renderBraindump } from "./components/braindump.js?v=20260405a";
-import { recordsApi, analysisApi, remindersApi } from "./api.js?v=20260405a";
-import { initSwipeNav } from "./swipe-nav.js?v=20260405a";
-import { buildTaskStatsCards, renderTaskStats } from "./components/task-stats.js?v=20260405a";
-import { renderFlashcardList } from "./components/flashcard-list.js?v=20260405a";
-import { renderFlashcardStudy } from "./components/flashcard-study.js?v=20260405a";
+import { addRoute, navigate, updateNavActive } from "./router.js?v=20260405b";
+import { renderInputForm } from "./components/input-form.js?v=20260405b";
+import { renderAnalysisView } from "./components/analysis-view.js?v=20260405b";
+import { renderHistoryList } from "./components/history-list.js?v=20260405b";
+import { renderWeeklyReport } from "./components/weekly-report.js?v=20260405b";
+import { renderSuggestions } from "./components/suggestions.js?v=20260405b";
+import { renderCoachingChat } from "./components/coaching-chat.js?v=20260405b";
+import { renderKnowledgeGraph } from "./components/knowledge-graph.js?v=20260405b";
+import { renderMonthlyReport } from "./components/monthly-report.js?v=20260405b";
+import { renderJournal } from "./components/journal.js?v=20260405b";
+import { renderBraindump } from "./components/braindump.js?v=20260405b";
+import { recordsApi, analysisApi, remindersApi } from "./api.js?v=20260405b";
+import { initSwipeNav } from "./swipe-nav.js?v=20260405b";
+import { buildTaskStatsCards, renderTaskStats } from "./components/task-stats.js?v=20260405b";
+import { renderFlashcardList } from "./components/flashcard-list.js?v=20260405b";
+import { renderFlashcardStudy } from "./components/flashcard-study.js?v=20260405b";
 
 // ===== ユーティリティ =====
 
