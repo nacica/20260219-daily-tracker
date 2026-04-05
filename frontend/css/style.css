@@ -6114,6 +6114,13 @@ main.swipe-enter-right {
   width: 100%;
 }
 
+.fcs-back .fcs-face-content {
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-width: 100%;
+  width: 100%;
+}
+
 .fcs-tap-hint {
   position: absolute;
   bottom: 8px;
