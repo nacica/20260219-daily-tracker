@@ -5698,6 +5698,49 @@ main.swipe-enter-right {
   flex: 1;
 }
 
+/* ページネーション */
+.fc-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.fc-pagination-bottom {
+  border-bottom: none;
+  border-top: 1px solid var(--border);
+}
+
+.fc-page-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--cyan);
+  padding: 4px 12px;
+  border-radius: var(--radius-xs);
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: background 0.15s, opacity 0.15s;
+}
+
+.fc-page-btn:hover:not(:disabled) {
+  background: rgba(0, 212, 255, 0.1);
+}
+
+.fc-page-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.fc-page-info {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  min-width: 50px;
+  text-align: center;
+}
+
 /* 問題行 */
 .fc-row {
   display: flex;

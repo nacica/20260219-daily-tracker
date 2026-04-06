@@ -5,8 +5,8 @@
  * カードの追加・編集・削除 + 学習画面への遷移
  */
 
-import { flashcardsApi } from "../api.js?v=20260406f";
-import { showToast } from "../app.js?v=20260406f";
+import { flashcardsApi } from "../api.js?v=20260406g";
+import { showToast } from "../app.js?v=20260406g";
 
 const WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
 
@@ -28,9 +28,12 @@ function escapeHtml(str) {
   );
 }
 
+const PAGE_SIZE = 15;
+
 let cards = [];
 let selectedId = null;
 let keyHandler = null;
+let currentPage = 1;
 
 // ページ遷移時にオーバーレイとキーハンドラを除去
 window.addEventListener("hashchange", () => {
@@ -73,7 +76,18 @@ export async function renderFlashcardList() {
   const totalCount = cards.length;
   const rememberedCount = cards.filter((c) => c.remembered).length;
 
-  selectedId = cards.length > 0 ? cards[0].id : null;
+  // ページ数を正規化（カード削除後などで超過しないように）
+  const totalPages = Math.max(1, Math.ceil(cards.length / PAGE_SIZE));
+  if (currentPage > totalPages) currentPage = totalPages;
+
+  // 選択中カードがあればそのページに合わせる、なければ現在ページの先頭を選択
+  if (selectedId && cards.find((c) => c.id === selectedId)) {
+    const idx = cards.findIndex((c) => c.id === selectedId);
+    currentPage = Math.floor(idx / PAGE_SIZE) + 1;
+  } else {
+    const startIdx = (currentPage - 1) * PAGE_SIZE;
+    selectedId = cards.length > 0 ? cards[Math.min(startIdx, cards.length - 1)].id : null;
+  }
 
   main.innerHTML = `
     <div class="fc-list-container">
@@ -133,9 +147,11 @@ export async function renderFlashcardList() {
                 <span class="fc-pane-left-label">問題一覧</span>
                 <span class="fc-pane-left-hint">↑↓キーで移動</span>
               </div>
+              ${buildPagination(currentPage, totalPages, "top")}
               <div class="fc-pane-list" id="fc-pane-list">
-                ${cards.map((c) => buildListRow(c)).join("")}
+                ${getPageCards(currentPage).map((c) => buildListRow(c)).join("")}
               </div>
+              ${buildPagination(currentPage, totalPages, "bottom")}
             </div>
             <!-- 右ペイン: 回答表示（PC のみ表示） -->
             <div class="fc-pane-right" id="fc-pane-right">
@@ -162,6 +178,61 @@ export async function renderFlashcardList() {
     selectCard(selectedId);
   }
   attachEvents(cards);
+}
+
+function getPageCards(page) {
+  const start = (page - 1) * PAGE_SIZE;
+  return cards.slice(start, start + PAGE_SIZE);
+}
+
+function buildPagination(page, totalPages, position) {
+  if (totalPages <= 1) return "";
+  return `
+    <div class="fc-pagination fc-pagination-${position}">
+      <button class="fc-page-btn" data-page="${page - 1}" ${page <= 1 ? "disabled" : ""}>← 前</button>
+      <span class="fc-page-info">${page} / ${totalPages}</span>
+      <button class="fc-page-btn" data-page="${page + 1}" ${page >= totalPages ? "disabled" : ""}>次 →</button>
+    </div>`;
+}
+
+function goToPage(page) {
+  const totalPages = Math.max(1, Math.ceil(cards.length / PAGE_SIZE));
+  if (page < 1 || page > totalPages) return;
+  currentPage = page;
+  // 新しいページの先頭カードを選択
+  const pageCards = getPageCards(page);
+  if (pageCards.length > 0) selectedId = pageCards[0].id;
+  rerenderList();
+}
+
+function rerenderList() {
+  const totalPages = Math.max(1, Math.ceil(cards.length / PAGE_SIZE));
+  const listEl = document.getElementById("fc-pane-list");
+  if (!listEl) return;
+  listEl.innerHTML = getPageCards(currentPage).map((c) => buildListRow(c)).join("");
+
+  // ページネーション更新
+  document.querySelectorAll(".fc-pagination").forEach((el) => {
+    const pos = el.classList.contains("fc-pagination-top") ? "top" : "bottom";
+    el.outerHTML = buildPagination(currentPage, totalPages, pos);
+  });
+
+  // ページネーションボタン再バインド
+  attachPaginationEvents();
+
+  // 選択中カードの詳細を更新
+  if (selectedId && !isMobile()) {
+    selectCard(selectedId);
+  }
+}
+
+function attachPaginationEvents() {
+  document.querySelectorAll(".fc-page-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const page = parseInt(btn.dataset.page, 10);
+      goToPage(page);
+    });
+  });
 }
 
 function buildListRow(card) {
@@ -270,7 +341,13 @@ function moveTo(direction) {
   if (newIdx < 0) newIdx = 0;
   if (newIdx >= cards.length) newIdx = cards.length - 1;
   if (newIdx !== idx) {
-    if (isMobile()) {
+    // ページをまたぐ場合はページ切り替え
+    const newPage = Math.floor(newIdx / PAGE_SIZE) + 1;
+    if (newPage !== currentPage) {
+      currentPage = newPage;
+      selectedId = cards[newIdx].id;
+      rerenderList();
+    } else if (isMobile()) {
       selectCardMobile(cards[newIdx].id);
     } else {
       selectCard(cards[newIdx].id);
@@ -513,6 +590,9 @@ function attachEvents() {
       }
     });
   }
+
+  // ページネーションボタン
+  attachPaginationEvents();
 
   // キーボード ↑↓ 操作
   keyHandler = (e) => {
