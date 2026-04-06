@@ -5661,10 +5661,6 @@ main.swipe-enter-right {
   gap: 0;
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  overflow: hidden;
-  height: 65vh;
-  min-height: 320px;
-  max-height: 700px;
   background: var(--bg-card);
 }
 
@@ -5700,8 +5696,6 @@ main.swipe-enter-right {
 
 .fc-pane-list {
   flex: 1;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
 }
 
 /* 問題行 */
@@ -5764,9 +5758,6 @@ main.swipe-enter-right {
 
 .fc-pane-detail {
   padding: 20px;
-  height: 100%;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
 }
 
 .fc-detail-placeholder {
