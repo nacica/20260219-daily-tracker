@@ -5,8 +5,8 @@
  * カードの追加・編集・削除 + 学習画面への遷移
  */
 
-import { flashcardsApi } from "../api.js?v=20260406b";
-import { showToast } from "../app.js?v=20260406b";
+import { flashcardsApi } from "../api.js?v=20260406c";
+import { showToast } from "../app.js?v=20260406c";
 
 const WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
 
@@ -298,9 +298,8 @@ function attachDetailEvents(container) {
   const root = container || document.getElementById("fc-pane-detail");
   if (!root) return;
 
-  // 編集ボタン
-  const editBtn = root.querySelector(".fc-detail-edit");
-  if (editBtn) {
+  // 編集ボタン（上部・下部の両方）
+  root.querySelectorAll(".fc-detail-edit").forEach((editBtn) => {
     editBtn.addEventListener("click", () => {
       const id = editBtn.dataset.id;
       const form = root.querySelector(`.fc-detail-edit-form[data-id="${id}"]`);
@@ -309,21 +308,19 @@ function attachDetailEvents(container) {
       form.style.display = "block";
       form.querySelector(".fc-edit-front").focus();
     });
-  }
+  });
 
   // 編集キャンセル
-  const cancelBtn = root.querySelector(".fc-detail-cancel-edit");
-  if (cancelBtn) {
+  root.querySelectorAll(".fc-detail-cancel-edit").forEach((cancelBtn) => {
     cancelBtn.addEventListener("click", () => {
       const sections = root.querySelectorAll(".fc-detail-section, .fc-detail-divider, .fc-detail-actions, .fc-detail-actions-top");
       sections.forEach((s) => (s.style.display = ""));
       root.querySelector(".fc-detail-edit-form").style.display = "none";
     });
-  }
+  });
 
   // 編集保存
-  const saveBtn = root.querySelector(".fc-detail-save-edit");
-  if (saveBtn) {
+  root.querySelectorAll(".fc-detail-save-edit").forEach((saveBtn) => {
     saveBtn.addEventListener("click", async () => {
       const id = saveBtn.dataset.id;
       const front = root.querySelector(".fc-edit-front").value.trim();
@@ -340,11 +337,10 @@ function attachDetailEvents(container) {
         showToast(`更新に失敗: ${e.message}`, "error");
       }
     });
-  }
+  });
 
   // ステータス切り替えボタン
-  const toggleBtns = root.querySelectorAll(".fc-detail-toggle-status");
-  toggleBtns.forEach((btn) => {
+  root.querySelectorAll(".fc-detail-toggle-status").forEach((btn) => {
     btn.addEventListener("click", async () => {
       const id = btn.dataset.id;
       const card = cards.find((c) => c.id === id);
@@ -361,9 +357,8 @@ function attachDetailEvents(container) {
     });
   });
 
-  // 削除ボタン
-  const deleteBtn = root.querySelector(".fc-detail-delete");
-  if (deleteBtn) {
+  // 削除ボタン（上部・下部の両方）
+  root.querySelectorAll(".fc-detail-delete").forEach((deleteBtn) => {
     deleteBtn.addEventListener("click", async () => {
       const id = deleteBtn.dataset.id;
       if (!confirm("このカードを削除しますか？")) return;
@@ -375,7 +370,7 @@ function attachDetailEvents(container) {
         showToast(`削除に失敗: ${e.message}`, "error");
       }
     });
-  }
+  });
 }
 
 function attachEvents() {
