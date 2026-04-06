@@ -5862,14 +5862,8 @@ main.swipe-enter-right {
   margin-top: 16px;
 }
 
-/* モバイル: 上にボタン表示、下は非表示 / PC: 上は非表示、下にボタン表示 */
-@media (max-width: 767px) {
-  .fc-detail-actions { display: none; }
-}
-
-@media (min-width: 768px) {
-  .fc-detail-actions-top { display: none; }
-}
+/* 下部のボタンは非表示（上部のみ使用） */
+.fc-detail-actions { display: none; }
 
 .fc-detail-edit-form {
   margin-top: 12px;

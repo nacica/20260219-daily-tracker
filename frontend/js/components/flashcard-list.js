@@ -5,8 +5,8 @@
  * カードの追加・編集・削除 + 学習画面への遷移
  */
 
-import { flashcardsApi } from "../api.js?v=20260406e";
-import { showToast } from "../app.js?v=20260406e";
+import { flashcardsApi } from "../api.js?v=20260406f";
+import { showToast } from "../app.js?v=20260406f";
 
 const WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
 
