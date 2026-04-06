@@ -5,8 +5,8 @@
  * カードの追加・編集・削除 + 学習画面への遷移
  */
 
-import { flashcardsApi } from "../api.js?v=20260406g";
-import { showToast } from "../app.js?v=20260406g";
+import { flashcardsApi } from "../api.js?v=20260406h";
+import { showToast } from "../app.js?v=20260406h";
 
 const WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
 
@@ -198,18 +198,39 @@ function buildPagination(page, totalPages, position) {
 function goToPage(page) {
   const totalPages = Math.max(1, Math.ceil(cards.length / PAGE_SIZE));
   if (page < 1 || page > totalPages) return;
+  const direction = page > currentPage ? "next" : "prev";
   currentPage = page;
   // 新しいページの先頭カードを選択
   const pageCards = getPageCards(page);
   if (pageCards.length > 0) selectedId = pageCards[0].id;
-  rerenderList();
+  rerenderList(direction);
 }
 
-function rerenderList() {
+function rerenderList(direction) {
   const totalPages = Math.max(1, Math.ceil(cards.length / PAGE_SIZE));
   const listEl = document.getElementById("fc-pane-list");
   if (!listEl) return;
-  listEl.innerHTML = getPageCards(currentPage).map((c) => buildListRow(c)).join("");
+
+  const newHtml = getPageCards(currentPage).map((c) => buildListRow(c)).join("");
+
+  if (direction) {
+    // スライド+フェードアニメーション
+    const exitClass = direction === "next" ? "fc-slide-out-left" : "fc-slide-out-right";
+    listEl.classList.add(exitClass);
+    listEl.addEventListener("animationend", function handler() {
+      listEl.removeEventListener("animationend", handler);
+      listEl.classList.remove(exitClass);
+      listEl.innerHTML = newHtml;
+      const enterClass = direction === "next" ? "fc-slide-in-right" : "fc-slide-in-left";
+      listEl.classList.add(enterClass);
+      listEl.addEventListener("animationend", function handler2() {
+        listEl.removeEventListener("animationend", handler2);
+        listEl.classList.remove(enterClass);
+      });
+    });
+  } else {
+    listEl.innerHTML = newHtml;
+  }
 
   // ページネーション更新
   document.querySelectorAll(".fc-pagination").forEach((el) => {
@@ -344,9 +365,10 @@ function moveTo(direction) {
     // ページをまたぐ場合はページ切り替え
     const newPage = Math.floor(newIdx / PAGE_SIZE) + 1;
     if (newPage !== currentPage) {
+      const direction = newPage > currentPage ? "next" : "prev";
       currentPage = newPage;
       selectedId = cards[newIdx].id;
-      rerenderList();
+      rerenderList(direction);
     } else if (isMobile()) {
       selectCardMobile(cards[newIdx].id);
     } else {

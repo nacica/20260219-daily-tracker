@@ -5741,6 +5741,47 @@ main.swipe-enter-right {
   text-align: center;
 }
 
+/* ページ切り替えアニメーション（スライド+フェード） */
+.fc-pane-list {
+  overflow: hidden;
+}
+
+.fc-slide-out-left {
+  animation: slideOutLeft 0.2s ease-in forwards;
+}
+
+.fc-slide-out-right {
+  animation: slideOutRight 0.2s ease-in forwards;
+}
+
+.fc-slide-in-right {
+  animation: slideInRight 0.2s ease-out forwards;
+}
+
+.fc-slide-in-left {
+  animation: slideInLeft 0.2s ease-out forwards;
+}
+
+@keyframes slideOutLeft {
+  from { transform: translateX(0); opacity: 1; }
+  to   { transform: translateX(-30px); opacity: 0; }
+}
+
+@keyframes slideOutRight {
+  from { transform: translateX(0); opacity: 1; }
+  to   { transform: translateX(30px); opacity: 0; }
+}
+
+@keyframes slideInRight {
+  from { transform: translateX(30px); opacity: 0; }
+  to   { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes slideInLeft {
+  from { transform: translateX(-30px); opacity: 0; }
+  to   { transform: translateX(0); opacity: 1; }
+}
+
 /* 問題行 */
 .fc-row {
   display: flex;
