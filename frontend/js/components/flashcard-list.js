@@ -5,8 +5,8 @@
  * カードの追加・編集・削除 + 学習画面への遷移
  */
 
-import { flashcardsApi } from "../api.js?v=20260406d";
-import { showToast } from "../app.js?v=20260406d";
+import { flashcardsApi } from "../api.js?v=20260406e";
+import { showToast } from "../app.js?v=20260406e";
 
 const WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
 
@@ -181,15 +181,15 @@ function buildDetailView(card) {
   const statusClass = card.remembered ? "remembered" : "not-yet";
   const statusLabel = card.remembered ? "覚えた" : "まだ";
   return `
-    <div class="fc-detail-header">
-      <span class="fc-detail-num">#${card._num}</span>
-      <span class="fc-item-status ${statusClass}">${statusLabel}</span>
-      <span class="fc-detail-date">${formatDateTime(card.created_at)}</span>
-    </div>
     <div class="fc-detail-actions-top">
       <button class="btn btn-outline btn-sm fc-detail-toggle-status" data-id="${card.id}" style="color: ${card.remembered ? 'var(--neon-red)' : 'var(--neon-green)'}; border-color: ${card.remembered ? 'rgba(255,51,102,0.3)' : 'rgba(0,255,148,0.3)'};">${card.remembered ? '「まだ」に戻す' : '「覚えた」にする'}</button>
       <button class="btn btn-outline btn-sm fc-detail-edit" data-id="${card.id}">編集</button>
       <button class="btn btn-outline btn-sm fc-detail-delete" data-id="${card.id}" style="color: var(--neon-red); border-color: rgba(255,51,102,0.3);">削除</button>
+    </div>
+    <div class="fc-detail-header">
+      <span class="fc-detail-num">#${card._num}</span>
+      <span class="fc-item-status ${statusClass}">${statusLabel}</span>
+      <span class="fc-detail-date">${formatDateTime(card.created_at)}</span>
     </div>
     <div class="fc-detail-section">
       <div class="fc-detail-label">表面</div>
