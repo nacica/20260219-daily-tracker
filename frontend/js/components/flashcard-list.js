@@ -5,11 +5,11 @@
  * カードの追加・編集・削除 + 学習画面への遷移
  */
 
-import { flashcardsApi } from "../api.js?v=20260411d";
-import { showToast } from "../app.js?v=20260411d";
+import { flashcardsApi } from "../api.js?v=20260411e";
+import { showToast } from "../app.js?v=20260411e";
 
 // モジュールロード時に読み込み確認ログを出す（キャッシュ診断用）
-const FLASHCARD_LIST_VERSION = "20260411d";
+const FLASHCARD_LIST_VERSION = "20260411e";
 console.log(`%c[flashcard-list] モジュール読み込み完了 version=${FLASHCARD_LIST_VERSION}`, "color:#0f0;font-weight:bold;");
 
 const WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
@@ -131,12 +131,12 @@ export async function renderFlashcardList() {
         </div>
         <textarea class="fc-textarea" id="fc-bulk-input" rows="14"></textarea>
         <div class="fc-bulk-preview" id="fc-bulk-preview"></div>
-        <div class="fc-bulk-status" id="fc-bulk-status" style="display:none; margin-top:12px; padding:12px; background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.1); border-radius:8px; font-family:monospace; font-size:12px; white-space:pre-wrap; max-height:240px; overflow-y:auto;"></div>
         <div class="fc-form-btns">
           <button class="btn btn-primary btn-sm" id="fc-bulk-save">一括登録</button>
           <button class="btn btn-outline btn-sm" id="fc-bulk-preview-btn">プレビュー</button>
           <button class="btn btn-outline btn-sm" id="fc-bulk-cancel">キャンセル</button>
         </div>
+        <div class="fc-bulk-status" id="fc-bulk-status" style="display:none; margin-top:16px; padding:14px; background:#111; color:#eee; border:2px solid #ffcc00; border-radius:8px; font-family:monospace; font-size:13px; white-space:pre-wrap; max-height:320px; overflow-y:auto; box-shadow:0 0 12px rgba(255,204,0,0.4);"></div>
       </div>
 
       <!-- 2ペインレイアウト -->
@@ -646,6 +646,13 @@ function attachEvents() {
     const saveBtn = document.getElementById("fc-bulk-save");
     const originalText = saveBtn.textContent;
 
+    // ステータス要素がない場合は alert で必ず気づけるようにする（保険）
+    if (!statusEl) {
+      alert("⚠ fc-bulk-status 要素が見つかりません。キャッシュが古い可能性があります。ハードリロード (Ctrl+Shift+R) してください。");
+      console.error("[flashcard-bulk] fc-bulk-status element NOT FOUND");
+      return;
+    }
+
     const log = (msg, color) => {
       const ts = new Date().toLocaleTimeString("ja-JP", { hour12: false });
       const line = document.createElement("div");
@@ -659,6 +666,8 @@ function attachEvents() {
     try {
       statusEl.innerHTML = "";
       statusEl.style.display = "block";
+      // 表示直後にパネルをビューポート内へスクロール
+      statusEl.scrollIntoView({ behavior: "smooth", block: "center" });
       log(`=== 一括登録 開始 (version=${FLASHCARD_LIST_VERSION}) ===`, "#0ff");
 
       const text = document.getElementById("fc-bulk-input").value;
