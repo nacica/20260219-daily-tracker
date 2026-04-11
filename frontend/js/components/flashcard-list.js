@@ -5,8 +5,8 @@
  * カードの追加・編集・削除 + 学習画面への遷移
  */
 
-import { flashcardsApi } from "../api.js?v=20260406h";
-import { showToast } from "../app.js?v=20260406h";
+import { flashcardsApi } from "../api.js?v=20260411c";
+import { showToast } from "../app.js?v=20260411c";
 
 const WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
 
@@ -379,18 +379,77 @@ function moveTo(direction) {
 
 /** 一括入力テキストをパースしてカード配列を返す */
 function parseBulkInput(text) {
-  const result = [];
-  const rawCards = text.split(/^---$/m);
-  for (const block of rawCards) {
-    const parts = block.split(/^===$/m);
-    if (parts.length < 2) continue;
-    const front = parts[0].trim();
-    const back = parts.slice(1).join("===").trim();
-    if (front && back) {
-      result.push({ front, back });
-    }
+  console.groupCollapsed("[flashcard-bulk] parseBulkInput");
+  console.log("raw length:", text.length);
+  console.log("raw (JSON):", JSON.stringify(text));
+
+  // 改行コード正規化（\r\n / \r → \n）。貼り付け由来の CRLF 対策。
+  const normalized = text.replace(/\r\n?/g, "\n");
+  if (normalized !== text) {
+    console.warn("改行コードを正規化しました (\\r\\n → \\n)");
   }
-  return result;
+
+  // 区切り行の前後空白も許容するため、行単位で走査して手動分割する
+  const lines = normalized.split("\n");
+  const result = [];
+  const skipped = [];
+  let front = [];
+  let back = [];
+  let mode = "front"; // "front" → "back" → (--- で次カード)
+
+  const flush = (reason) => {
+    const f = front.join("\n").trim();
+    const b = back.join("\n").trim();
+    if (f && b) {
+      result.push({ front: f, back: b });
+    } else if (f || b) {
+      skipped.push({ front: f, back: b, reason });
+    }
+    front = [];
+    back = [];
+    mode = "front";
+  };
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const trimmed = line.trim();
+    if (trimmed === "---") {
+      flush("separator");
+      continue;
+    }
+    if (trimmed === "===") {
+      if (mode === "front") {
+        mode = "back";
+      } else {
+        // back 中に再び === が出た場合は区切り記号ではなく本文として扱う
+        back.push(line);
+      }
+      continue;
+    }
+    if (mode === "front") front.push(line);
+    else back.push(line);
+  }
+  flush("eof");
+
+  console.log(`検出されたカード: ${result.length} 枚`);
+  console.log(`スキップされた不完全ブロック: ${skipped.length} 件`);
+  if (skipped.length > 0) {
+    console.table(skipped.map((s, i) => ({
+      "#": i + 1,
+      front: s.front.slice(0, 30) || "(空)",
+      back: s.back.slice(0, 30) || "(空)",
+      理由: s.front && !s.back ? "裏面が空" : (!s.front && s.back ? "表面が空" : s.reason),
+    })));
+  }
+  if (result.length > 0) {
+    console.table(result.map((c, i) => ({
+      "#": i + 1,
+      front: c.front.slice(0, 30),
+      back: c.back.slice(0, 30),
+    })));
+  }
+  console.groupEnd();
+  return { cards: result, skipped };
 }
 
 function attachDetailEvents(container) {
@@ -555,14 +614,17 @@ function attachEvents() {
   // 一括追加 — プレビュー
   document.getElementById("fc-bulk-preview-btn").addEventListener("click", () => {
     const text = document.getElementById("fc-bulk-input").value;
-    const parsed = parseBulkInput(text);
+    const { cards: parsed, skipped } = parseBulkInput(text);
     const previewEl = document.getElementById("fc-bulk-preview");
     if (parsed.length === 0) {
-      previewEl.innerHTML = `<div class="fc-bulk-preview-empty">カードが検出されませんでした。形式を確認してください。</div>`;
+      const hint = skipped.length > 0
+        ? `${skipped.length} 件の不完全ブロックを検出しました。表面または裏面が空です。コンソールを確認してください。`
+        : "カードが検出されませんでした。=== と --- の形式を確認してください。";
+      previewEl.innerHTML = `<div class="fc-bulk-preview-empty">${hint}</div>`;
       return;
     }
     previewEl.innerHTML = `
-      <div class="fc-bulk-preview-title">${parsed.length} 枚のカードを検出</div>
+      <div class="fc-bulk-preview-title">${parsed.length} 枚のカードを検出${skipped.length > 0 ? `（${skipped.length} 件の不完全ブロックはスキップ）` : ""}</div>
       ${parsed.map((c, i) => `
         <div class="fc-bulk-preview-card">
           <div class="fc-bulk-preview-num">#${i + 1}</div>
@@ -575,26 +637,60 @@ function attachEvents() {
 
   // 一括追加 — 保存
   document.getElementById("fc-bulk-save").addEventListener("click", async () => {
+    console.group("[flashcard-bulk] 一括登録 開始");
     const text = document.getElementById("fc-bulk-input").value;
-    const parsed = parseBulkInput(text);
+    const { cards: parsed, skipped } = parseBulkInput(text);
+
     if (parsed.length === 0) {
-      showToast("カードが検出されませんでした。=== と --- の形式を確認してください", "error");
+      const msg = skipped.length > 0
+        ? `表/裏が空のブロックが ${skipped.length} 件あります。コンソールで内容を確認してください`
+        : "カードが検出されませんでした。=== と --- の形式を確認してください";
+      console.error("[flashcard-bulk] 登録中止:", msg);
+      console.groupEnd();
+      showToast(msg, "error");
       return;
     }
+
     const saveBtn = document.getElementById("fc-bulk-save");
+    const originalText = saveBtn.textContent;
     saveBtn.disabled = true;
     saveBtn.textContent = `登録中... (0/${parsed.length})`;
+
     let successCount = 0;
+    const failures = [];
     for (let i = 0; i < parsed.length; i++) {
+      const card = parsed[i];
+      console.log(`[flashcard-bulk] POST #${i + 1}/${parsed.length}`, { front: card.front, back: card.back });
       try {
-        await flashcardsApi.create(parsed[i].front, parsed[i].back);
+        const res = await flashcardsApi.create(card.front, card.back);
+        console.log(`[flashcard-bulk] ✓ #${i + 1} 成功`, res);
         successCount++;
         saveBtn.textContent = `登録中... (${successCount}/${parsed.length})`;
       } catch (e) {
+        console.error(`[flashcard-bulk] ✗ #${i + 1} 失敗:`, e);
+        failures.push({ index: i + 1, front: card.front.slice(0, 40), error: e.message });
         showToast(`カード${i + 1}の登録に失敗: ${e.message}`, "error");
       }
     }
-    showToast(`${successCount} 枚のカードを登録しました`, "success");
+
+    console.log(`[flashcard-bulk] 結果: 成功=${successCount} / 失敗=${failures.length} / 合計=${parsed.length}`);
+    if (failures.length > 0) console.table(failures);
+    console.groupEnd();
+
+    if (successCount === 0) {
+      // 全滅時は画面を再描画せずフォームを残し、再試行できるようにする
+      saveBtn.disabled = false;
+      saveBtn.textContent = originalText;
+      showToast("登録に失敗しました。コンソールログを確認してください", "error");
+      return;
+    }
+
+    showToast(
+      failures.length > 0
+        ? `${successCount} 枚登録しました（${failures.length} 枚失敗）`
+        : `${successCount} 枚のカードを登録しました`,
+      failures.length > 0 ? "error" : "success"
+    );
     renderFlashcardList();
   });
 
