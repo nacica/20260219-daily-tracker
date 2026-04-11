@@ -5,8 +5,12 @@
  * カードの追加・編集・削除 + 学習画面への遷移
  */
 
-import { flashcardsApi } from "../api.js?v=20260411c";
-import { showToast } from "../app.js?v=20260411c";
+import { flashcardsApi } from "../api.js?v=20260411d";
+import { showToast } from "../app.js?v=20260411d";
+
+// モジュールロード時に読み込み確認ログを出す（キャッシュ診断用）
+const FLASHCARD_LIST_VERSION = "20260411d";
+console.log(`%c[flashcard-list] モジュール読み込み完了 version=${FLASHCARD_LIST_VERSION}`, "color:#0f0;font-weight:bold;");
 
 const WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
 
@@ -127,6 +131,7 @@ export async function renderFlashcardList() {
         </div>
         <textarea class="fc-textarea" id="fc-bulk-input" rows="14"></textarea>
         <div class="fc-bulk-preview" id="fc-bulk-preview"></div>
+        <div class="fc-bulk-status" id="fc-bulk-status" style="display:none; margin-top:12px; padding:12px; background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.1); border-radius:8px; font-family:monospace; font-size:12px; white-space:pre-wrap; max-height:240px; overflow-y:auto;"></div>
         <div class="fc-form-btns">
           <button class="btn btn-primary btn-sm" id="fc-bulk-save">一括登録</button>
           <button class="btn btn-outline btn-sm" id="fc-bulk-preview-btn">プレビュー</button>
@@ -635,63 +640,85 @@ function attachEvents() {
       `).join("")}`;
   });
 
-  // 一括追加 — 保存
+  // 一括追加 — 保存（画面上のステータスパネルに進捗を書き出す）
   document.getElementById("fc-bulk-save").addEventListener("click", async () => {
-    console.group("[flashcard-bulk] 一括登録 開始");
-    const text = document.getElementById("fc-bulk-input").value;
-    const { cards: parsed, skipped } = parseBulkInput(text);
-
-    if (parsed.length === 0) {
-      const msg = skipped.length > 0
-        ? `表/裏が空のブロックが ${skipped.length} 件あります。コンソールで内容を確認してください`
-        : "カードが検出されませんでした。=== と --- の形式を確認してください";
-      console.error("[flashcard-bulk] 登録中止:", msg);
-      console.groupEnd();
-      showToast(msg, "error");
-      return;
-    }
-
+    const statusEl = document.getElementById("fc-bulk-status");
     const saveBtn = document.getElementById("fc-bulk-save");
     const originalText = saveBtn.textContent;
-    saveBtn.disabled = true;
-    saveBtn.textContent = `登録中... (0/${parsed.length})`;
 
-    let successCount = 0;
-    const failures = [];
-    for (let i = 0; i < parsed.length; i++) {
-      const card = parsed[i];
-      console.log(`[flashcard-bulk] POST #${i + 1}/${parsed.length}`, { front: card.front, back: card.back });
-      try {
-        const res = await flashcardsApi.create(card.front, card.back);
-        console.log(`[flashcard-bulk] ✓ #${i + 1} 成功`, res);
-        successCount++;
-        saveBtn.textContent = `登録中... (${successCount}/${parsed.length})`;
-      } catch (e) {
-        console.error(`[flashcard-bulk] ✗ #${i + 1} 失敗:`, e);
-        failures.push({ index: i + 1, front: card.front.slice(0, 40), error: e.message });
-        showToast(`カード${i + 1}の登録に失敗: ${e.message}`, "error");
+    const log = (msg, color) => {
+      const ts = new Date().toLocaleTimeString("ja-JP", { hour12: false });
+      const line = document.createElement("div");
+      if (color) line.style.color = color;
+      line.textContent = `[${ts}] ${msg}`;
+      statusEl.appendChild(line);
+      statusEl.scrollTop = statusEl.scrollHeight;
+      console.log(`[flashcard-bulk] ${msg}`);
+    };
+
+    try {
+      statusEl.innerHTML = "";
+      statusEl.style.display = "block";
+      log(`=== 一括登録 開始 (version=${FLASHCARD_LIST_VERSION}) ===`, "#0ff");
+
+      const text = document.getElementById("fc-bulk-input").value;
+      log(`入力長: ${text.length} 文字`);
+
+      const { cards: parsed, skipped } = parseBulkInput(text);
+      log(`パース結果: 有効=${parsed.length} 件, スキップ=${skipped.length} 件`);
+
+      if (parsed.length === 0) {
+        log(skipped.length > 0
+          ? `✗ 中止: 表/裏が空のブロックが ${skipped.length} 件あります`
+          : "✗ 中止: カードが検出されませんでした (===, --- の形式を確認)", "#f66");
+        return;
       }
-    }
 
-    console.log(`[flashcard-bulk] 結果: 成功=${successCount} / 失敗=${failures.length} / 合計=${parsed.length}`);
-    if (failures.length > 0) console.table(failures);
-    console.groupEnd();
+      saveBtn.disabled = true;
+      saveBtn.textContent = `登録中... (0/${parsed.length})`;
 
-    if (successCount === 0) {
-      // 全滅時は画面を再描画せずフォームを残し、再試行できるようにする
+      let successCount = 0;
+      const failures = [];
+      for (let i = 0; i < parsed.length; i++) {
+        const card = parsed[i];
+        const label = `#${i + 1}/${parsed.length} "${card.front.slice(0, 20)}"`;
+        log(`→ POST ${label}`);
+        try {
+          const res = await flashcardsApi.create(card.front, card.back);
+          successCount++;
+          saveBtn.textContent = `登録中... (${successCount}/${parsed.length})`;
+          log(`  ✓ 成功 id=${res?.id || "?"}`, "#0f0");
+        } catch (e) {
+          failures.push({ index: i + 1, error: e.message });
+          log(`  ✗ 失敗: ${e.message}`, "#f66");
+          console.error(`[flashcard-bulk] #${i + 1} 詳細:`, e);
+        }
+      }
+
+      log(`=== 完了: 成功=${successCount} / 失敗=${failures.length} / 合計=${parsed.length} ===`, successCount === parsed.length ? "#0f0" : "#ff0");
+
+      if (successCount === 0) {
+        log("登録に失敗しました。入力内容は残しています。上のログを確認してください", "#f66");
+        saveBtn.disabled = false;
+        saveBtn.textContent = originalText;
+        return;
+      }
+
+      if (failures.length > 0) {
+        showToast(`${successCount} 枚登録 / ${failures.length} 枚失敗`, "error");
+      } else {
+        showToast(`${successCount} 枚のカードを登録しました`, "success");
+      }
+      // 成功時のみリスト再描画（ステータスログは renderFlashcardList で消える）
+      setTimeout(() => renderFlashcardList(), 800);
+    } catch (fatal) {
+      // ハンドラ内で想定外の例外が出た場合の最終セーフティネット
+      console.error("[flashcard-bulk] FATAL", fatal);
+      log(`✗ FATAL: ${fatal?.message || fatal}`, "#f66");
+      log(fatal?.stack || "(stack なし)", "#f99");
       saveBtn.disabled = false;
       saveBtn.textContent = originalText;
-      showToast("登録に失敗しました。コンソールログを確認してください", "error");
-      return;
     }
-
-    showToast(
-      failures.length > 0
-        ? `${successCount} 枚登録しました（${failures.length} 枚失敗）`
-        : `${successCount} 枚のカードを登録しました`,
-      failures.length > 0 ? "error" : "success"
-    );
-    renderFlashcardList();
   });
 
   // 左ペインのクリックイベント
