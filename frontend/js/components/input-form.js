@@ -5,9 +5,9 @@
  * 朝のタスク整理（ソクラテス式問答）統合
  */
 
-import { recordsApi, analysisApi, morningDialogueApi, remindersApi, categoriesApi } from "../api.js?v=20260411a";
-import { showToast } from "../app.js?v=20260411a";
-import { showTaskCompleteAnimation, buildTaskStatsCards } from "./task-stats.js?v=20260411a";
+import { recordsApi, analysisApi, morningDialogueApi, remindersApi, categoriesApi } from "../api.js?v=20260411b";
+import { showToast } from "../app.js?v=20260411b";
+import { showTaskCompleteAnimation, buildTaskStatsCards } from "./task-stats.js?v=20260411b";
 
 /* ── カテゴリ管理 ── */
 
@@ -1590,7 +1590,9 @@ function attachFormEvents(date, isEdit) {
       const rows = timelineRows.querySelectorAll(".timeline-row");
       const lastRow = rows[rows.length - 1];
       const lastEnd = lastRow?.querySelector(".timeline-end")?.value || "";
-      timelineRows.insertAdjacentHTML("beforeend", buildTimelineRowHTML(lastEnd, "", ""));
+      const now = new Date();
+      const nowStr = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+      timelineRows.insertAdjacentHTML("beforeend", buildTimelineRowHTML(lastEnd || nowStr, "", ""));
       // 新しい行の活動入力にフォーカス
       const newRow = timelineRows.lastElementChild;
       newRow.querySelector(".timeline-activity").focus();
