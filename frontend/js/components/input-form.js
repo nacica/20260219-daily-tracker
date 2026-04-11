@@ -5,9 +5,9 @@
  * 朝のタスク整理（ソクラテス式問答）統合
  */
 
-import { recordsApi, analysisApi, morningDialogueApi, remindersApi, categoriesApi } from "../api.js?v=20260406h";
-import { showToast } from "../app.js?v=20260406h";
-import { showTaskCompleteAnimation, buildTaskStatsCards } from "./task-stats.js?v=20260406h";
+import { recordsApi, analysisApi, morningDialogueApi, remindersApi, categoriesApi } from "../api.js?v=20260411a";
+import { showToast } from "../app.js?v=20260411a";
+import { showTaskCompleteAnimation, buildTaskStatsCards } from "./task-stats.js?v=20260411a";
 
 /* ── カテゴリ管理 ── */
 
@@ -1491,7 +1491,10 @@ function attachFormEvents(date, isEdit) {
         endGroup.style.display = "";
         toggleEnd.style.display = "none";
         row.classList.add("has-end");
-        row.querySelector(".timeline-end").focus();
+        const endInput = row.querySelector(".timeline-end");
+        const now = new Date();
+        endInput.value = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+        endInput.focus();
         return;
       }
 
