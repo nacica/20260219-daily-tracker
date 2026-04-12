@@ -6067,7 +6067,7 @@ main.swipe-enter-right {
 
 .fcs-card-face {
   border-radius: var(--radius);
-  padding: 40px 20px 40px;
+  padding: 20px 20px 24px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -6400,7 +6400,7 @@ main.swipe-enter-right {
   }
 
   .fcs-card-face {
-    padding: 44px 32px 40px;
+    padding: 24px 32px 28px;
   }
 
   .fcs-face-content {
