@@ -4,11 +4,13 @@
  * 学習中のカード編集にも対応
  */
 
-import { flashcardsApi } from "../api.js?v=20260406f";
-import { showToast } from "../app.js?v=20260406f";
+import { flashcardsApi } from "../api.js?v=20260412a";
+import { showToast } from "../app.js?v=20260412a";
+
+const ORDER_STORAGE_KEY = "flashcard-study-order";
 
 let allCards = [];
-let deck = [];       // シャッフル済み出題リスト
+let deck = [];       // 出題リスト
 let currentIndex = 0;
 let isFlipped = false;
 let isEditing = false;
@@ -26,6 +28,30 @@ function escapeHtml(str) {
   return str.replace(/[&<>"']/g, (c) =>
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]
   );
+}
+
+function getSavedOrder() {
+  return localStorage.getItem(ORDER_STORAGE_KEY) || "random";
+}
+
+function saveOrder(order) {
+  localStorage.setItem(ORDER_STORAGE_KEY, order);
+}
+
+/** カード配列を指定順序で並べ替える */
+function orderCards(cards, order) {
+  switch (order) {
+    case "random":
+      return shuffle(cards);
+    case "oldest":
+      // _num が小さい順 = 古い順（#1 から）
+      return [...cards].sort((a, b) => a._num - b._num);
+    case "newest":
+      // _num が大きい順 = 新しい順
+      return [...cards].sort((a, b) => b._num - a._num);
+    default:
+      return shuffle(cards);
+  }
 }
 
 export async function renderFlashcardStudy() {
@@ -61,50 +87,86 @@ export async function renderFlashcardStudy() {
   // 作成順に番号を振る（APIは降順なので逆順）
   allCards.forEach((c, i) => { c._num = allCards.length - i; });
 
-  const notYetCards = allCards.filter((c) => !c.remembered);
-
-  // 未記憶カードがある場合はモード選択画面を表示
-  if (notYetCards.length > 0 && notYetCards.length < allCards.length) {
-    renderModeSelect(main, notYetCards.length, allCards.length);
-  } else {
-    // 全部覚えた or 全部未記憶 → そのまま開始
-    startStudy(main, allCards);
-  }
+  // 常にモード選択画面を表示（順序選択が必要なため）
+  renderModeSelect(main);
 }
 
-function renderModeSelect(main, notYetCount, totalCount) {
+function renderModeSelect(main) {
+  const totalCount = allCards.length;
+  const notYetCount = allCards.filter((c) => !c.remembered).length;
+  const rememberedCount = totalCount - notYetCount;
+  const savedOrder = getSavedOrder();
+
+  // 未記憶カードの有無でボタン構成を決定
+  const hasNotYet = notYetCount > 0;
+  const hasRemembered = rememberedCount > 0;
+  const showScopeChoice = hasNotYet && hasRemembered;
+
   main.innerHTML = `
     <div class="fcs-mode-select">
       <div class="fcs-mode-title">学習モードを選択</div>
       <div class="fcs-mode-stats">
         <span class="fc-stat">全 ${totalCount} 枚</span>
         <span class="fc-stat not-yet">✗ 未記憶 ${notYetCount}</span>
-        <span class="fc-stat remembered">✓ 覚えた ${totalCount - notYetCount}</span>
+        <span class="fc-stat remembered">✓ 覚えた ${rememberedCount}</span>
       </div>
+
+      <!-- 順序選択 -->
+      <div class="fcs-order-select">
+        <div class="fcs-order-label">カードの順番</div>
+        <div class="fcs-order-buttons">
+          <button class="btn btn-sm fcs-order-btn ${savedOrder === 'random' ? 'active' : ''}" data-order="random">🔀 ランダム</button>
+          <button class="btn btn-sm fcs-order-btn ${savedOrder === 'newest' ? 'active' : ''}" data-order="newest">🆕 新しい順</button>
+          <button class="btn btn-sm fcs-order-btn ${savedOrder === 'oldest' ? 'active' : ''}" data-order="oldest">📜 古い順</button>
+        </div>
+      </div>
+
+      <!-- 範囲選択 & 開始ボタン -->
       <div class="fcs-mode-buttons">
-        <button class="btn btn-primary fcs-mode-btn" id="fcs-mode-notyet">
-          未記憶のみ（${notYetCount} 枚）
-        </button>
-        <button class="btn btn-outline fcs-mode-btn" id="fcs-mode-all">
-          全カード（${totalCount} 枚）
-        </button>
+        ${showScopeChoice ? `
+          <button class="btn btn-primary fcs-mode-btn" id="fcs-mode-notyet">
+            未記憶のみ（${notYetCount} 枚）
+          </button>
+          <button class="btn btn-outline fcs-mode-btn" id="fcs-mode-all">
+            全カード（${totalCount} 枚）
+          </button>
+        ` : `
+          <button class="btn btn-primary fcs-mode-btn" id="fcs-mode-all">
+            学習を開始（${totalCount} 枚）
+          </button>
+        `}
       </div>
       <button class="btn btn-outline btn-sm" id="fcs-mode-back" style="margin-top: 20px;">← 一覧に戻る</button>
     </div>`;
 
-  document.getElementById("fcs-mode-notyet").addEventListener("click", () => {
-    startStudy(main, allCards.filter((c) => !c.remembered));
+  // 順序ボタンのイベント
+  let currentOrder = savedOrder;
+  main.querySelectorAll(".fcs-order-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      currentOrder = btn.dataset.order;
+      saveOrder(currentOrder);
+      main.querySelectorAll(".fcs-order-btn").forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+    });
   });
+
+  // 開始ボタンのイベント
+  const notYetBtn = document.getElementById("fcs-mode-notyet");
+  if (notYetBtn) {
+    notYetBtn.addEventListener("click", () => {
+      startStudy(main, allCards.filter((c) => !c.remembered), currentOrder);
+    });
+  }
   document.getElementById("fcs-mode-all").addEventListener("click", () => {
-    startStudy(main, allCards);
+    startStudy(main, allCards, currentOrder);
   });
   document.getElementById("fcs-mode-back").addEventListener("click", () => {
     window.location.hash = "/flashcards";
   });
 }
 
-function startStudy(main, cards) {
-  deck = shuffle(cards);
+function startStudy(main, cards, order) {
+  deck = orderCards(cards, order);
   currentIndex = 0;
   isFlipped = false;
   isEditing = false;
@@ -286,14 +348,16 @@ function showComplete() {
       </div>
     </div>`;
 
+  const savedOrder = getSavedOrder();
+
   const retryNotYet = document.getElementById("fcs-retry-notyet");
   if (retryNotYet) {
     retryNotYet.addEventListener("click", () => {
-      startStudy(main, allCards.filter((c) => !c.remembered));
+      startStudy(main, allCards.filter((c) => !c.remembered), savedOrder);
     });
   }
   document.getElementById("fcs-retry").addEventListener("click", () => {
-    startStudy(main, allCards);
+    startStudy(main, allCards, savedOrder);
   });
   document.getElementById("fcs-to-list").addEventListener("click", () => {
     window.location.hash = "/flashcards";

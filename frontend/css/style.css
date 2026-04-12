@@ -6326,6 +6326,40 @@ main.swipe-enter-right {
   margin-bottom: 24px;
 }
 
+.fcs-order-select {
+  margin-bottom: 24px;
+}
+
+.fcs-order-label {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+
+.fcs-order-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+}
+
+.fcs-order-btn {
+  padding: 8px 14px;
+  font-size: 0.85rem;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.fcs-order-btn.active {
+  background: rgba(0, 255, 148, 0.12);
+  border-color: var(--neon-green);
+  color: var(--neon-green);
+  font-weight: 600;
+}
+
 .fcs-mode-buttons {
   display: flex;
   flex-direction: column;
