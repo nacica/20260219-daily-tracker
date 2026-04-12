@@ -6252,6 +6252,13 @@ main.swipe-enter-right {
   background: rgba(0, 255, 148, 0.25);
 }
 
+.fcs-btn-show-front {
+  flex-shrink: 0;
+  padding: 10px 14px;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
 .fcs-btn-edit {
   flex-shrink: 0;
 }

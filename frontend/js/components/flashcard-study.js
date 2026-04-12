@@ -4,8 +4,8 @@
  * 学習中のカード編集にも対応
  */
 
-import { flashcardsApi } from "../api.js?v=20260412a";
-import { showToast } from "../app.js?v=20260412a";
+import { flashcardsApi } from "../api.js?v=20260412b";
+import { showToast } from "../app.js?v=20260412b";
 
 const ORDER_STORAGE_KEY = "flashcard-study-order";
 
@@ -192,6 +192,7 @@ function renderStudyUI(main) {
       <!-- 評価ボタン（カードの上に配置） -->
       <div class="fcs-actions" id="fcs-actions" style="${isFlipped ? '' : 'visibility:hidden;'}">
         <button class="btn fcs-btn-forgot" id="fcs-forgot">まだ ✗</button>
+        <button class="btn btn-outline btn-sm fcs-btn-show-front" id="fcs-show-front">表面を見る</button>
         <button class="btn fcs-btn-remembered" id="fcs-remembered">覚えた ✓</button>
       </div>
 
@@ -244,6 +245,20 @@ function attachStudyEvents() {
       document.getElementById("fcs-actions").style.visibility = "";
     } else {
       markAndNext(false);
+    }
+  });
+
+  // 「表面を見る」ボタン: 表裏トグル
+  const showFrontBtn = document.getElementById("fcs-show-front");
+  showFrontBtn.addEventListener("click", () => {
+    if (isFlipped) {
+      cardEl.classList.remove("flipped");
+      isFlipped = false;
+      showFrontBtn.textContent = "裏面を見る";
+    } else {
+      cardEl.classList.add("flipped");
+      isFlipped = true;
+      showFrontBtn.textContent = "表面を見る";
     }
   });
 
