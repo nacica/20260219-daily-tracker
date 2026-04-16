@@ -4,6 +4,7 @@
 
 毎日の行動記録をAIが分析し、改善提案を行うPWAアプリケーション。
 単一ユーザー（自分専用）で認証なし。
+日記・ブレインダンプ・単語帳・コーチングなど多機能な自己改善ツール。
 
 ---
 
@@ -33,16 +34,25 @@ project_root/
 │   ├── sw.js                       # Service Worker
 │   ├── css/style.css               # サイバーパンク UIスタイル
 │   ├── js/
-│   │   ├── app.js                  # メインロジック・ユーティリティ
+│   │   ├── app.js                  # メインロジック・ルーティング設定・ホーム画面
 │   │   ├── api.js                  # API通信（fetch ラッパー）
 │   │   ├── router.js               # SPA ルーティング
+│   │   ├── swipe-nav.js            # スワイプナビゲーション
 │   │   └── components/
 │   │       ├── input-form.js       # 行動記録入力フォーム
 │   │       ├── analysis-view.js    # 日次分析結果表示
 │   │       ├── history-list.js     # 履歴一覧（カレンダー＆リスト）
 │   │       ├── weekly-report.js    # 週次分析レポート
+│   │       ├── monthly-report.js   # 月次分析レポート
 │   │       ├── screenshot-upload.js# スクショアップロード
-│   │       └── suggestions.js      # 改善提案アーカイブ
+│   │       ├── suggestions.js      # 改善提案アーカイブ
+│   │       ├── coaching-chat.js    # パーソナルコーチング
+│   │       ├── knowledge-graph.js  # 知識グラフ可視化
+│   │       ├── journal.js          # 日記（複数エントリ/日）
+│   │       ├── braindump.js        # ブレインダンプ（メモ・画像）
+│   │       ├── task-stats.js       # タスク統計
+│   │       ├── flashcard-list.js   # 単語帳一覧（2ペイン）
+│   │       └── flashcard-study.js  # 単語帳学習モード
 │   └── icons/                      # PWA アイコン群
 │
 ├── backend/
@@ -54,15 +64,34 @@ project_root/
 │   │   ├── records.py              # 行動記録 CRUD
 │   │   ├── analysis.py             # AI 日次分析
 │   │   ├── weekly.py               # 週次分析
-│   │   └── screenshots.py          # スクショ＆OCR
+│   │   ├── summaries.py            # 月次サマリー
+│   │   ├── screenshots.py          # スクショ＆OCR
+│   │   ├── dialogue.py             # ソクラテス式対話
+│   │   ├── morning_dialogue.py     # 朝のタスク計画対話
+│   │   ├── diary_dialogue.py       # 日記対話（AI質問→記録合成）
+│   │   ├── journal.py              # 日記エントリ CRUD
+│   │   ├── braindump.py            # ブレインダンプ CRUD
+│   │   ├── flashcards.py           # 単語帳 CRUD
+│   │   ├── coaching.py             # コーチング＆知識グラフ
+│   │   ├── categories.py           # タスクカテゴリ管理
+│   │   └── reminders.py            # リマインダー（付箋）
 │   ├── services/
 │   │   ├── claude_service.py       # Claude API 連携
+│   │   ├── coaching_service.py     # コーチング応答生成
+│   │   ├── knowledge_graph_service.py # 知識グラフ管理
 │   │   ├── firestore_service.py    # Firestore CRUD
 │   │   ├── ocr_service.py          # Claude Vision OCR
 │   │   └── storage_service.py      # Cloud Storage 管理
 │   ├── prompts/
 │   │   ├── daily_analysis.py       # 日次分析プロンプト
 │   │   ├── weekly_analysis.py      # 週次分析プロンプト
+│   │   ├── monthly_summary.py      # 月次サマリープロンプト
+│   │   ├── socratic_dialogue.py    # ソクラテス式対話プロンプト
+│   │   ├── morning_planning.py     # 朝の計画プロンプト
+│   │   ├── diary_dialogue.py       # 日記対話プロンプト
+│   │   ├── journal_analysis.py     # 日記分析プロンプト
+│   │   ├── coaching.py             # コーチングプロンプト
+│   │   ├── knowledge_graph.py      # 知識グラフ抽出プロンプト
 │   │   └── ocr_extraction.py       # OCR プロンプト
 │   └── utils/helpers.py            # 日時・フォーマット処理
 │
@@ -82,19 +111,20 @@ project_root/
 
 | Method | Path | 説明 |
 |--------|------|------|
-| POST | `/records` | 日次記録を作成 |
+| POST | `/records` | 日次記録を作成（Claude APIでパース） |
 | GET | `/records` | 記録一覧（start_date, end_date で絞込可） |
 | GET | `/records/{date}` | 特定日の記録取得 |
 | PUT | `/records/{date}` | 記録更新 |
 | DELETE | `/records/{date}` | 記録削除 |
+| PUT | `/records/{date}/rest-day` | 休息日トグル |
 
 ### AI分析 (Analysis)
 
 | Method | Path | 説明 |
 |--------|------|------|
-| POST | `/analysis/{date}/generate` | 日次分析を生成（Claude API） |
+| POST | `/analysis/{date}/generate` | 日次分析を生成（Claude API、過去7日比較付き） |
 | GET | `/analysis/{date}` | 保存済み分析を取得 |
-| GET | `/analysis` | 分析一覧 |
+| GET | `/analysis` | 分析一覧（start_date, end_date で絞込可） |
 
 ### 週次分析 (Weekly)
 
@@ -104,12 +134,116 @@ project_root/
 | GET | `/weekly/{week_id}` | 保存済み週次分析を取得 |
 | GET | `/weekly` | 週次分析一覧 |
 
+### 月次サマリー (Summaries)
+
+| Method | Path | 説明 |
+|--------|------|------|
+| POST | `/summaries/generate/{yearMonth}` | 月次サマリーを生成 |
+| GET | `/summaries/{yearMonth}` | 保存済み月次サマリーを取得 |
+| GET | `/summaries` | 月次サマリー一覧 |
+
+### ソクラテス式対話 (Dialogue)
+
+| Method | Path | 説明 |
+|--------|------|------|
+| POST | `/dialogue/{date}/start` | 対話を開始 |
+| POST | `/dialogue/{date}/reply` | ユーザー返答を送信 |
+| POST | `/dialogue/{date}/synthesize` | 対話を総括 |
+| GET | `/dialogue/{date}` | 対話履歴を取得 |
+| DELETE | `/dialogue/{date}` | 対話を削除 |
+
+### 朝の計画対話 (Morning Dialogue)
+
+| Method | Path | 説明 |
+|--------|------|------|
+| POST | `/morning/{date}/start` | 朝対話を開始 |
+| POST | `/morning/{date}/reply` | ユーザー返答を送信 |
+| POST | `/morning/{date}/synthesize` | 計画を総括 |
+| GET | `/morning/{date}` | 対話履歴を取得 |
+| DELETE | `/morning/{date}` | 対話を削除 |
+
+### 日記対話 (Diary Dialogue)
+
+| Method | Path | 説明 |
+|--------|------|------|
+| POST | `/diary-dialogue/{date}/start` | AI質問で日記対話を開始 |
+| POST | `/diary-dialogue/{date}/reply` | ユーザー返答を送信 |
+| POST | `/diary-dialogue/{date}/synthesize` | 記録を合成 |
+| GET | `/diary-dialogue/{date}` | 対話履歴を取得 |
+| DELETE | `/diary-dialogue/{date}` | 対話を削除 |
+
+### 日記 (Journal)
+
+| Method | Path | 説明 |
+|--------|------|------|
+| POST | `/journal` | 日記エントリを作成（自動採番、1日複数可） |
+| GET | `/journal` | エントリ一覧（start_date, end_date で絞込可） |
+| GET | `/journal/by-date/{date}` | 特定日のエントリ一覧 |
+| GET | `/journal/entry/{entry_id}` | 特定エントリを取得 |
+| PUT | `/journal/entry/{entry_id}` | エントリを更新 |
+| DELETE | `/journal/entry/{entry_id}` | エントリを削除 |
+| POST | `/journal/entry/{entry_id}/analyze` | AIで分析 |
+| POST | `/journal/entry/{entry_id}/summarize` | Markdownサマリー生成 |
+| GET | `/journal/digest/{week_id}` | 週次ダイジェストを取得 |
+| POST | `/journal/digest/{week_id}/generate` | 週次ダイジェストを生成 |
+
+### ブレインダンプ (Braindump)
+
+| Method | Path | 説明 |
+|--------|------|------|
+| POST | `/braindump` | メモを作成 |
+| GET | `/braindump` | メモ一覧（start_date, end_date で絞込可） |
+| GET | `/braindump/by-date/{date}` | 特定日のメモ一覧 |
+| GET | `/braindump/dates-with-entries` | エントリのある日付一覧 |
+| GET | `/braindump/entry/{entry_id}` | 特定メモを取得 |
+| PUT | `/braindump/entry/{entry_id}` | メモを更新 |
+| DELETE | `/braindump/entry/{entry_id}` | メモを削除 |
+| POST | `/braindump/entry/{entry_id}/generate-title` | AIでタイトル自動生成 |
+| POST | `/braindump/upload-image` | 画像をアップロード |
+
+### 単語帳 (Flashcards)
+
+| Method | Path | 説明 |
+|--------|------|------|
+| POST | `/flashcards` | カードを作成（表面/裏面） |
+| GET | `/flashcards` | カード一覧 |
+| GET | `/flashcards/{card_id}` | 特定カードを取得 |
+| PUT | `/flashcards/{card_id}` | カードを更新 |
+| DELETE | `/flashcards/{card_id}` | カードを削除 |
+| PUT | `/flashcards/{card_id}/mark` | 覚えた/未チェック切替 |
+
+### コーチング＆知識グラフ (Coaching / Knowledge Graph)
+
+| Method | Path | 説明 |
+|--------|------|------|
+| POST | `/coach/chat` | コーチング会話（会話履歴付き） |
+| GET | `/knowledge/entities` | エンティティ一覧（type, status, limit） |
+| GET | `/knowledge/entities/{id}` | 特定エンティティを取得 |
+| DELETE | `/knowledge/entities/{id}` | エンティティを削除 |
+| GET | `/knowledge/relations` | リレーション一覧（min_strength, limit） |
+| DELETE | `/knowledge/relations/{id}` | リレーションを削除 |
+| GET | `/knowledge/summary` | 知識グラフのサマリー |
+
 ### スクリーンショット (Screenshots)
 
 | Method | Path | 説明 |
 |--------|------|------|
 | POST | `/screenshots/{date}` | スクショをアップロード＆OCR |
 | GET | `/screenshots/{date}/url` | 署名付きURLを取得 |
+
+### カテゴリ (Categories)
+
+| Method | Path | 説明 |
+|--------|------|------|
+| GET | `/categories` | カテゴリ一覧を取得 |
+| PUT | `/categories` | カテゴリを更新 |
+
+### リマインダー (Reminders)
+
+| Method | Path | 説明 |
+|--------|------|------|
+| GET | `/reminders` | リマインダー（付箋）を取得 |
+| PUT | `/reminders` | リマインダーを更新 |
 
 ### ヘルスチェック
 
@@ -153,6 +287,8 @@ project_root/
     "completed": ["コードレビュー"],
     "completion_rate": 0.5
   },
+  "rest_day": false,
+  "rest_reason": "",
   "created_at": "2026-02-19T23:00:00+09:00",
   "updated_at": "2026-02-19T23:30:00+09:00"
 }
@@ -234,27 +370,147 @@ project_root/
 }
 ```
 
+### `dialogue` — ソクラテス式対話
+
+ドキュメントID: `YYYY-MM-DD`
+
+```json
+{
+  "date": "2026-02-19",
+  "messages": [
+    { "role": "assistant", "content": "今日の行動で一番気になった点は？" },
+    { "role": "user", "content": "YouTube見すぎた" }
+  ],
+  "status": "active|synthesized",
+  "created_at": "...",
+  "updated_at": "..."
+}
+```
+
+### `morning_dialogue` — 朝の計画対話
+
+ドキュメントID: `YYYY-MM-DD`（dialogue と同構造）
+
+### `diary_dialogue` — 日記対話
+
+ドキュメントID: `YYYY-MM-DD`（dialogue と同構造、AI質問→記録合成）
+
+### `journal_entries` — 日記エントリ
+
+ドキュメントID: `YYYY-MM-DD#N`（1日複数エントリ可）
+
+```json
+{
+  "entry_id": "2026-02-19#1",
+  "date": "2026-02-19",
+  "content": "今日は新しいプロジェクトに着手した...",
+  "analysis": { "..." },
+  "summary_md": "...",
+  "created_at": "...",
+  "updated_at": "..."
+}
+```
+
+### `braindump_entries` — ブレインダンプ
+
+ドキュメントID: `braindump#YYYY-MM-DD#N`
+
+```json
+{
+  "entry_id": "braindump#2026-02-19#1",
+  "date": "2026-02-19",
+  "title": "AIが自動生成したタイトル",
+  "content": "思いついたこと...",
+  "images": ["gs://bucket/braindump/..."],
+  "created_at": "...",
+  "updated_at": "..."
+}
+```
+
+### `flashcards` — 単語帳カード
+
+ドキュメントID: `fc-{uuid}`
+
+```json
+{
+  "id": "fc-abc123",
+  "front": "表面テキスト",
+  "back": "裏面テキスト",
+  "remembered": false,
+  "created_at": "...",
+  "updated_at": "..."
+}
+```
+
+### `knowledge_graph_entities` — 知識グラフエンティティ
+
+行動パターン・課題・習慣などのエンティティ
+
+```json
+{
+  "id": "...",
+  "entity_type": "behavior|issue|habit|goal",
+  "name": "YouTube長時間視聴",
+  "status": "active|resolved",
+  "metadata": { "..." },
+  "created_at": "..."
+}
+```
+
+### `knowledge_graph_relations` — 知識グラフリレーション
+
+エンティティ間の関係性
+
+```json
+{
+  "id": "...",
+  "source_id": "...",
+  "target_id": "...",
+  "relation_type": "causes|correlates|improves",
+  "strength": 0.8,
+  "created_at": "..."
+}
+```
+
+### `categories` — タスクカテゴリ
+
+カラー付きタスクカテゴリの定義
+
+### `reminders` — リマインダー（付箋）
+
+「今日の気づき」として表示される付箋メモ
+
 ---
 
 ## フロントエンド画面
 
 | ルート | コンポーネント | 内容 |
 |--------|--------------|------|
-| `/` | Home | 当日サマリー＆クイックアクション |
-| `/input` | Input Form | 日次記録の作成・編集 |
+| `/` | Home | 当日スコア・統計・気づきカルーセル・リマインダー・クイックアクション |
+| `/input` `/input/:date` | Input Form | 日次記録の作成・編集（休息日モード、カテゴリ管理、タスク管理） |
 | `/history` | History List | カレンダー＆リスト表示の履歴 |
-| `/analysis/{date}` | Analysis View | 分析結果の詳細表示 |
-| `/weekly` | Weekly Report | 週次トレンド＆改善計画 |
+| `/analysis/:date` | Analysis View | 分析結果の詳細表示 |
+| `/weekly` `/weekly/:weekId` | Weekly Report | 週次トレンド＆改善計画 |
+| `/monthly` `/monthly/:yearMonth` | Monthly Report | 月次サマリー |
 | `/suggestions` | Suggestions | 過去の改善提案アーカイブ |
+| `/coach` | Coaching Chat | パーソナルコーチング（知識グラフ文脈付き） |
+| `/knowledge` | Knowledge Graph | エンティティ可視化・行動パターン |
+| `/journal` `/journal/:date` | Journal | 自由形式の日記（1日複数エントリ、AI分析） |
+| `/braindump` `/braindump/:date` | Brain Dump | クイックメモ（自動タイトル、画像添付） |
+| `/task-stats` | Task Stats | タスク完了率の統計・可視化 |
+| `/flashcards` | Flashcard List | 単語帳一覧（2ペインUI、15件ページネーション） |
+| `/flashcards/study` | Flashcard Study | 学習モード（フリップ、順序選択、覚えたマーク） |
 
 ### UIデザイン
 
-- **テーマ**: サイバーパンク / ダークモード
+- **テーマ**: サイバーパンク / ダークモード（ライトモード切替対応）
 - **フォント**: Space Grotesk (Google Fonts)
 - **プライマリカラー**: Cyan (#00d4ff) + ネオングロー
 - **アクセント**: Violet (#a855f7), Blue (#3b82f6)
 - **スコア表示**: 緑(70+) / 黄(40-69) / 赤(0-39)
 - **レスポンシブ**: モバイルファースト、max-width 680px
+- **ページ遷移**: スライド＆フェードアニメーション
+- **スワイプナビ**: モバイルでのスワイプによるページ移動
 
 ### Service Worker
 
@@ -277,6 +533,48 @@ project_root/
 入力: 1週間分の日次記録・分析、前週の分析
 
 出力: 週間パターン、最大時間浪費、認知パターン、来週の目標・アクション
+
+### 月次サマリー (`prompts/monthly_summary.py`)
+
+入力: 1ヶ月分の日次・週次データ
+
+出力: 月間の傾向・成長・課題・次月の目標
+
+### ソクラテス式対話 (`prompts/socratic_dialogue.py`)
+
+入力: 日次記録・分析結果
+
+出力: 気づきを促す質問、ユーザー返答への深掘り、対話の総括
+
+### 朝の計画 (`prompts/morning_planning.py`)
+
+入力: 前日の振り返り、今日の予定
+
+出力: タスク優先順位の提案、計画の対話的整理
+
+### 日記対話 (`prompts/diary_dialogue.py`)
+
+入力: 日付、過去の文脈
+
+出力: AI質問による日記エントリの引き出し、構造化された記録の合成
+
+### 日記分析 (`prompts/journal_analysis.py`)
+
+入力: 日記エントリの本文
+
+出力: エントリごとのAI分析
+
+### コーチング (`prompts/coaching.py`)
+
+入力: 会話履歴、知識グラフ文脈、直近の分析データ
+
+出力: パーソナライズされたコーチング応答
+
+### 知識グラフ抽出 (`prompts/knowledge_graph.py`)
+
+入力: 分析結果
+
+出力: 行動パターン・課題・習慣のエンティティとリレーション
 
 ### OCR抽出 (`prompts/ocr_extraction.py`)
 
@@ -345,9 +643,22 @@ http://localhost:8000/docs
 ## 主要機能一覧
 
 1. **日次行動記録** — フリーテキスト入力をClaude APIで構造化
-2. **AI分析** — 生産性・時間浪費・タスク完了率の総合分析
+2. **AI分析** — 生産性・時間浪費・タスク完了率の総合分析（スコア0-100）
 3. **スクリーンタイムOCR** — iPhoneスクショからアプリ使用時間を自動抽出
-4. **タスク管理** — 計画→完了のトラッキングと達成率算出
+4. **タスク管理** — 計画→完了のトラッキングと達成率算出（カテゴリ色分け対応）
 5. **週次レビュー** — パターン分析と来週の改善計画
-6. **PWA対応** — スマホインストール可能、オフライン対応
-7. **サイバーパンクUI** — ダークテーマ、ネオングロー、レスポンシブ
+6. **月次サマリー** — 月間の傾向・成長・課題のコーチングサマリー
+7. **ソクラテス式対話** — AI質問による深掘り振り返り
+8. **朝の計画対話** — タスク優先順位の対話的整理
+9. **日記対話** — AI質問で日記を引き出し、記録を合成
+10. **日記 (Journal)** — 自由形式の日記（1日複数エントリ、AI分析、週次ダイジェスト）
+11. **ブレインダンプ** — クイックメモ（AIタイトル自動生成、画像添付）
+12. **単語帳** — 表裏カード学習（2ペインUI、学習モード、順序選択、一括登録）
+13. **パーソナルコーチング** — 知識グラフ文脈を活用した対話型コーチ
+14. **知識グラフ** — 行動パターン・課題・習慣のエンティティ可視化
+15. **タスク統計** — 完了率の可視化・パフォーマンスカード
+16. **リマインダー** — 「今日の気づき」付箋カルーセル
+17. **休息日モード** — 休日・体調不良の記録
+18. **PWA対応** — スマホインストール可能、オフライン対応
+19. **ダーク/ライトテーマ** — テーマ切替対応、サイバーパンクUI
+20. **スワイプナビ** — モバイルでのスワイプによるページ移動
