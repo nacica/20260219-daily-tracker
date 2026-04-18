@@ -6088,21 +6088,18 @@ main.swipe-enter-right {
 
 /* Slide-up Replace アニメーション */
 .fcs-card-face .fcs-face-label,
-.fcs-card-face .fcs-face-content,
-.fcs-card-face .fcs-tap-hint {
+.fcs-card-face .fcs-face-content {
   transition: opacity 0.28s ease, transform 0.28s ease;
 }
 
 .fcs-front .fcs-face-label,
-.fcs-front .fcs-face-content,
-.fcs-front .fcs-tap-hint {
+.fcs-front .fcs-face-content {
   opacity: 1;
   transform: translateY(0);
 }
 
 .fcs-card.flipped .fcs-front .fcs-face-label,
-.fcs-card.flipped .fcs-front .fcs-face-content,
-.fcs-card.flipped .fcs-front .fcs-tap-hint {
+.fcs-card.flipped .fcs-front .fcs-face-content {
   opacity: 0;
   transform: translateY(-8px);
 }
@@ -6187,25 +6184,6 @@ main.swipe-enter-right {
   word-break: break-word;
   max-width: 100%;
   width: 100%;
-}
-
-.fcs-tap-hint {
-  position: absolute;
-  bottom: 8px;
-  left: 0;
-  right: 0;
-  text-align: center;
-  font-size: 0.72rem;
-  color: var(--text-muted);
-  background: linear-gradient(transparent, var(--bg-card) 40%);
-  padding: 16px 0 4px;
-  pointer-events: none;
-  animation: fcs-pulse 2s ease-in-out infinite;
-}
-
-@keyframes fcs-pulse {
-  0%, 100% { opacity: 0.5; }
-  50% { opacity: 1; }
 }
 
 /* 評価ボタン */

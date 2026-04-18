@@ -4,8 +4,8 @@
  * 学習中のカード編集にも対応
  */
 
-import { flashcardsApi } from "../api.js?v=20260412c";
-import { showToast } from "../app.js?v=20260412c";
+import { flashcardsApi } from "../api.js?v=20260418a";
+import { showToast } from "../app.js?v=20260418a";
 
 const ORDER_STORAGE_KEY = "flashcard-study-order";
 
@@ -201,7 +201,6 @@ function renderStudyUI(main) {
           <div class="fcs-card-face fcs-front">
             <div class="fcs-face-label">表面</div>
             <div class="fcs-face-content" id="fcs-front-content">${escapeHtml(card.front)}</div>
-            <div class="fcs-tap-hint">タップで裏面を表示</div>
           </div>
           <div class="fcs-card-face fcs-back">
             <div class="fcs-face-label">裏面</div>
