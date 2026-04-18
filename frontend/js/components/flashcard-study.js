@@ -4,8 +4,8 @@
  * 学習中のカード編集にも対応
  */
 
-import { flashcardsApi } from "../api.js?v=20260418b";
-import { showToast } from "../app.js?v=20260418b";
+import { flashcardsApi } from "../api.js?v=20260418c";
+import { showToast } from "../app.js?v=20260418c";
 
 const ORDER_STORAGE_KEY = "flashcard-study-order";
 
@@ -182,7 +182,10 @@ function renderStudyUI(main) {
     <div class="fcs-container">
       <div class="fcs-top-bar">
         <button class="btn btn-outline btn-sm fcs-back-btn" id="fcs-back">← 一覧に戻る</button>
-        <span class="fcs-progress">#${card._num}　${progress} / ${total}</span>
+        <div class="fcs-top-right">
+          <button class="btn btn-outline btn-sm fcs-prev-btn" id="fcs-prev" ${currentIndex === 0 ? 'disabled' : ''}>← 前へ</button>
+          <span class="fcs-progress">#${card._num}　${progress} / ${total}</span>
+        </div>
       </div>
 
       <div class="fcs-edit-bar">
@@ -238,6 +241,15 @@ function attachStudyEvents() {
   // 一覧に戻る
   document.getElementById("fcs-back").addEventListener("click", () => {
     window.location.hash = "/flashcards";
+  });
+
+  // 前のカードに戻る
+  document.getElementById("fcs-prev").addEventListener("click", () => {
+    if (isEditing) return;
+    if (currentIndex === 0) return;
+    currentIndex--;
+    isFlipped = false;
+    renderStudyUI(document.querySelector("main"));
   });
 
   // タップ: 表面→裏返し、裏面→「まだ」で次へ

@@ -6029,7 +6029,24 @@ main.swipe-enter-right {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 8px;
   margin-bottom: 16px;
+}
+
+.fcs-top-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.fcs-prev-btn {
+  padding: 6px 12px;
+  font-size: 0.8rem;
+}
+
+.fcs-prev-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 .fcs-progress {
