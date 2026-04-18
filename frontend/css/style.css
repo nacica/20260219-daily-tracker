@@ -6196,6 +6196,30 @@ main.swipe-enter-right {
   margin-bottom: 12px;
 }
 
+/* 削除ボタン（カード下） */
+
+.fcs-delete-bar {
+  display: flex;
+  justify-content: center;
+  margin-top: 12px;
+}
+
+.fcs-btn-delete {
+  background: rgba(255, 51, 102, 0.08);
+  color: var(--neon-red);
+  border: 1px solid rgba(255, 51, 102, 0.25);
+  border-radius: var(--radius-sm);
+  padding: 8px 20px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.fcs-btn-delete:active {
+  background: rgba(255, 51, 102, 0.2);
+}
+
 .fcs-btn-forgot {
   flex: 1;
   background: rgba(255, 51, 102, 0.12);

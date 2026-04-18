@@ -4,8 +4,8 @@
  * 学習中のカード編集にも対応
  */
 
-import { flashcardsApi } from "../api.js?v=20260418a";
-import { showToast } from "../app.js?v=20260418a";
+import { flashcardsApi } from "../api.js?v=20260418b";
+import { showToast } from "../app.js?v=20260418b";
 
 const ORDER_STORAGE_KEY = "flashcard-study-order";
 
@@ -209,6 +209,11 @@ function renderStudyUI(main) {
         </div>
       </div>
 
+      <!-- 削除ボタン -->
+      <div class="fcs-delete-bar" id="fcs-delete-bar">
+        <button class="btn btn-sm fcs-btn-delete" id="fcs-delete">削除</button>
+      </div>
+
       <!-- 編集フォーム（非表示） -->
       <div class="fcs-edit-form card" id="fcs-edit-form" style="display:none;">
         <label class="fc-label">表面</label>
@@ -267,12 +272,14 @@ function attachStudyEvents() {
 
   // 編集
   const editBar = document.querySelector(".fcs-edit-bar");
+  const deleteBar = document.getElementById("fcs-delete-bar");
   document.getElementById("fcs-edit").addEventListener("click", () => {
     isEditing = true;
     document.getElementById("fcs-edit-form").style.display = "block";
     document.getElementById("fcs-card-wrapper").style.display = "none";
     document.getElementById("fcs-actions").style.display = "none";
     editBar.style.display = "none";
+    deleteBar.style.display = "none";
     document.getElementById("fcs-edit-front").focus();
   });
 
@@ -282,6 +289,32 @@ function attachStudyEvents() {
     document.getElementById("fcs-card-wrapper").style.display = "";
     document.getElementById("fcs-actions").style.display = "";
     editBar.style.display = "";
+    deleteBar.style.display = "";
+  });
+
+  // 削除
+  document.getElementById("fcs-delete").addEventListener("click", async () => {
+    if (isEditing) return;
+    const card = deck[currentIndex];
+    if (!confirm("このカードを削除しますか？")) return;
+    try {
+      await flashcardsApi.delete(card.id);
+      deck.splice(currentIndex, 1);
+      const origIdx = allCards.findIndex((c) => c.id === card.id);
+      if (origIdx !== -1) allCards.splice(origIdx, 1);
+
+      showToast("カードを削除しました", "success");
+
+      if (deck.length === 0) {
+        showComplete();
+        return;
+      }
+      if (currentIndex >= deck.length) currentIndex = deck.length - 1;
+      isFlipped = false;
+      renderStudyUI(document.querySelector("main"));
+    } catch (e) {
+      showToast(`削除に失敗: ${e.message}`, "error");
+    }
   });
 
   document.getElementById("fcs-save-edit").addEventListener("click", async () => {
@@ -307,7 +340,8 @@ function attachStudyEvents() {
       document.getElementById("fcs-edit-form").style.display = "none";
       document.getElementById("fcs-card-wrapper").style.display = "";
       document.getElementById("fcs-actions").style.display = "";
-        editBar.style.display = "";
+      editBar.style.display = "";
+      deleteBar.style.display = "";
     } catch (e) {
       showToast(`更新に失敗: ${e.message}`, "error");
     }
