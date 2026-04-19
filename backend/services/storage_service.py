@@ -64,30 +64,40 @@ def upload_screenshot(date: str, image_bytes: bytes, content_type: str = "image/
     return f"gs://{bucket_name}/{blob_name}"
 
 
-def upload_braindump_image(image_bytes: bytes, content_type: str = "image/png") -> str:
+def _upload_public_image(prefix: str, image_bytes: bytes, content_type: str = "image/png") -> str:
     """
-    ブレインダンプの貼り付け画像を Cloud Storage にアップロードする
+    画像を Cloud Storage にアップロードし、公開 URL を返す共通処理
 
     Args:
+        prefix: バケット内のディレクトリプレフィックス（例 "braindump-images" / "flashcard-images"）
         image_bytes: 画像のバイト列
         content_type: MIME タイプ
 
     Returns:
-        署名付き URL（7日間有効）
+        永続的な公開 URL（https://storage.googleapis.com/<bucket>/<path>）
     """
     import uuid
-    from datetime import datetime, timedelta
+    from datetime import datetime
 
     bucket = get_bucket()
     ext = content_type.split("/")[-1]  # jpeg / png
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     unique_id = uuid.uuid4().hex[:8]
-    blob_name = f"braindump-images/{timestamp}_{unique_id}.{ext}"
+    blob_name = f"{prefix}/{timestamp}_{unique_id}.{ext}"
     blob = bucket.blob(blob_name)
     blob.upload_from_string(image_bytes, content_type=content_type)
+    blob.make_public()
+    return blob.public_url
 
-    # 署名付き URL を返す（7日間有効 = v4 の最大値）
-    return _generate_signed_url(blob, timedelta(days=7))
+
+def upload_braindump_image(image_bytes: bytes, content_type: str = "image/png") -> str:
+    """ブレインダンプの貼り付け画像を公開URLでアップロードする"""
+    return _upload_public_image("braindump-images", image_bytes, content_type)
+
+
+def upload_flashcard_image(image_bytes: bytes, content_type: str = "image/png") -> str:
+    """単語帳カードの貼り付け画像を公開URLでアップロードする"""
+    return _upload_public_image("flashcard-images", image_bytes, content_type)
 
 
 def get_screenshot_url(date: str, expiration_seconds: int = 3600) -> str | None:

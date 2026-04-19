@@ -5,11 +5,11 @@
  * カードの追加・編集・削除 + 学習画面への遷移
  */
 
-import { flashcardsApi } from "../api.js?v=20260418c";
-import { showToast } from "../app.js?v=20260418c";
+import { flashcardsApi } from "../api.js?v=20260419a";
+import { showToast } from "../app.js?v=20260419a";
 
 // モジュールロード時に読み込み確認ログを出す（キャッシュ診断用）
-const FLASHCARD_LIST_VERSION = "20260411e";
+const FLASHCARD_LIST_VERSION = "20260419a";
 console.log(`%c[flashcard-list] モジュール読み込み完了 version=${FLASHCARD_LIST_VERSION}`, "color:#0f0;font-weight:bold;");
 
 const WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
@@ -30,6 +30,96 @@ function escapeHtml(str) {
   return str.replace(/[&<>"']/g, (c) =>
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]
   );
+}
+
+// 画像マークダウン ![alt](url) をテキストから除去してテキストだけ返す（一覧表示用）
+function stripImages(str) {
+  return str.replace(/!\[[^\]]*\]\([^)]+\)/g, "").trim();
+}
+
+// テキスト + マークダウン画像を含む文字列を HTML に変換する
+// テキスト部分はエスケープ、画像マークダウンは <img> に変換
+function renderFaceContent(str) {
+  if (!str) return "";
+  const imgRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;
+  let result = "";
+  let lastIndex = 0;
+  let m;
+  while ((m = imgRegex.exec(str)) !== null) {
+    const textBefore = str.slice(lastIndex, m.index);
+    if (textBefore) result += escapeHtml(textBefore);
+    const alt = escapeHtml(m[1] || "画像");
+    const url = escapeHtml(m[2]);
+    result += `<img class="fc-content-image" src="${url}" alt="${alt}" loading="lazy" />`;
+    lastIndex = imgRegex.lastIndex;
+  }
+  result += escapeHtml(str.slice(lastIndex));
+  return result;
+}
+
+// textarea に貼り付けられた画像をアップロードし、マークダウンを挿入する共通ハンドラ
+async function handleTextareaPaste(e) {
+  const clipboardData = e.clipboardData;
+  if (!clipboardData) return;
+
+  let file = null;
+  for (let i = 0; i < clipboardData.files.length; i++) {
+    if (clipboardData.files[i].type.startsWith("image/")) {
+      file = clipboardData.files[i];
+      break;
+    }
+  }
+  if (!file && clipboardData.items) {
+    for (let i = 0; i < clipboardData.items.length; i++) {
+      const item = clipboardData.items[i];
+      if (item.kind === "file" && item.type.startsWith("image/")) {
+        file = item.getAsFile();
+        break;
+      }
+    }
+  }
+  if (!file) return;
+
+  e.preventDefault();
+  const textarea = e.currentTarget;
+  const placeholder = `![画像アップロード中...](#uploading-${Date.now()})`;
+  insertAtCursor(textarea, placeholder);
+  showToast("画像をアップロード中...");
+
+  try {
+    const result = await flashcardsApi.uploadImage(file);
+    textarea.value = textarea.value.replace(placeholder, `![画像](${result.url})`);
+    textarea.dispatchEvent(new Event("input", { bubbles: true }));
+    showToast("画像を貼り付けました", "success");
+  } catch (err) {
+    textarea.value = textarea.value.replace(placeholder, "");
+    showToast(`画像アップロードに失敗: ${err.message}`, "error");
+  }
+}
+
+function insertAtCursor(textarea, text) {
+  const start = textarea.selectionStart || 0;
+  const end = textarea.selectionEnd || 0;
+  const before = textarea.value.slice(0, start);
+  const after = textarea.value.slice(end);
+  const needsNewlineBefore = before.length > 0 && !before.endsWith("\n");
+  const needsNewlineAfter = after.length > 0 && !after.startsWith("\n");
+  const insertText = (needsNewlineBefore ? "\n" : "") + text + (needsNewlineAfter ? "\n" : "");
+  textarea.value = before + insertText + after;
+  const newPos = start + insertText.length;
+  textarea.setSelectionRange(newPos, newPos);
+  textarea.focus();
+}
+
+// 複数 textarea にまとめて paste ハンドラを装着する
+function attachPasteHandlers(selectors, root = document) {
+  selectors.forEach((sel) => {
+    root.querySelectorAll(sel).forEach((ta) => {
+      if (ta.dataset.pasteBound) return;
+      ta.dataset.pasteBound = "1";
+      ta.addEventListener("paste", handleTextareaPaste);
+    });
+  });
 }
 
 const PAGE_SIZE = 15;
@@ -183,6 +273,9 @@ export async function renderFlashcardList() {
     selectCard(selectedId);
   }
   attachEvents(cards);
+
+  // 追加フォーム・一括追加フォームの textarea に paste ハンドラ装着
+  attachPasteHandlers(["#fc-new-front", "#fc-new-back", "#fc-bulk-input"]);
 }
 
 function getPageCards(page) {
@@ -264,8 +357,10 @@ function attachPaginationEvents() {
 function buildListRow(card) {
   const statusClass = card.remembered ? "remembered" : "not-yet";
   const statusIcon = card.remembered ? "✓" : "✗";
-  // 表面テキストを1行に切り詰め
-  const frontText = card.front.length > 60 ? card.front.substring(0, 60) + "…" : card.front;
+  // 一覧は画像マークダウンを除いたテキスト部分だけ表示（画像のみのカードは [画像] とする）
+  const textOnly = stripImages(card.front);
+  const displayText = textOnly || (card.front.includes("![") ? "[画像]" : "");
+  const frontText = displayText.length > 60 ? displayText.substring(0, 60) + "…" : displayText;
   return `
     <div class="fc-row ${card.id === selectedId ? 'active' : ''}" data-id="${card.id}">
       <span class="fc-row-num">#${card._num}</span>
@@ -290,12 +385,12 @@ function buildDetailView(card) {
     </div>
     <div class="fc-detail-section">
       <div class="fc-detail-label">表面</div>
-      <div class="fc-detail-front">${escapeHtml(card.front)}</div>
+      <div class="fc-detail-front">${renderFaceContent(card.front)}</div>
     </div>
     <div class="fc-detail-divider"></div>
     <div class="fc-detail-section">
       <div class="fc-detail-label">裏面</div>
-      <div class="fc-detail-back">${escapeHtml(card.back)}</div>
+      <div class="fc-detail-back">${renderFaceContent(card.back)}</div>
     </div>
     <div class="fc-detail-actions">
       <button class="btn btn-outline btn-sm fc-detail-toggle-status" data-id="${card.id}" style="color: ${card.remembered ? 'var(--neon-red)' : 'var(--neon-green)'}; border-color: ${card.remembered ? 'rgba(255,51,102,0.3)' : 'rgba(0,255,148,0.3)'};">${card.remembered ? '「まだ」に戻す' : '「覚えた」にする'}</button>
@@ -469,6 +564,8 @@ function attachDetailEvents(container) {
       const sections = root.querySelectorAll(".fc-detail-section, .fc-detail-divider, .fc-detail-actions, .fc-detail-actions-top");
       sections.forEach((s) => (s.style.display = "none"));
       form.style.display = "block";
+      // 編集フォームの textarea にも paste ハンドラを装着
+      attachPasteHandlers([".fc-edit-front", ".fc-edit-back"], form);
       form.querySelector(".fc-edit-front").focus();
     });
   });
@@ -633,9 +730,9 @@ function attachEvents() {
       ${parsed.map((c, i) => `
         <div class="fc-bulk-preview-card">
           <div class="fc-bulk-preview-num">#${i + 1}</div>
-          <div class="fc-bulk-preview-front">${escapeHtml(c.front)}</div>
+          <div class="fc-bulk-preview-front">${renderFaceContent(c.front)}</div>
           <div class="fc-bulk-preview-sep">↓</div>
-          <div class="fc-bulk-preview-back">${escapeHtml(c.back)}</div>
+          <div class="fc-bulk-preview-back">${renderFaceContent(c.back)}</div>
         </div>
       `).join("")}`;
   });

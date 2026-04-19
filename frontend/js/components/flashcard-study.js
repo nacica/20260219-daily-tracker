@@ -4,8 +4,8 @@
  * 学習中のカード編集にも対応
  */
 
-import { flashcardsApi } from "../api.js?v=20260418c";
-import { showToast } from "../app.js?v=20260418c";
+import { flashcardsApi } from "../api.js?v=20260419a";
+import { showToast } from "../app.js?v=20260419a";
 
 const ORDER_STORAGE_KEY = "flashcard-study-order";
 
@@ -28,6 +28,72 @@ function escapeHtml(str) {
   return str.replace(/[&<>"']/g, (c) =>
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]
   );
+}
+
+// テキスト + 画像マークダウン ![alt](url) を HTML に変換
+function renderFaceContent(str) {
+  if (!str) return "";
+  const imgRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;
+  let result = "";
+  let lastIndex = 0;
+  let m;
+  while ((m = imgRegex.exec(str)) !== null) {
+    const textBefore = str.slice(lastIndex, m.index);
+    if (textBefore) result += escapeHtml(textBefore);
+    const alt = escapeHtml(m[1] || "画像");
+    const url = escapeHtml(m[2]);
+    result += `<img class="fc-content-image" src="${url}" alt="${alt}" loading="lazy" />`;
+    lastIndex = imgRegex.lastIndex;
+  }
+  result += escapeHtml(str.slice(lastIndex));
+  return result;
+}
+
+async function handleStudyPaste(e) {
+  const clipboardData = e.clipboardData;
+  if (!clipboardData) return;
+
+  let file = null;
+  for (let i = 0; i < clipboardData.files.length; i++) {
+    if (clipboardData.files[i].type.startsWith("image/")) {
+      file = clipboardData.files[i];
+      break;
+    }
+  }
+  if (!file && clipboardData.items) {
+    for (let i = 0; i < clipboardData.items.length; i++) {
+      const item = clipboardData.items[i];
+      if (item.kind === "file" && item.type.startsWith("image/")) {
+        file = item.getAsFile();
+        break;
+      }
+    }
+  }
+  if (!file) return;
+
+  e.preventDefault();
+  const textarea = e.currentTarget;
+  const placeholder = `![画像アップロード中...](#uploading-${Date.now()})`;
+  const start = textarea.selectionStart || 0;
+  const end = textarea.selectionEnd || 0;
+  const before = textarea.value.slice(0, start);
+  const after = textarea.value.slice(end);
+  const needNlBefore = before.length > 0 && !before.endsWith("\n");
+  const needNlAfter = after.length > 0 && !after.startsWith("\n");
+  const inserted = (needNlBefore ? "\n" : "") + placeholder + (needNlAfter ? "\n" : "");
+  textarea.value = before + inserted + after;
+  const newPos = start + inserted.length;
+  textarea.setSelectionRange(newPos, newPos);
+  showToast("画像をアップロード中...");
+
+  try {
+    const result = await flashcardsApi.uploadImage(file);
+    textarea.value = textarea.value.replace(placeholder, `![画像](${result.url})`);
+    showToast("画像を貼り付けました", "success");
+  } catch (err) {
+    textarea.value = textarea.value.replace(placeholder, "");
+    showToast(`画像アップロードに失敗: ${err.message}`, "error");
+  }
 }
 
 function getSavedOrder() {
@@ -203,11 +269,11 @@ function renderStudyUI(main) {
         <div class="fcs-card ${isFlipped ? 'flipped' : ''}" id="fcs-card">
           <div class="fcs-card-face fcs-front">
             <div class="fcs-face-label">表面</div>
-            <div class="fcs-face-content" id="fcs-front-content">${escapeHtml(card.front)}</div>
+            <div class="fcs-face-content" id="fcs-front-content">${renderFaceContent(card.front)}</div>
           </div>
           <div class="fcs-card-face fcs-back">
             <div class="fcs-face-label">裏面</div>
-            <div class="fcs-face-content" id="fcs-back-content">${escapeHtml(card.back)}</div>
+            <div class="fcs-face-content" id="fcs-back-content">${renderFaceContent(card.back)}</div>
           </div>
         </div>
       </div>
@@ -292,7 +358,15 @@ function attachStudyEvents() {
     document.getElementById("fcs-actions").style.display = "none";
     editBar.style.display = "none";
     deleteBar.style.display = "none";
-    document.getElementById("fcs-edit-front").focus();
+    const editFront = document.getElementById("fcs-edit-front");
+    const editBack = document.getElementById("fcs-edit-back");
+    [editFront, editBack].forEach((ta) => {
+      if (!ta.dataset.pasteBound) {
+        ta.dataset.pasteBound = "1";
+        ta.addEventListener("paste", handleStudyPaste);
+      }
+    });
+    editFront.focus();
   });
 
   document.getElementById("fcs-cancel-edit").addEventListener("click", () => {
@@ -347,8 +421,8 @@ function attachStudyEvents() {
 
       showToast("カードを更新しました", "success");
       isEditing = false;
-      document.getElementById("fcs-front-content").textContent = front;
-      document.getElementById("fcs-back-content").textContent = back;
+      document.getElementById("fcs-front-content").innerHTML = renderFaceContent(front);
+      document.getElementById("fcs-back-content").innerHTML = renderFaceContent(back);
       document.getElementById("fcs-edit-form").style.display = "none";
       document.getElementById("fcs-card-wrapper").style.display = "";
       document.getElementById("fcs-actions").style.display = "";

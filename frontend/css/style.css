@@ -6450,3 +6450,35 @@ main.swipe-enter-right {
     max-width: 1100px;
   }
 }
+
+/* ========== 単語帳カード内の画像 ========== */
+.fc-content-image {
+  display: block;
+  max-width: 100%;
+  max-height: 400px;
+  width: auto;
+  height: auto;
+  margin: 8px 0;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  object-fit: contain;
+  background: rgba(0, 0, 0, 0.2);
+  cursor: zoom-in;
+}
+
+[data-theme="light"] .fc-content-image {
+  border-color: rgba(0, 0, 0, 0.1);
+  background: rgba(0, 0, 0, 0.03);
+}
+
+/* 学習画面のカード面では画像を中央寄せし、高さ上限を少し大きく */
+.fcs-face-content .fc-content-image {
+  margin: 12px auto;
+  max-height: 60vh;
+}
+
+/* 一覧詳細の表面・裏面内の画像 */
+.fc-detail-front .fc-content-image,
+.fc-detail-back .fc-content-image {
+  max-height: 320px;
+}

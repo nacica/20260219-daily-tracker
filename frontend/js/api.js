@@ -357,6 +357,20 @@ export const flashcardsApi = {
       method: "PUT",
       body: { remembered },
     }),
+
+  /** 画像アップロード（FormData を使うため apiFetch を経由しない） */
+  uploadImage: async (file) => {
+    const url = `${API_BASE}/flashcards/upload-image`;
+    const formData = new FormData();
+    formData.append("file", file);
+    const res = await fetch(url, { method: "POST", body: formData });
+    if (!res.ok) {
+      let message = `HTTP ${res.status}`;
+      try { const d = await res.json(); if (d.detail) message = d.detail; } catch {}
+      throw new Error(message);
+    }
+    return res.json();
+  },
 };
 
 // ---- カテゴリ ----

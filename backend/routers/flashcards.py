@@ -9,17 +9,46 @@ DELETE /api/v1/flashcards/{card_id}          - カード削除
 PUT    /api/v1/flashcards/{card_id}/mark     - 覚えた/まだ マーク
 """
 
+import os
 import uuid
 
-from fastapi import APIRouter, HTTPException, Response
+from fastapi import APIRouter, HTTPException, Response, UploadFile, File
 
 from models.flashcard_schemas import (
     FlashcardCreate, FlashcardUpdate, FlashcardMark, FlashcardEntry,
 )
-from services import firestore_service
+from services import firestore_service, storage_service
 from utils.helpers import now_jst
 
 router = APIRouter()
+
+ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/jpg", "image/png", "image/webp", "image/gif"}
+MAX_IMAGE_SIZE = 10 * 1024 * 1024  # 10 MB
+
+
+@router.post("/flashcards/upload-image")
+async def upload_flashcard_image(file: UploadFile = File(...)):
+    """単語帳カードに貼り付けた画像をアップロードする"""
+    if not os.getenv("CLOUD_STORAGE_BUCKET"):
+        raise HTTPException(status_code=503, detail="Cloud Storage が設定されていません")
+
+    content_type = file.content_type or "image/png"
+    if content_type not in ALLOWED_IMAGE_TYPES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"サポートされていない画像形式です: {content_type}",
+        )
+
+    image_bytes = await file.read()
+    if len(image_bytes) > MAX_IMAGE_SIZE:
+        raise HTTPException(status_code=413, detail="ファイルサイズが大きすぎます（上限 10MB）")
+
+    try:
+        url = storage_service.upload_flashcard_image(image_bytes, content_type)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"画像のアップロードに失敗しました: {str(e)[:200]}")
+
+    return {"url": url}
 
 
 @router.post("/flashcards", response_model=FlashcardEntry, status_code=201)
