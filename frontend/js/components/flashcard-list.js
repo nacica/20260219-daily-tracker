@@ -5,11 +5,11 @@
  * カードの追加・編集・削除 + 学習画面への遷移
  */
 
-import { flashcardsApi } from "../api.js?v=20260419b";
-import { showToast } from "../app.js?v=20260419b";
+import { flashcardsApi } from "../api.js?v=20260419c";
+import { showToast } from "../app.js?v=20260419c";
 
 // モジュールロード時に読み込み確認ログを出す（キャッシュ診断用）
-const FLASHCARD_LIST_VERSION = "20260419b";
+const FLASHCARD_LIST_VERSION = "20260419c";
 console.log(`%c[flashcard-list] モジュール読み込み完了 version=${FLASHCARD_LIST_VERSION}`, "color:#0f0;font-weight:bold;");
 
 const WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
@@ -57,21 +57,242 @@ function renderFaceContent(str) {
   return result;
 }
 
-// textarea に貼り付けられた画像をアップロードし、マークダウンを挿入する共通ハンドラ
-async function handleTextareaPaste(e) {
-  const clipboardData = e.clipboardData;
-  if (!clipboardData) return;
+// ========== contenteditable リッチエディタ ==========
+// textarea の代わりに contenteditable div を使い、画像をインラインで表示する。
+// 保存形式（DB）は従来と同じ Markdown (![画像](url))。表示時のみ HTML に変換。
+
+// Markdown → contenteditable 用 HTML
+function markdownToEditorHtml(md) {
+  if (!md) return "";
+  let result = "";
+  let lastIndex = 0;
+  const imgRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;
+  let m;
+  while ((m = imgRegex.exec(md)) !== null) {
+    result += textToEditorHtml(md.slice(lastIndex, m.index));
+    const alt = escapeHtml(m[1] || "画像");
+    const url = escapeHtml(m[2]);
+    result += buildInlineImageHtml(url, alt);
+    lastIndex = imgRegex.lastIndex;
+  }
+  result += textToEditorHtml(md.slice(lastIndex));
+  return result;
+}
+
+function textToEditorHtml(text) {
+  return escapeHtml(text).replace(/\n/g, "<br>");
+}
+
+function buildInlineImageHtml(url, alt) {
+  return `<span class="fc-inline-image-wrap" contenteditable="false">` +
+    `<img class="fc-inline-image" src="${url}" alt="${alt}" loading="lazy" />` +
+    `<button type="button" class="fc-inline-image-remove" title="この画像を削除">×</button>` +
+    `</span>`;
+}
+
+// contenteditable の DOM から Markdown を復元する
+function editorToMarkdown(el) {
+  let md = "";
+  function walk(node) {
+    node.childNodes.forEach((child) => {
+      if (child.nodeType === Node.TEXT_NODE) {
+        md += child.textContent;
+      } else if (child.nodeType === Node.ELEMENT_NODE) {
+        const tag = child.tagName.toLowerCase();
+        if (tag === "img") {
+          const src = child.getAttribute("src") || "";
+          const alt = child.getAttribute("alt") || "画像";
+          md += `![${alt}](${src})`;
+          return;
+        }
+        if (tag === "br") {
+          md += "\n";
+          return;
+        }
+        // 画像ラッパーはその中の img だけ拾う
+        if (child.classList && child.classList.contains("fc-inline-image-wrap")) {
+          const img = child.querySelector("img");
+          if (img) {
+            const src = img.getAttribute("src") || "";
+            const alt = img.getAttribute("alt") || "画像";
+            md += `![${alt}](${src})`;
+          }
+          return;
+        }
+        // ブロック要素の前に改行を挿入
+        if (tag === "div" || tag === "p") {
+          if (md && !md.endsWith("\n")) md += "\n";
+        }
+        walk(child);
+      }
+    });
+  }
+  walk(el);
+  return md.replace(/\n{3,}/g, "\n\n").trim();
+}
+
+// エディタにテキストをカーソル位置に挿入（改行は <br> に変換）
+function insertPlainTextAtCursor(text) {
+  const sel = window.getSelection();
+  if (!sel || !sel.rangeCount) return;
+  const range = sel.getRangeAt(0);
+  range.deleteContents();
+  const frag = document.createDocumentFragment();
+  const lines = text.split(/\r?\n/);
+  lines.forEach((line, i) => {
+    if (i > 0) frag.appendChild(document.createElement("br"));
+    frag.appendChild(document.createTextNode(line));
+  });
+  const last = frag.lastChild;
+  range.insertNode(frag);
+  if (last) {
+    range.setStartAfter(last);
+    range.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(range);
+  }
+}
+
+// エディタに 1 つの DOM ノードをカーソル位置に挿入
+function insertNodeAtCursor(editor, node) {
+  editor.focus();
+  const sel = window.getSelection();
+  let range;
+  if (sel && sel.rangeCount && editor.contains(sel.anchorNode)) {
+    range = sel.getRangeAt(0);
+    range.deleteContents();
+  } else {
+    range = document.createRange();
+    range.selectNodeContents(editor);
+    range.collapse(false);
+  }
+  range.insertNode(node);
+  range.setStartAfter(node);
+  range.collapse(true);
+  if (sel) {
+    sel.removeAllRanges();
+    sel.addRange(range);
+  }
+}
+
+// 画像ファイルをアップロードし、エディタに <img> を挿入
+async function uploadAndInsertImage(editor, file) {
+  const placeholder = document.createElement("span");
+  placeholder.className = "fc-inline-uploading";
+  placeholder.setAttribute("contenteditable", "false");
+  placeholder.innerHTML = `<span class="fc-image-uploading-spinner"></span><span class="fc-image-uploading-label">アップロード中…</span>`;
+  insertNodeAtCursor(editor, placeholder);
+
+  try {
+    const result = await flashcardsApi.uploadImage(file);
+    const wrap = createInlineImageNode(result.url, "画像");
+    placeholder.replaceWith(wrap);
+    showToast("画像を貼り付けました", "success");
+  } catch (err) {
+    placeholder.remove();
+    showToast(`画像アップロードに失敗: ${err.message}`, "error");
+  }
+}
+
+// インライン画像の DOM ノードを作る（× ボタン付き）
+function createInlineImageNode(url, alt) {
+  const wrap = document.createElement("span");
+  wrap.className = "fc-inline-image-wrap";
+  wrap.setAttribute("contenteditable", "false");
+  const img = document.createElement("img");
+  img.className = "fc-inline-image";
+  img.src = url;
+  img.alt = alt || "画像";
+  img.loading = "lazy";
+  const rm = document.createElement("button");
+  rm.type = "button";
+  rm.className = "fc-inline-image-remove";
+  rm.title = "この画像を削除";
+  rm.textContent = "×";
+  wrap.appendChild(img);
+  wrap.appendChild(rm);
+  return wrap;
+}
+
+// contenteditable エディタの paste イベント
+async function handleEditorPaste(e) {
+  const cd = e.clipboardData;
+  if (!cd) return;
 
   let file = null;
-  for (let i = 0; i < clipboardData.files.length; i++) {
-    if (clipboardData.files[i].type.startsWith("image/")) {
-      file = clipboardData.files[i];
+  for (let i = 0; i < cd.files.length; i++) {
+    if (cd.files[i].type.startsWith("image/")) {
+      file = cd.files[i];
       break;
     }
   }
-  if (!file && clipboardData.items) {
-    for (let i = 0; i < clipboardData.items.length; i++) {
-      const item = clipboardData.items[i];
+  if (!file && cd.items) {
+    for (let i = 0; i < cd.items.length; i++) {
+      const item = cd.items[i];
+      if (item.kind === "file" && item.type.startsWith("image/")) {
+        file = item.getAsFile();
+        break;
+      }
+    }
+  }
+
+  if (file) {
+    e.preventDefault();
+    showToast("画像をアップロード中...");
+    await uploadAndInsertImage(e.currentTarget, file);
+    return;
+  }
+
+  // プレーンテキストとして貼り付け（リッチテキストの書式は捨てる）
+  const text = cd.getData("text/plain");
+  if (text) {
+    e.preventDefault();
+    insertPlainTextAtCursor(text);
+  }
+}
+
+// エディタ内の × ボタンクリックで画像を削除
+function handleEditorClick(e) {
+  const rm = e.target.closest(".fc-inline-image-remove");
+  if (!rm) return;
+  e.preventDefault();
+  e.stopPropagation();
+  const wrap = rm.closest(".fc-inline-image-wrap");
+  if (wrap) wrap.remove();
+}
+
+// contenteditable div のセットアップ（paste/click 装着、初期値設定）
+function setupEditor(editor, initialMarkdown) {
+  if (!editor) return;
+  editor.innerHTML = markdownToEditorHtml(initialMarkdown || "");
+  if (editor.dataset.editorBound) return;
+  editor.dataset.editorBound = "1";
+  editor.addEventListener("paste", handleEditorPaste);
+  editor.addEventListener("click", handleEditorClick);
+}
+
+// セレクタ群から対応する contenteditable を初期化
+function setupEditors(pairs, root = document) {
+  pairs.forEach(({ selector, value }) => {
+    root.querySelectorAll(selector).forEach((ed) => setupEditor(ed, value));
+  });
+}
+
+// 一括追加の textarea 用 paste ハンドラ（従来通り Markdown 文字列を扱う）
+async function handleBulkPaste(e) {
+  const cd = e.clipboardData;
+  if (!cd) return;
+
+  let file = null;
+  for (let i = 0; i < cd.files.length; i++) {
+    if (cd.files[i].type.startsWith("image/")) {
+      file = cd.files[i];
+      break;
+    }
+  }
+  if (!file && cd.items) {
+    for (let i = 0; i < cd.items.length; i++) {
+      const item = cd.items[i];
       if (item.kind === "file" && item.type.startsWith("image/")) {
         file = item.getAsFile();
         break;
@@ -82,120 +303,22 @@ async function handleTextareaPaste(e) {
 
   e.preventDefault();
   const textarea = e.currentTarget;
+  const start = textarea.selectionStart || 0;
+  const end = textarea.selectionEnd || 0;
+  const before = textarea.value.slice(0, start);
+  const after = textarea.value.slice(end);
   const placeholder = `![画像アップロード中...](#uploading-${Date.now()})`;
-  insertAtCursor(textarea, placeholder);
-  textarea.dispatchEvent(new Event("input", { bubbles: true }));
+  textarea.value = before + placeholder + after;
   showToast("画像をアップロード中...");
 
   try {
     const result = await flashcardsApi.uploadImage(file);
     textarea.value = textarea.value.replace(placeholder, `![画像](${result.url})`);
-    textarea.dispatchEvent(new Event("input", { bubbles: true }));
     showToast("画像を貼り付けました", "success");
   } catch (err) {
     textarea.value = textarea.value.replace(placeholder, "");
-    textarea.dispatchEvent(new Event("input", { bubbles: true }));
     showToast(`画像アップロードに失敗: ${err.message}`, "error");
   }
-}
-
-function insertAtCursor(textarea, text) {
-  const start = textarea.selectionStart || 0;
-  const end = textarea.selectionEnd || 0;
-  const before = textarea.value.slice(0, start);
-  const after = textarea.value.slice(end);
-  const needsNewlineBefore = before.length > 0 && !before.endsWith("\n");
-  const needsNewlineAfter = after.length > 0 && !after.startsWith("\n");
-  const insertText = (needsNewlineBefore ? "\n" : "") + text + (needsNewlineAfter ? "\n" : "");
-  textarea.value = before + insertText + after;
-  const newPos = start + insertText.length;
-  textarea.setSelectionRange(newPos, newPos);
-  textarea.focus();
-}
-
-// 複数 textarea にまとめて paste ハンドラを装着する
-function attachPasteHandlers(selectors, root = document) {
-  selectors.forEach((sel) => {
-    root.querySelectorAll(sel).forEach((ta) => {
-      if (ta.dataset.pasteBound) return;
-      ta.dataset.pasteBound = "1";
-      ta.addEventListener("paste", handleTextareaPaste);
-    });
-  });
-}
-
-// textarea 内の画像マークダウンをプレビュー表示する
-function ensureImagePreviewContainer(textarea) {
-  let container = textarea.nextElementSibling;
-  if (container && container.classList && container.classList.contains("fc-image-preview")) {
-    return container;
-  }
-  container = document.createElement("div");
-  container.className = "fc-image-preview";
-  textarea.parentNode.insertBefore(container, textarea.nextSibling);
-  return container;
-}
-
-function updateImagePreview(textarea) {
-  const container = ensureImagePreviewContainer(textarea);
-  const imgRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;
-  const items = [];
-  let m;
-  while ((m = imgRegex.exec(textarea.value)) !== null) {
-    items.push({ alt: m[1] || "画像", url: m[2], fullMatch: m[0] });
-  }
-  if (items.length === 0) {
-    container.style.display = "none";
-    container.innerHTML = "";
-    return;
-  }
-  container.style.display = "flex";
-  container.innerHTML = items.map((item, i) => {
-    if (item.url.startsWith("#uploading-")) {
-      return `<div class="fc-image-preview-item fc-image-uploading" title="アップロード中">
-        <div class="fc-image-uploading-spinner"></div>
-        <span class="fc-image-uploading-label">アップロード中...</span>
-      </div>`;
-    }
-    return `<div class="fc-image-preview-item" data-index="${i}">
-      <img src="${escapeHtml(item.url)}" alt="${escapeHtml(item.alt)}" loading="lazy" />
-      <button type="button" class="fc-image-remove" data-full="${encodeURIComponent(item.fullMatch)}" title="この画像を削除">×</button>
-    </div>`;
-  }).join("");
-
-  // 削除ボタン
-  container.querySelectorAll(".fc-image-remove").forEach((btn) => {
-    btn.addEventListener("click", (ev) => {
-      ev.preventDefault();
-      ev.stopPropagation();
-      const full = decodeURIComponent(btn.dataset.full);
-      // 画像マークダウン行ごと削除（前後の改行も吸収）
-      const escaped = full.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      const re = new RegExp(`\\n?${escaped}\\n?`, "");
-      textarea.value = textarea.value.replace(re, "\n").replace(/^\n+|\n+$/g, "");
-      textarea.dispatchEvent(new Event("input", { bubbles: true }));
-    });
-  });
-}
-
-function attachImagePreview(textarea) {
-  if (textarea.dataset.previewBound) return;
-  textarea.dataset.previewBound = "1";
-  textarea.addEventListener("input", () => updateImagePreview(textarea));
-  updateImagePreview(textarea);
-}
-
-// textarea に paste + preview の両方をまとめて有効化
-function setupImageTextareas(selectors, root = document) {
-  selectors.forEach((sel) => {
-    root.querySelectorAll(sel).forEach((ta) => {
-      if (!ta.dataset.pasteBound) {
-        ta.dataset.pasteBound = "1";
-        ta.addEventListener("paste", handleTextareaPaste);
-      }
-      attachImagePreview(ta);
-    });
-  });
 }
 
 const PAGE_SIZE = 15;
@@ -280,9 +403,9 @@ export async function renderFlashcardList() {
       <div class="fc-add-form card" id="fc-add-form" style="display:none;">
         <div class="fc-form-title">新しいカード</div>
         <label class="fc-label">表面（問題・単語）</label>
-        <textarea class="fc-textarea" id="fc-new-front" rows="2" placeholder="覚えたい言葉や問題を入力..."></textarea>
+        <div class="fc-editor" id="fc-new-front" contenteditable="true" data-placeholder="覚えたい言葉や問題を入力... (画像は Ctrl+V で貼り付け)"></div>
         <label class="fc-label">裏面（答え・意味）</label>
-        <textarea class="fc-textarea" id="fc-new-back" rows="2" placeholder="答えや意味を入力..."></textarea>
+        <div class="fc-editor" id="fc-new-back" contenteditable="true" data-placeholder="答えや意味を入力... (画像は Ctrl+V で貼り付け)"></div>
         <div class="fc-form-btns">
           <button class="btn btn-primary btn-sm" id="fc-save-new">保存</button>
           <button class="btn btn-outline btn-sm" id="fc-cancel-new">キャンセル</button>
@@ -350,10 +473,16 @@ export async function renderFlashcardList() {
   }
   attachEvents(cards);
 
-  // 追加フォーム・一括追加フォームの textarea に paste ハンドラ装着
-  // 一括追加はテキスト主体なので画像プレビューは付けない（paste のみ有効化）
-  setupImageTextareas(["#fc-new-front", "#fc-new-back"]);
-  attachPasteHandlers(["#fc-bulk-input"]);
+  // 追加フォームの contenteditable エディタを初期化
+  setupEditor(document.getElementById("fc-new-front"), "");
+  setupEditor(document.getElementById("fc-new-back"), "");
+
+  // 一括追加の textarea には paste ハンドラのみ装着（従来通り Markdown 文字列を扱う）
+  const bulkInput = document.getElementById("fc-bulk-input");
+  if (bulkInput && !bulkInput.dataset.pasteBound) {
+    bulkInput.dataset.pasteBound = "1";
+    bulkInput.addEventListener("paste", handleBulkPaste);
+  }
 }
 
 function getPageCards(page) {
@@ -478,9 +607,9 @@ function buildDetailView(card) {
     <!-- 編集フォーム（非表示） -->
     <div class="fc-detail-edit-form" data-id="${card.id}" style="display:none;">
       <label class="fc-label">表面</label>
-      <textarea class="fc-textarea fc-edit-front" rows="2">${escapeHtml(card.front)}</textarea>
+      <div class="fc-editor fc-edit-front" contenteditable="true" data-initial="${encodeURIComponent(card.front)}"></div>
       <label class="fc-label">裏面</label>
-      <textarea class="fc-textarea fc-edit-back" rows="3">${escapeHtml(card.back)}</textarea>
+      <div class="fc-editor fc-edit-back" contenteditable="true" data-initial="${encodeURIComponent(card.back)}"></div>
       <div class="fc-form-btns">
         <button class="btn btn-primary btn-sm fc-detail-save-edit" data-id="${card.id}">保存</button>
         <button class="btn btn-outline btn-sm fc-detail-cancel-edit" data-id="${card.id}">キャンセル</button>
@@ -642,9 +771,12 @@ function attachDetailEvents(container) {
       const sections = root.querySelectorAll(".fc-detail-section, .fc-detail-divider, .fc-detail-actions, .fc-detail-actions-top");
       sections.forEach((s) => (s.style.display = "none"));
       form.style.display = "block";
-      // 編集フォームの textarea にも paste + プレビューを装着
-      setupImageTextareas([".fc-edit-front", ".fc-edit-back"], form);
-      form.querySelector(".fc-edit-front").focus();
+      // 編集フォームの contenteditable エディタを初期化
+      const frontEd = form.querySelector(".fc-edit-front");
+      const backEd = form.querySelector(".fc-edit-back");
+      setupEditor(frontEd, decodeURIComponent(frontEd.dataset.initial || ""));
+      setupEditor(backEd, decodeURIComponent(backEd.dataset.initial || ""));
+      frontEd.focus();
     });
   });
 
@@ -661,8 +793,8 @@ function attachDetailEvents(container) {
   root.querySelectorAll(".fc-detail-save-edit").forEach((saveBtn) => {
     saveBtn.addEventListener("click", async () => {
       const id = saveBtn.dataset.id;
-      const front = root.querySelector(".fc-edit-front").value.trim();
-      const back = root.querySelector(".fc-edit-back").value.trim();
+      const front = editorToMarkdown(root.querySelector(".fc-edit-front"));
+      const back = editorToMarkdown(root.querySelector(".fc-edit-back"));
       if (!front || !back) {
         showToast("表面と裏面の両方を入力してください", "error");
         return;
@@ -763,14 +895,14 @@ function attachEvents() {
   // キャンセル
   document.getElementById("fc-cancel-new").addEventListener("click", () => {
     addForm.style.display = "none";
-    document.getElementById("fc-new-front").value = "";
-    document.getElementById("fc-new-back").value = "";
+    document.getElementById("fc-new-front").innerHTML = "";
+    document.getElementById("fc-new-back").innerHTML = "";
   });
 
   // 保存
   document.getElementById("fc-save-new").addEventListener("click", async () => {
-    const front = document.getElementById("fc-new-front").value.trim();
-    const back = document.getElementById("fc-new-back").value.trim();
+    const front = editorToMarkdown(document.getElementById("fc-new-front"));
+    const back = editorToMarkdown(document.getElementById("fc-new-back"));
     if (!front || !back) {
       showToast("表面と裏面の両方を入力してください", "error");
       return;

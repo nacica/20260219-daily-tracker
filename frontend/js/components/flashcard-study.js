@@ -4,8 +4,8 @@
  * 学習中のカード編集にも対応
  */
 
-import { flashcardsApi } from "../api.js?v=20260419b";
-import { showToast } from "../app.js?v=20260419b";
+import { flashcardsApi } from "../api.js?v=20260419c";
+import { showToast } from "../app.js?v=20260419c";
 
 const ORDER_STORAGE_KEY = "flashcard-study-order";
 
@@ -49,105 +49,189 @@ function renderFaceContent(str) {
   return result;
 }
 
-function ensureImagePreviewContainer(textarea) {
-  let container = textarea.nextElementSibling;
-  if (container && container.classList && container.classList.contains("fc-image-preview")) {
-    return container;
+// ========== contenteditable リッチエディタ（学習画面の編集用） ==========
+
+function markdownToEditorHtml(md) {
+  if (!md) return "";
+  let result = "";
+  let lastIndex = 0;
+  const imgRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;
+  let m;
+  while ((m = imgRegex.exec(md)) !== null) {
+    const before = md.slice(lastIndex, m.index);
+    result += escapeHtml(before).replace(/\n/g, "<br>");
+    const alt = escapeHtml(m[1] || "画像");
+    const url = escapeHtml(m[2]);
+    result += `<span class="fc-inline-image-wrap" contenteditable="false">` +
+      `<img class="fc-inline-image" src="${url}" alt="${alt}" loading="lazy" />` +
+      `<button type="button" class="fc-inline-image-remove" title="この画像を削除">×</button>` +
+      `</span>`;
+    lastIndex = imgRegex.lastIndex;
   }
-  container = document.createElement("div");
-  container.className = "fc-image-preview";
-  textarea.parentNode.insertBefore(container, textarea.nextSibling);
-  return container;
+  result += escapeHtml(md.slice(lastIndex)).replace(/\n/g, "<br>");
+  return result;
 }
 
-function updateImagePreview(textarea) {
-  const container = ensureImagePreviewContainer(textarea);
-  const imgRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;
-  const items = [];
-  let m;
-  while ((m = imgRegex.exec(textarea.value)) !== null) {
-    items.push({ alt: m[1] || "画像", url: m[2], fullMatch: m[0] });
-  }
-  if (items.length === 0) {
-    container.style.display = "none";
-    container.innerHTML = "";
-    return;
-  }
-  container.style.display = "flex";
-  container.innerHTML = items.map((item) => {
-    if (item.url.startsWith("#uploading-")) {
-      return `<div class="fc-image-preview-item fc-image-uploading" title="アップロード中">
-        <div class="fc-image-uploading-spinner"></div>
-        <span class="fc-image-uploading-label">アップロード中...</span>
-      </div>`;
-    }
-    return `<div class="fc-image-preview-item">
-      <img src="${escapeHtml(item.url)}" alt="${escapeHtml(item.alt)}" loading="lazy" />
-      <button type="button" class="fc-image-remove" data-full="${encodeURIComponent(item.fullMatch)}" title="この画像を削除">×</button>
-    </div>`;
-  }).join("");
-
-  container.querySelectorAll(".fc-image-remove").forEach((btn) => {
-    btn.addEventListener("click", (ev) => {
-      ev.preventDefault();
-      ev.stopPropagation();
-      const full = decodeURIComponent(btn.dataset.full);
-      const escaped = full.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      const re = new RegExp(`\\n?${escaped}\\n?`, "");
-      textarea.value = textarea.value.replace(re, "\n").replace(/^\n+|\n+$/g, "");
-      textarea.dispatchEvent(new Event("input", { bubbles: true }));
+function editorToMarkdown(el) {
+  let md = "";
+  function walk(node) {
+    node.childNodes.forEach((child) => {
+      if (child.nodeType === Node.TEXT_NODE) {
+        md += child.textContent;
+      } else if (child.nodeType === Node.ELEMENT_NODE) {
+        const tag = child.tagName.toLowerCase();
+        if (tag === "img") {
+          md += `![${child.getAttribute("alt") || "画像"}](${child.getAttribute("src") || ""})`;
+          return;
+        }
+        if (tag === "br") {
+          md += "\n";
+          return;
+        }
+        if (child.classList && child.classList.contains("fc-inline-image-wrap")) {
+          const img = child.querySelector("img");
+          if (img) {
+            md += `![${img.getAttribute("alt") || "画像"}](${img.getAttribute("src") || ""})`;
+          }
+          return;
+        }
+        if (tag === "div" || tag === "p") {
+          if (md && !md.endsWith("\n")) md += "\n";
+        }
+        walk(child);
+      }
     });
+  }
+  walk(el);
+  return md.replace(/\n{3,}/g, "\n\n").trim();
+}
+
+function createInlineImageNode(url, alt) {
+  const wrap = document.createElement("span");
+  wrap.className = "fc-inline-image-wrap";
+  wrap.setAttribute("contenteditable", "false");
+  const img = document.createElement("img");
+  img.className = "fc-inline-image";
+  img.src = url;
+  img.alt = alt || "画像";
+  img.loading = "lazy";
+  const rm = document.createElement("button");
+  rm.type = "button";
+  rm.className = "fc-inline-image-remove";
+  rm.title = "この画像を削除";
+  rm.textContent = "×";
+  wrap.appendChild(img);
+  wrap.appendChild(rm);
+  return wrap;
+}
+
+function insertPlainTextAtCursor(text) {
+  const sel = window.getSelection();
+  if (!sel || !sel.rangeCount) return;
+  const range = sel.getRangeAt(0);
+  range.deleteContents();
+  const frag = document.createDocumentFragment();
+  const lines = text.split(/\r?\n/);
+  lines.forEach((line, i) => {
+    if (i > 0) frag.appendChild(document.createElement("br"));
+    frag.appendChild(document.createTextNode(line));
   });
+  const last = frag.lastChild;
+  range.insertNode(frag);
+  if (last) {
+    range.setStartAfter(last);
+    range.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(range);
+  }
+}
+
+function insertNodeAtCursor(editor, node) {
+  editor.focus();
+  const sel = window.getSelection();
+  let range;
+  if (sel && sel.rangeCount && editor.contains(sel.anchorNode)) {
+    range = sel.getRangeAt(0);
+    range.deleteContents();
+  } else {
+    range = document.createRange();
+    range.selectNodeContents(editor);
+    range.collapse(false);
+  }
+  range.insertNode(node);
+  range.setStartAfter(node);
+  range.collapse(true);
+  if (sel) {
+    sel.removeAllRanges();
+    sel.addRange(range);
+  }
+}
+
+async function uploadAndInsertImage(editor, file) {
+  const placeholder = document.createElement("span");
+  placeholder.className = "fc-inline-uploading";
+  placeholder.setAttribute("contenteditable", "false");
+  placeholder.innerHTML = `<span class="fc-image-uploading-spinner"></span><span class="fc-image-uploading-label">アップロード中…</span>`;
+  insertNodeAtCursor(editor, placeholder);
+
+  try {
+    const result = await flashcardsApi.uploadImage(file);
+    placeholder.replaceWith(createInlineImageNode(result.url, "画像"));
+    showToast("画像を貼り付けました", "success");
+  } catch (err) {
+    placeholder.remove();
+    showToast(`画像アップロードに失敗: ${err.message}`, "error");
+  }
 }
 
 async function handleStudyPaste(e) {
-  const clipboardData = e.clipboardData;
-  if (!clipboardData) return;
+  const cd = e.clipboardData;
+  if (!cd) return;
 
   let file = null;
-  for (let i = 0; i < clipboardData.files.length; i++) {
-    if (clipboardData.files[i].type.startsWith("image/")) {
-      file = clipboardData.files[i];
-      break;
-    }
+  for (let i = 0; i < cd.files.length; i++) {
+    if (cd.files[i].type.startsWith("image/")) { file = cd.files[i]; break; }
   }
-  if (!file && clipboardData.items) {
-    for (let i = 0; i < clipboardData.items.length; i++) {
-      const item = clipboardData.items[i];
+  if (!file && cd.items) {
+    for (let i = 0; i < cd.items.length; i++) {
+      const item = cd.items[i];
       if (item.kind === "file" && item.type.startsWith("image/")) {
         file = item.getAsFile();
         break;
       }
     }
   }
-  if (!file) return;
 
-  e.preventDefault();
-  const textarea = e.currentTarget;
-  const placeholder = `![画像アップロード中...](#uploading-${Date.now()})`;
-  const start = textarea.selectionStart || 0;
-  const end = textarea.selectionEnd || 0;
-  const before = textarea.value.slice(0, start);
-  const after = textarea.value.slice(end);
-  const needNlBefore = before.length > 0 && !before.endsWith("\n");
-  const needNlAfter = after.length > 0 && !after.startsWith("\n");
-  const inserted = (needNlBefore ? "\n" : "") + placeholder + (needNlAfter ? "\n" : "");
-  textarea.value = before + inserted + after;
-  const newPos = start + inserted.length;
-  textarea.setSelectionRange(newPos, newPos);
-  textarea.dispatchEvent(new Event("input", { bubbles: true }));
-  showToast("画像をアップロード中...");
-
-  try {
-    const result = await flashcardsApi.uploadImage(file);
-    textarea.value = textarea.value.replace(placeholder, `![画像](${result.url})`);
-    textarea.dispatchEvent(new Event("input", { bubbles: true }));
-    showToast("画像を貼り付けました", "success");
-  } catch (err) {
-    textarea.value = textarea.value.replace(placeholder, "");
-    textarea.dispatchEvent(new Event("input", { bubbles: true }));
-    showToast(`画像アップロードに失敗: ${err.message}`, "error");
+  if (file) {
+    e.preventDefault();
+    showToast("画像をアップロード中...");
+    await uploadAndInsertImage(e.currentTarget, file);
+    return;
   }
+
+  const text = cd.getData("text/plain");
+  if (text) {
+    e.preventDefault();
+    insertPlainTextAtCursor(text);
+  }
+}
+
+function handleStudyEditorClick(e) {
+  const rm = e.target.closest(".fc-inline-image-remove");
+  if (!rm) return;
+  e.preventDefault();
+  e.stopPropagation();
+  const wrap = rm.closest(".fc-inline-image-wrap");
+  if (wrap) wrap.remove();
+}
+
+function setupStudyEditor(editor, initialMarkdown) {
+  if (!editor) return;
+  editor.innerHTML = markdownToEditorHtml(initialMarkdown || "");
+  if (editor.dataset.editorBound) return;
+  editor.dataset.editorBound = "1";
+  editor.addEventListener("paste", handleStudyPaste);
+  editor.addEventListener("click", handleStudyEditorClick);
 }
 
 function getSavedOrder() {
@@ -340,9 +424,9 @@ function renderStudyUI(main) {
       <!-- 編集フォーム（非表示） -->
       <div class="fcs-edit-form card" id="fcs-edit-form" style="display:none;">
         <label class="fc-label">表面</label>
-        <textarea class="fc-textarea" id="fcs-edit-front" rows="2">${escapeHtml(card.front)}</textarea>
+        <div class="fc-editor" id="fcs-edit-front" contenteditable="true"></div>
         <label class="fc-label">裏面</label>
-        <textarea class="fc-textarea" id="fcs-edit-back" rows="2">${escapeHtml(card.back)}</textarea>
+        <div class="fc-editor" id="fcs-edit-back" contenteditable="true"></div>
         <div class="fc-form-btns">
           <button class="btn btn-primary btn-sm" id="fcs-save-edit">保存</button>
           <button class="btn btn-outline btn-sm" id="fcs-cancel-edit">キャンセル</button>
@@ -412,19 +496,11 @@ function attachStudyEvents() {
     document.getElementById("fcs-actions").style.display = "none";
     editBar.style.display = "none";
     deleteBar.style.display = "none";
+    const card = deck[currentIndex];
     const editFront = document.getElementById("fcs-edit-front");
     const editBack = document.getElementById("fcs-edit-back");
-    [editFront, editBack].forEach((ta) => {
-      if (!ta.dataset.pasteBound) {
-        ta.dataset.pasteBound = "1";
-        ta.addEventListener("paste", handleStudyPaste);
-      }
-      if (!ta.dataset.previewBound) {
-        ta.dataset.previewBound = "1";
-        ta.addEventListener("input", () => updateImagePreview(ta));
-      }
-      updateImagePreview(ta);
-    });
+    setupStudyEditor(editFront, card.front);
+    setupStudyEditor(editBack, card.back);
     editFront.focus();
   });
 
@@ -463,8 +539,8 @@ function attachStudyEvents() {
   });
 
   document.getElementById("fcs-save-edit").addEventListener("click", async () => {
-    const front = document.getElementById("fcs-edit-front").value.trim();
-    const back = document.getElementById("fcs-edit-back").value.trim();
+    const front = editorToMarkdown(document.getElementById("fcs-edit-front"));
+    const back = editorToMarkdown(document.getElementById("fcs-edit-back"));
     if (!front || !back) {
       showToast("表面と裏面の両方を入力してください", "error");
       return;
