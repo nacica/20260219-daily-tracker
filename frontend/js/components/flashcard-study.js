@@ -4,8 +4,8 @@
  * 学習中のカード編集にも対応
  */
 
-import { flashcardsApi } from "../api.js?v=20260419a";
-import { showToast } from "../app.js?v=20260419a";
+import { flashcardsApi } from "../api.js?v=20260419b";
+import { showToast } from "../app.js?v=20260419b";
 
 const ORDER_STORAGE_KEY = "flashcard-study-order";
 
@@ -49,6 +49,57 @@ function renderFaceContent(str) {
   return result;
 }
 
+function ensureImagePreviewContainer(textarea) {
+  let container = textarea.nextElementSibling;
+  if (container && container.classList && container.classList.contains("fc-image-preview")) {
+    return container;
+  }
+  container = document.createElement("div");
+  container.className = "fc-image-preview";
+  textarea.parentNode.insertBefore(container, textarea.nextSibling);
+  return container;
+}
+
+function updateImagePreview(textarea) {
+  const container = ensureImagePreviewContainer(textarea);
+  const imgRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;
+  const items = [];
+  let m;
+  while ((m = imgRegex.exec(textarea.value)) !== null) {
+    items.push({ alt: m[1] || "画像", url: m[2], fullMatch: m[0] });
+  }
+  if (items.length === 0) {
+    container.style.display = "none";
+    container.innerHTML = "";
+    return;
+  }
+  container.style.display = "flex";
+  container.innerHTML = items.map((item) => {
+    if (item.url.startsWith("#uploading-")) {
+      return `<div class="fc-image-preview-item fc-image-uploading" title="アップロード中">
+        <div class="fc-image-uploading-spinner"></div>
+        <span class="fc-image-uploading-label">アップロード中...</span>
+      </div>`;
+    }
+    return `<div class="fc-image-preview-item">
+      <img src="${escapeHtml(item.url)}" alt="${escapeHtml(item.alt)}" loading="lazy" />
+      <button type="button" class="fc-image-remove" data-full="${encodeURIComponent(item.fullMatch)}" title="この画像を削除">×</button>
+    </div>`;
+  }).join("");
+
+  container.querySelectorAll(".fc-image-remove").forEach((btn) => {
+    btn.addEventListener("click", (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      const full = decodeURIComponent(btn.dataset.full);
+      const escaped = full.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const re = new RegExp(`\\n?${escaped}\\n?`, "");
+      textarea.value = textarea.value.replace(re, "\n").replace(/^\n+|\n+$/g, "");
+      textarea.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+  });
+}
+
 async function handleStudyPaste(e) {
   const clipboardData = e.clipboardData;
   if (!clipboardData) return;
@@ -84,14 +135,17 @@ async function handleStudyPaste(e) {
   textarea.value = before + inserted + after;
   const newPos = start + inserted.length;
   textarea.setSelectionRange(newPos, newPos);
+  textarea.dispatchEvent(new Event("input", { bubbles: true }));
   showToast("画像をアップロード中...");
 
   try {
     const result = await flashcardsApi.uploadImage(file);
     textarea.value = textarea.value.replace(placeholder, `![画像](${result.url})`);
+    textarea.dispatchEvent(new Event("input", { bubbles: true }));
     showToast("画像を貼り付けました", "success");
   } catch (err) {
     textarea.value = textarea.value.replace(placeholder, "");
+    textarea.dispatchEvent(new Event("input", { bubbles: true }));
     showToast(`画像アップロードに失敗: ${err.message}`, "error");
   }
 }
@@ -365,6 +419,11 @@ function attachStudyEvents() {
         ta.dataset.pasteBound = "1";
         ta.addEventListener("paste", handleStudyPaste);
       }
+      if (!ta.dataset.previewBound) {
+        ta.dataset.previewBound = "1";
+        ta.addEventListener("input", () => updateImagePreview(ta));
+      }
+      updateImagePreview(ta);
     });
     editFront.focus();
   });

@@ -5,11 +5,11 @@
  * カードの追加・編集・削除 + 学習画面への遷移
  */
 
-import { flashcardsApi } from "../api.js?v=20260419a";
-import { showToast } from "../app.js?v=20260419a";
+import { flashcardsApi } from "../api.js?v=20260419b";
+import { showToast } from "../app.js?v=20260419b";
 
 // モジュールロード時に読み込み確認ログを出す（キャッシュ診断用）
-const FLASHCARD_LIST_VERSION = "20260419a";
+const FLASHCARD_LIST_VERSION = "20260419b";
 console.log(`%c[flashcard-list] モジュール読み込み完了 version=${FLASHCARD_LIST_VERSION}`, "color:#0f0;font-weight:bold;");
 
 const WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
@@ -84,6 +84,7 @@ async function handleTextareaPaste(e) {
   const textarea = e.currentTarget;
   const placeholder = `![画像アップロード中...](#uploading-${Date.now()})`;
   insertAtCursor(textarea, placeholder);
+  textarea.dispatchEvent(new Event("input", { bubbles: true }));
   showToast("画像をアップロード中...");
 
   try {
@@ -93,6 +94,7 @@ async function handleTextareaPaste(e) {
     showToast("画像を貼り付けました", "success");
   } catch (err) {
     textarea.value = textarea.value.replace(placeholder, "");
+    textarea.dispatchEvent(new Event("input", { bubbles: true }));
     showToast(`画像アップロードに失敗: ${err.message}`, "error");
   }
 }
@@ -118,6 +120,80 @@ function attachPasteHandlers(selectors, root = document) {
       if (ta.dataset.pasteBound) return;
       ta.dataset.pasteBound = "1";
       ta.addEventListener("paste", handleTextareaPaste);
+    });
+  });
+}
+
+// textarea 内の画像マークダウンをプレビュー表示する
+function ensureImagePreviewContainer(textarea) {
+  let container = textarea.nextElementSibling;
+  if (container && container.classList && container.classList.contains("fc-image-preview")) {
+    return container;
+  }
+  container = document.createElement("div");
+  container.className = "fc-image-preview";
+  textarea.parentNode.insertBefore(container, textarea.nextSibling);
+  return container;
+}
+
+function updateImagePreview(textarea) {
+  const container = ensureImagePreviewContainer(textarea);
+  const imgRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;
+  const items = [];
+  let m;
+  while ((m = imgRegex.exec(textarea.value)) !== null) {
+    items.push({ alt: m[1] || "画像", url: m[2], fullMatch: m[0] });
+  }
+  if (items.length === 0) {
+    container.style.display = "none";
+    container.innerHTML = "";
+    return;
+  }
+  container.style.display = "flex";
+  container.innerHTML = items.map((item, i) => {
+    if (item.url.startsWith("#uploading-")) {
+      return `<div class="fc-image-preview-item fc-image-uploading" title="アップロード中">
+        <div class="fc-image-uploading-spinner"></div>
+        <span class="fc-image-uploading-label">アップロード中...</span>
+      </div>`;
+    }
+    return `<div class="fc-image-preview-item" data-index="${i}">
+      <img src="${escapeHtml(item.url)}" alt="${escapeHtml(item.alt)}" loading="lazy" />
+      <button type="button" class="fc-image-remove" data-full="${encodeURIComponent(item.fullMatch)}" title="この画像を削除">×</button>
+    </div>`;
+  }).join("");
+
+  // 削除ボタン
+  container.querySelectorAll(".fc-image-remove").forEach((btn) => {
+    btn.addEventListener("click", (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      const full = decodeURIComponent(btn.dataset.full);
+      // 画像マークダウン行ごと削除（前後の改行も吸収）
+      const escaped = full.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const re = new RegExp(`\\n?${escaped}\\n?`, "");
+      textarea.value = textarea.value.replace(re, "\n").replace(/^\n+|\n+$/g, "");
+      textarea.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+  });
+}
+
+function attachImagePreview(textarea) {
+  if (textarea.dataset.previewBound) return;
+  textarea.dataset.previewBound = "1";
+  textarea.addEventListener("input", () => updateImagePreview(textarea));
+  updateImagePreview(textarea);
+}
+
+// textarea に paste + preview の両方をまとめて有効化
+function setupImageTextareas(selectors, root = document) {
+  selectors.forEach((sel) => {
+    root.querySelectorAll(sel).forEach((ta) => {
+      if (!ta.dataset.pasteBound) {
+        ta.dataset.pasteBound = "1";
+        ta.addEventListener("paste", handleTextareaPaste);
+      }
+      attachImagePreview(ta);
     });
   });
 }
@@ -275,7 +351,9 @@ export async function renderFlashcardList() {
   attachEvents(cards);
 
   // 追加フォーム・一括追加フォームの textarea に paste ハンドラ装着
-  attachPasteHandlers(["#fc-new-front", "#fc-new-back", "#fc-bulk-input"]);
+  // 一括追加はテキスト主体なので画像プレビューは付けない（paste のみ有効化）
+  setupImageTextareas(["#fc-new-front", "#fc-new-back"]);
+  attachPasteHandlers(["#fc-bulk-input"]);
 }
 
 function getPageCards(page) {
@@ -564,8 +642,8 @@ function attachDetailEvents(container) {
       const sections = root.querySelectorAll(".fc-detail-section, .fc-detail-divider, .fc-detail-actions, .fc-detail-actions-top");
       sections.forEach((s) => (s.style.display = "none"));
       form.style.display = "block";
-      // 編集フォームの textarea にも paste ハンドラを装着
-      attachPasteHandlers([".fc-edit-front", ".fc-edit-back"], form);
+      // 編集フォームの textarea にも paste + プレビューを装着
+      setupImageTextareas([".fc-edit-front", ".fc-edit-back"], form);
       form.querySelector(".fc-edit-front").focus();
     });
   });
