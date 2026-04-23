@@ -7,25 +7,25 @@
  *   - 各画面のコンポーネントはルート遷移時に動的 import（初期ロードを軽量化）
  */
 
-import { addRoute, navigate, updateNavActive } from "./router.js?v=20260424a";
-import { recordsApi, analysisApi, remindersApi } from "./api.js?v=20260424a";
-import { initSwipeNav } from "./swipe-nav.js?v=20260424a";
+import { addRoute, navigate, updateNavActive } from "./router.js?v=20260424b";
+import { recordsApi, analysisApi, remindersApi } from "./api.js?v=20260424b";
+import { initSwipeNav } from "./swipe-nav.js?v=20260424b";
 
 // ===== 動的 import ヘルパー =====
 // 各コンポーネントは初回訪問時に初めてネットワーク取得（以降は SW キャッシュから即応答）
-const loadInputForm       = () => import("./components/input-form.js?v=20260424a");
-const loadAnalysisView    = () => import("./components/analysis-view.js?v=20260424a");
-const loadHistoryList     = () => import("./components/history-list.js?v=20260424a");
-const loadWeeklyReport    = () => import("./components/weekly-report.js?v=20260424a");
-const loadSuggestions     = () => import("./components/suggestions.js?v=20260424a");
-const loadCoachingChat    = () => import("./components/coaching-chat.js?v=20260424a");
-const loadKnowledgeGraph  = () => import("./components/knowledge-graph.js?v=20260424a");
-const loadMonthlyReport   = () => import("./components/monthly-report.js?v=20260424a");
-const loadJournal         = () => import("./components/journal.js?v=20260424a");
-const loadBraindump       = () => import("./components/braindump.js?v=20260424a");
-const loadTaskStats       = () => import("./components/task-stats.js?v=20260424a");
-const loadFlashcardList   = () => import("./components/flashcard-list.js?v=20260424a");
-const loadFlashcardStudy  = () => import("./components/flashcard-study.js?v=20260424a");
+const loadInputForm       = () => import("./components/input-form.js?v=20260424b");
+const loadAnalysisView    = () => import("./components/analysis-view.js?v=20260424b");
+const loadHistoryList     = () => import("./components/history-list.js?v=20260424b");
+const loadWeeklyReport    = () => import("./components/weekly-report.js?v=20260424b");
+const loadSuggestions     = () => import("./components/suggestions.js?v=20260424b");
+const loadCoachingChat    = () => import("./components/coaching-chat.js?v=20260424b");
+const loadKnowledgeGraph  = () => import("./components/knowledge-graph.js?v=20260424b");
+const loadMonthlyReport   = () => import("./components/monthly-report.js?v=20260424b");
+const loadJournal         = () => import("./components/journal.js?v=20260424b");
+const loadBraindump       = () => import("./components/braindump.js?v=20260424b");
+const loadTaskStats       = () => import("./components/task-stats.js?v=20260424b");
+const loadFlashcardList   = () => import("./components/flashcard-list.js?v=20260424b");
+const loadFlashcardStudy  = () => import("./components/flashcard-study.js?v=20260424b");
 
 // ===== ユーティリティ =====
 
@@ -304,6 +304,30 @@ function saveHomeCache(dateStr, record, analysis, reminders) {
   } catch {}
 }
 
+/**
+ * ホームで取得済みの record / reminders を /input 画面のキャッシュに事前ウォームアップ。
+ * ユーザーがホーム → 記録タブに遷移したとき、/input の楽観描画が即座に使える。
+ * input-form.js の `INPUT_CACHE_KEY_PREFIX` 形式と合わせること。
+ */
+function prewarmInputCache(dateStr, record, reminders) {
+  try {
+    const key = "input_cache_v1_" + dateStr;
+    const existing = (() => {
+      try { return JSON.parse(localStorage.getItem(key)) || {}; } catch { return {}; }
+    })();
+    const merged = {
+      ...existing,
+      date: dateStr,
+      existingRecord: record || null,
+      isRestDay: !!(record && record.rest_day),
+      restReason: (record && record.rest_reason) || "",
+      reminders: reminders || existing.reminders || [],
+      ts: Date.now(),
+    };
+    localStorage.setItem(key, JSON.stringify(merged));
+  } catch {}
+}
+
 // ===== 今日意識すること（ホーム用） =====
 
 let _homeRemindersCache = [];
@@ -455,6 +479,9 @@ async function renderHome() {
 
     // キャッシュを更新（次回起動時の楽観描画のため）
     saveHomeCache(todayStr, record, analysis, reminders);
+
+    // ホームで取得済みの record / reminders を /input の楽観描画キャッシュに事前ウォームアップ
+    prewarmInputCache(todayStr, record, reminders);
 
     // 最新データで再描画（差分チェックは省略 — 全体再描画でも十分軽い）
     getMain().innerHTML = buildHomeHTML(todayStr, record, analysis, reminders);

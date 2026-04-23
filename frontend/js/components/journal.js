@@ -3,8 +3,8 @@
  * 1日に複数エントリ作成可能。各エントリに独立した分析・MD要約。
  */
 
-import { journalApi, diaryDialogueApi } from "../api.js?v=20260424a";
-import { showToast } from "../app.js?v=20260424a";
+import { journalApi, diaryDialogueApi } from "../api.js?v=20260424b";
+import { showToast } from "../app.js?v=20260424b";
 
 // ===== ユーティリティ =====
 

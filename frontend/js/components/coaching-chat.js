@@ -3,8 +3,8 @@
  * パーソナルコーチとの対話インターフェース
  */
 
-import { coachApi } from "../api.js?v=20260424a";
-import { showToast } from "../app.js?v=20260424a";
+import { coachApi } from "../api.js?v=20260424b";
+import { showToast } from "../app.js?v=20260424b";
 
 /** 会話履歴をメモリに保持 */
 let conversationHistory = [];

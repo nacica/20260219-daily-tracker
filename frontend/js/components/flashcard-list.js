@@ -5,11 +5,11 @@
  * カードの追加・編集・削除 + 学習画面への遷移
  */
 
-import { flashcardsApi } from "../api.js?v=20260424a";
-import { showToast } from "../app.js?v=20260424a";
+import { flashcardsApi } from "../api.js?v=20260424b";
+import { showToast } from "../app.js?v=20260424b";
 
 // モジュールロード時に読み込み確認ログを出す（キャッシュ診断用）
-const FLASHCARD_LIST_VERSION = "20260424a";
+const FLASHCARD_LIST_VERSION = "20260424b";
 console.log(`%c[flashcard-list] モジュール読み込み完了 version=${FLASHCARD_LIST_VERSION}`, "color:#0f0;font-weight:bold;");
 
 const WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];

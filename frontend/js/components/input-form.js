@@ -5,9 +5,9 @@
  * 朝のタスク整理（ソクラテス式問答）統合
  */
 
-import { recordsApi, analysisApi, morningDialogueApi, remindersApi, categoriesApi } from "../api.js?v=20260424a";
-import { showToast } from "../app.js?v=20260424a";
-import { showTaskCompleteAnimation, buildTaskStatsCards } from "./task-stats.js?v=20260424a";
+import { recordsApi, analysisApi, morningDialogueApi, remindersApi, categoriesApi } from "../api.js?v=20260424b";
+import { showToast } from "../app.js?v=20260424b";
+import { showTaskCompleteAnimation, buildTaskStatsCards } from "./task-stats.js?v=20260424b";
 
 /* ── カテゴリ管理 ── */
 
@@ -282,49 +282,74 @@ function saveLayoutPreference(layout) {
 /* ── メインレンダリング ── */
 
 /**
- * 入力フォームをメインエリアにレンダリングする
- * @param {string} date - 対象日 (YYYY-MM-DD)
+ * /input 画面の楽観描画用キャッシュ
+ * localStorage に前回描画時のスナップショット（record, morningDialogue, tasks, 休養日状態）を保存し、
+ * 次回起動時に API 応答を待たずに即描画する。app.js のホーム画面からも書き込み可能
+ * （ホームで取得済みの record を事前ウォームアップするため）。
  */
-export async function renderInputForm(date) {
-  const main = document.querySelector("main");
-  main.innerHTML = `<div class="loading"><div class="spinner"></div><p>読み込み中...</p></div>`;
+const INPUT_CACHE_KEY_PREFIX = "input_cache_v1_";
 
-  // 既存レコードと朝問答を並行取得
-  let existingRecord = null;
-  let morningDialogue = null;
+function loadInputCache(date) {
+  try {
+    const raw = localStorage.getItem(INPUT_CACHE_KEY_PREFIX + date);
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    if (!data || data.date !== date) return null;
+    return data;
+  } catch { return null; }
+}
 
-  const [recordResult, morningResult] = await Promise.allSettled([
-    recordsApi.get(date),
-    morningDialogueApi.get(date),
-    syncRemindersFromServer(),
-    syncCategoriesFromServer(),
-  ]);
+function saveInputCache(date, snapshot) {
+  try {
+    const existing = loadInputCache(date) || {};
+    const merged = { ...existing, ...snapshot, date, ts: Date.now() };
+    localStorage.setItem(INPUT_CACHE_KEY_PREFIX + date, JSON.stringify(merged));
+  } catch {}
+}
 
-  if (recordResult.status === "fulfilled") existingRecord = recordResult.value;
-  if (morningResult.status === "fulfilled") morningDialogue = morningResult.value;
+/**
+ * セッション内の categories / reminders 同期に短い TTL を設けて、
+ * 同じセッションで /input を複数回開いた時の重複 API 呼び出しを避ける
+ */
+const SESSION_SYNC_TTL_MS = 5 * 60 * 1000; // 5分
+let _lastRemindersSyncAt = 0;
+let _lastCategoriesSyncAt = 0;
 
-  const isEdit = !!existingRecord;
-  const tasks = existingRecord?.tasks || { planned: [], completed: [], backlog: [] };
+async function syncRemindersWithCache() {
+  if (Date.now() - _lastRemindersSyncAt < SESSION_SYNC_TTL_MS && _remindersCache.length > 0) return;
+  await syncRemindersFromServer();
+  _lastRemindersSyncAt = Date.now();
+}
 
-  // 近日中タスクが空の場合、直近7日から自動引き継ぎ
-  if (tasks.backlog.length === 0) {
-    try {
-      const base = new Date(date + "T00:00:00");
-      for (let i = 1; i <= 7; i++) {
-        const d = new Date(base);
-        d.setDate(d.getDate() - i);
-        const prevDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-        const prev = await recordsApi.get(prevDate).catch(() => null);
-        const prevBacklog = prev?.tasks?.backlog || [];
-        if (prevBacklog.length > 0) {
-          tasks.backlog = [...prevBacklog];
-          break;
-        }
-      }
-    } catch { /* ignore */ }
+async function syncCategoriesWithCache() {
+  if (Date.now() - _lastCategoriesSyncAt < SESSION_SYNC_TTL_MS) return;
+  await syncCategoriesFromServer();
+  _lastCategoriesSyncAt = Date.now();
+}
+
+/** 日付文字列の前日を返す */
+function _prevDateStr(date, daysAgo) {
+  const d = new Date(date + "T00:00:00");
+  d.setDate(d.getDate() - daysAgo);
+  return d.toLocaleDateString("sv-SE");
+}
+
+/** 朝問答 plan + 瞑想タスク + backlog 引き継ぎを 1 箇所で適用 */
+function _mergeTasks(existingRecord, morningDialogue, prevRecords) {
+  const tasks = existingRecord?.tasks
+    ? { planned: [...(existingRecord.tasks.planned || [])], completed: [...(existingRecord.tasks.completed || [])], backlog: [...(existingRecord.tasks.backlog || [])] }
+    : { planned: [], completed: [], backlog: [] };
+
+  // 近日中タスク引き継ぎ: 直近7日を1回の list で取得済み → 新しい日から非空 backlog を採用
+  if (tasks.backlog.length === 0 && Array.isArray(prevRecords) && prevRecords.length > 0) {
+    const sorted = prevRecords.slice().sort((a, b) => (a.date < b.date ? 1 : -1));
+    for (const p of sorted) {
+      const bk = p?.tasks?.backlog || [];
+      if (bk.length > 0) { tasks.backlog = [...bk]; break; }
+    }
   }
 
-  // 朝問答のプランからタスクをマージ（completedの場合）
+  // 朝問答 plan からタスクマージ（completed のみ）
   if (morningDialogue?.status === "completed" && morningDialogue.plan) {
     const plan = morningDialogue.plan;
     const existingNames = new Set([
@@ -334,16 +359,10 @@ export async function renderInputForm(date) {
     ]);
     for (const item of plan.tasks_today || []) {
       const name = item.task || "";
-      if (name && !existingNames.has(name)) {
-        tasks.planned.push(name);
-        existingNames.add(name);
-      }
+      if (name && !existingNames.has(name)) { tasks.planned.push(name); existingNames.add(name); }
     }
     for (const task of plan.carried_over || []) {
-      if (task && !existingNames.has(task)) {
-        tasks.planned.push(task);
-        existingNames.add(task);
-      }
+      if (task && !existingNames.has(task)) { tasks.planned.push(task); existingNames.add(task); }
     }
   }
 
@@ -357,17 +376,92 @@ export async function renderInputForm(date) {
     tasks.planned.unshift(MEDITATION_TASK);
   }
 
-  const isRestDay = existingRecord?.rest_day || false;
-  const restReason = existingRecord?.rest_reason || "";
+  return tasks;
+}
 
-  // タスク完了サマリーカードを非同期で取得
-  const taskStatsHTML = await buildTaskStatsCards();
-
-  main.innerHTML = taskStatsHTML + buildFormHTML(date, existingRecord, tasks, isEdit, morningDialogue, isRestDay, restReason);
+/** フォームを描画してイベントを再アタッチする共通処理 */
+function _paintForm(main, date, existingRecord, morningDialogue, tasks, isRestDay, restReason) {
+  const isEdit = !!existingRecord;
+  // タスク統計カードは後から差し込むためのプレースホルダ（スロット）を先頭に用意
+  main.innerHTML = `<div id="task-stats-slot"></div>` +
+    buildFormHTML(date, existingRecord, tasks, isEdit, morningDialogue, isRestDay, restReason);
   attachFormEvents(date, isEdit);
   attachMorningDialogueEvents(date, morningDialogue);
   attachReminderEvents();
   attachRestDayEvents(date, isRestDay);
+}
+
+/**
+ * 入力フォームをメインエリアにレンダリングする
+ * @param {string} date - 対象日 (YYYY-MM-DD)
+ *
+ * 高速化戦略:
+ *   1. localStorage キャッシュから即描画（スピナー回避）
+ *   2. タスク統計カードは並行取得 → 準備でき次第スロットに差し込む（クリティカルパス外）
+ *   3. クリティカルパスの API 5 本を並列: record / morning / reminders / categories / 直近7日の list
+ *   4. reminders / categories は 5 分 TTL のセッションキャッシュで二重取得を回避
+ */
+export async function renderInputForm(date) {
+  const main = document.querySelector("main");
+
+  // ── 1. 楽観描画: 前回のキャッシュから即描画 ──
+  const cached = loadInputCache(date);
+  if (cached) {
+    if (Array.isArray(cached.reminders)) _remindersCache = cached.reminders;
+    // キャッシュ内容から tasks を合成（prevRecords はキャッシュ済みのものを使う）
+    const cachedTasks = cached.tasks || _mergeTasks(cached.existingRecord, cached.morningDialogue, cached.prevRecords || []);
+    _paintForm(main, date, cached.existingRecord || null, cached.morningDialogue || null, cachedTasks,
+      !!cached.isRestDay, cached.restReason || "");
+  } else {
+    main.innerHTML = `<div class="loading"><div class="spinner"></div><p>読み込み中...</p></div>`;
+  }
+
+  // ── 2. タスク統計カードは並列で取得 → 準備でき次第スロットへ差し込む ──
+  const statsPromise = buildTaskStatsCards().catch(() => "");
+  statsPromise.then((html) => {
+    if (!html) return;
+    const slot = document.getElementById("task-stats-slot");
+    if (slot) slot.innerHTML = html;
+  });
+
+  // ── 3. クリティカルパスの API を 5 本並列実行 ──
+  const startStr = _prevDateStr(date, 7);
+  const endStr = _prevDateStr(date, 1);
+
+  const [recordResult, morningResult, , , prevResult] = await Promise.allSettled([
+    recordsApi.get(date),
+    morningDialogueApi.get(date),
+    syncRemindersWithCache(),
+    syncCategoriesWithCache(),
+    recordsApi.list(startStr, endStr),
+  ]);
+
+  const existingRecord = recordResult.status === "fulfilled" ? recordResult.value : null;
+  const morningDialogue = morningResult.status === "fulfilled" ? morningResult.value : null;
+  const prevRecords = prevResult.status === "fulfilled" ? (prevResult.value || []) : [];
+
+  const tasks = _mergeTasks(existingRecord, morningDialogue, prevRecords);
+  const isRestDay = existingRecord?.rest_day || false;
+  const restReason = existingRecord?.rest_reason || "";
+
+  // ── 4. フレッシュデータで再描画 ──
+  _paintForm(main, date, existingRecord, morningDialogue, tasks, isRestDay, restReason);
+
+  // ── 5. キャッシュを更新（次回の楽観描画用）──
+  saveInputCache(date, {
+    existingRecord,
+    morningDialogue,
+    tasks,
+    isRestDay,
+    restReason,
+    prevRecords,
+    reminders: _remindersCache,
+  });
+
+  // ── 6. 再描画でスロットが空になったため、ready な統計 HTML を差し込む ──
+  const html = await statsPromise;
+  const slot = document.getElementById("task-stats-slot");
+  if (slot && html) slot.innerHTML = html;
 }
 
 /* ── 付箋リマインダー ── */
