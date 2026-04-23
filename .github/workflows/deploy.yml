@@ -87,7 +87,23 @@ jobs:
             dist/index.html
 
           # 4. firebase.json を生成（dist/ を公開ディレクトリに指定）
-          printf '{"hosting":{"public":"dist","ignore":["firebase.json","**/.*","**/node_modules/**"],"rewrites":[{"source":"**","destination":"/index.html"}]}}\n' > firebase.json
+          #    HTML / sw.js / CSS / JS に no-cache ヘッダを付与し、
+          #    デプロイ後の変更が CDN キャッシュで止まらないようにする。
+          cat > firebase.json <<'JSON'
+          {
+            "hosting": {
+              "public": "dist",
+              "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+              "rewrites": [{"source": "**", "destination": "/index.html"}],
+              "headers": [
+                {"source": "/sw.js",     "headers": [{"key": "Cache-Control", "value": "no-cache, no-store, must-revalidate"}]},
+                {"source": "**/*.html",  "headers": [{"key": "Cache-Control", "value": "no-cache"}]},
+                {"source": "**/*.css",   "headers": [{"key": "Cache-Control", "value": "no-cache"}]},
+                {"source": "**/*.js",    "headers": [{"key": "Cache-Control", "value": "no-cache"}]}
+              ]
+            }
+          }
+          JSON
 
           # 5. Firebase CLI インストール & デプロイ
           npm install -g firebase-tools

@@ -3,8 +3,24 @@
  * エンティティ・リレーションの一覧とグラフ表示
  */
 
-import { knowledgeApi } from "../api.js?v=20260324c";
-import { showToast } from "../app.js?v=20260324c";
+import { knowledgeApi } from "../api.js?v=20260424a";
+import { showToast } from "../app.js?v=20260424a";
+
+/** D3.js を必要時に一度だけロード（グローバル window.d3 を設定） */
+let _d3LoadPromise = null;
+function loadD3() {
+  if (window.d3) return Promise.resolve(window.d3);
+  if (_d3LoadPromise) return _d3LoadPromise;
+  _d3LoadPromise = new Promise((resolve, reject) => {
+    const s = document.createElement("script");
+    s.src = "https://d3js.org/d3.v7.min.js";
+    s.async = true;
+    s.onload = () => resolve(window.d3);
+    s.onerror = () => { _d3LoadPromise = null; reject(new Error("D3.js の読込に失敗")); };
+    document.head.appendChild(s);
+  });
+  return _d3LoadPromise;
+}
 
 /** メインコンテンツエリアを返す */
 function getMain() {
@@ -136,7 +152,10 @@ export async function renderKnowledgeGraph() {
     `;
 
     _setupFilters(entities);
-    _renderGraph(entities, relations);
+    // D3.js をこのタイミングで初めて読み込む（ホーム等での初期ロードを回避）
+    loadD3().then(() => _renderGraph(entities, relations)).catch((e) => {
+      showToast(`グラフ描画に失敗: ${e.message}`, "error");
+    });
 
   } catch (err) {
     main.innerHTML = `

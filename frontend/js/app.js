@@ -1,24 +1,31 @@
 /**
  * アプリのメインロジック
- * ルーティングの設定とホーム画面の表示を担当する
+ * ルーティングの設定とホーム画面の表示を担当する。
+ *
+ * コード分割方針:
+ *   - ホーム表示に必要なコア（router / api / swipe-nav）のみ静的 import
+ *   - 各画面のコンポーネントはルート遷移時に動的 import（初期ロードを軽量化）
  */
 
-import { addRoute, navigate, updateNavActive } from "./router.js?v=20260419c";
-import { renderInputForm } from "./components/input-form.js?v=20260419c";
-import { renderAnalysisView } from "./components/analysis-view.js?v=20260419c";
-import { renderHistoryList } from "./components/history-list.js?v=20260419c";
-import { renderWeeklyReport } from "./components/weekly-report.js?v=20260419c";
-import { renderSuggestions } from "./components/suggestions.js?v=20260419c";
-import { renderCoachingChat } from "./components/coaching-chat.js?v=20260419c";
-import { renderKnowledgeGraph } from "./components/knowledge-graph.js?v=20260419c";
-import { renderMonthlyReport } from "./components/monthly-report.js?v=20260419c";
-import { renderJournal } from "./components/journal.js?v=20260419c";
-import { renderBraindump } from "./components/braindump.js?v=20260419c";
-import { recordsApi, analysisApi, remindersApi } from "./api.js?v=20260419c";
-import { initSwipeNav } from "./swipe-nav.js?v=20260419c";
-import { buildTaskStatsCards, renderTaskStats } from "./components/task-stats.js?v=20260419c";
-import { renderFlashcardList } from "./components/flashcard-list.js?v=20260419c";
-import { renderFlashcardStudy } from "./components/flashcard-study.js?v=20260419c";
+import { addRoute, navigate, updateNavActive } from "./router.js?v=20260424a";
+import { recordsApi, analysisApi, remindersApi } from "./api.js?v=20260424a";
+import { initSwipeNav } from "./swipe-nav.js?v=20260424a";
+
+// ===== 動的 import ヘルパー =====
+// 各コンポーネントは初回訪問時に初めてネットワーク取得（以降は SW キャッシュから即応答）
+const loadInputForm       = () => import("./components/input-form.js?v=20260424a");
+const loadAnalysisView    = () => import("./components/analysis-view.js?v=20260424a");
+const loadHistoryList     = () => import("./components/history-list.js?v=20260424a");
+const loadWeeklyReport    = () => import("./components/weekly-report.js?v=20260424a");
+const loadSuggestions     = () => import("./components/suggestions.js?v=20260424a");
+const loadCoachingChat    = () => import("./components/coaching-chat.js?v=20260424a");
+const loadKnowledgeGraph  = () => import("./components/knowledge-graph.js?v=20260424a");
+const loadMonthlyReport   = () => import("./components/monthly-report.js?v=20260424a");
+const loadJournal         = () => import("./components/journal.js?v=20260424a");
+const loadBraindump       = () => import("./components/braindump.js?v=20260424a");
+const loadTaskStats       = () => import("./components/task-stats.js?v=20260424a");
+const loadFlashcardList   = () => import("./components/flashcard-list.js?v=20260424a");
+const loadFlashcardStudy  = () => import("./components/flashcard-study.js?v=20260424a");
 
 // ===== ユーティリティ =====
 
@@ -269,6 +276,34 @@ export function showToast(message, type = "info") {
   }
 }
 
+// ===== ホーム楽観描画用キャッシュ =====
+// localStorage に「今日の record / analysis / reminders」のスナップショットを保存し、
+// 次回起動時に API 応答を待たずに即描画する。日付が変わったら破棄する。
+const HOME_CACHE_KEY = "home_cache_v1";
+
+function loadHomeCache(dateStr) {
+  try {
+    const raw = localStorage.getItem(HOME_CACHE_KEY);
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    if (!data || data.date !== dateStr) return null;
+    return data;
+  } catch {
+    return null;
+  }
+}
+
+function saveHomeCache(dateStr, record, analysis, reminders) {
+  try {
+    localStorage.setItem(HOME_CACHE_KEY, JSON.stringify({
+      date: dateStr,
+      record: record || null,
+      analysis: analysis || null,
+      reminders: reminders || [],
+    }));
+  } catch {}
+}
+
 // ===== 今日意識すること（ホーム用） =====
 
 let _homeRemindersCache = [];
@@ -281,7 +316,10 @@ async function syncRemindersFromServer() {
   try {
     const res = await remindersApi.get();
     _homeRemindersCache = res.items || [];
-  } catch {}
+    return _homeRemindersCache;
+  } catch {
+    return null;
+  }
 }
 
 let homeReminderIndex = 0;
@@ -360,52 +398,78 @@ function attachHomeReminderEvents() {
 
 // ===== ホーム画面 =====
 
+/** ホーム HTML を組み立てる（record/analysis/reminders から） */
+function buildHomeHTML(dateStr, record, analysis, reminders) {
+  _homeRemindersCache = reminders || [];
+  const isRestDay = !!(record && record.rest_day);
+  const restReason = record ? record.rest_reason || "" : "";
+  const hasRecord = !!record;
+  const hasAnalysis = !!analysis;
+
+  return `
+    <div class="home-date">${formatDateJP(dateStr)}</div>
+    <h1 class="home-title">今日の行動分析</h1>
+    ${buildHomeReminderCard()}
+    ${isRestDay ? `
+    <div class="card" style="border: 1px solid rgba(168, 85, 247, 0.3); background: rgba(168, 85, 247, 0.08); margin-bottom: var(--gap);">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <span style="font-size: 1.5rem;">🌙</span>
+        <div>
+          <div style="font-weight: 600;">おやすみモード</div>
+          <div style="font-size: 0.82rem; color: var(--text-secondary);">
+            今日は分析対象外です${restReason ? `（${restReason}）` : ""}
+          </div>
+        </div>
+      </div>
+    </div>` : ""}
+    ${hasAnalysis && !isRestDay ? buildHomeSummary(analysis) : ""}
+    ${buildHomeActions(hasRecord, hasAnalysis, dateStr, isRestDay)}
+  `;
+}
+
 async function renderHome() {
   const todayStr = today();
-  showLoading("今日のデータを確認中...");
 
+  // 1. キャッシュがあれば即描画（スピナーなし）
+  const cached = loadHomeCache(todayStr);
+  let rendered = false;
+  if (cached) {
+    getMain().innerHTML = buildHomeHTML(todayStr, cached.record, cached.analysis, cached.reminders);
+    attachHomeReminderEvents();
+    rendered = true;
+  } else {
+    showLoading("今日のデータを確認中...");
+  }
+
+  // 2. 最新データを取得して上書き
   try {
-    // 今日の記録と分析を並行取得 + リマインダー同期
-    const [record, analysis] = await Promise.allSettled([
+    const [recordRes, analysisRes, remindersRes] = await Promise.allSettled([
       recordsApi.get(todayStr),
       analysisApi.get(todayStr),
       syncRemindersFromServer(),
     ]);
 
-    const hasRecord = record.status === "fulfilled" && record.value;
-    const hasAnalysis = analysis.status === "fulfilled" && analysis.value;
-    const isRestDay = hasRecord && record.value.rest_day;
-    const restReason = hasRecord ? record.value.rest_reason || "" : "";
+    const record = recordRes.status === "fulfilled" ? recordRes.value : null;
+    const analysis = analysisRes.status === "fulfilled" ? analysisRes.value : null;
+    const reminders = remindersRes.status === "fulfilled" ? (remindersRes.value || []) : _homeRemindersCache;
 
-    getMain().innerHTML = `
-      <div class="home-date">${formatDateJP(todayStr)}</div>
-      <h1 class="home-title">今日の行動分析</h1>
-      ${buildHomeReminderCard()}
-      ${isRestDay ? `
-      <div class="card" style="border: 1px solid rgba(168, 85, 247, 0.3); background: rgba(168, 85, 247, 0.08); margin-bottom: var(--gap);">
-        <div style="display: flex; align-items: center; gap: 10px;">
-          <span style="font-size: 1.5rem;">🌙</span>
-          <div>
-            <div style="font-weight: 600;">おやすみモード</div>
-            <div style="font-size: 0.82rem; color: var(--text-secondary);">
-              今日は分析対象外です${restReason ? `（${restReason}）` : ""}
-            </div>
-          </div>
-        </div>
-      </div>` : ""}
-      ${hasAnalysis && !isRestDay ? buildHomeSummary(analysis.value) : ""}
-      ${buildHomeActions(hasRecord, hasAnalysis, todayStr, isRestDay)}
-    `;
+    // キャッシュを更新（次回起動時の楽観描画のため）
+    saveHomeCache(todayStr, record, analysis, reminders);
+
+    // 最新データで再描画（差分チェックは省略 — 全体再描画でも十分軽い）
+    getMain().innerHTML = buildHomeHTML(todayStr, record, analysis, reminders);
     attachHomeReminderEvents();
   } catch (e) {
-    getMain().innerHTML = `
-      ${buildHomeReminderCard()}
-      <div class="empty-state">
-        <div class="icon">📝</div>
-        <p>今日の記録はまだありません。<br>行動記録を入力して分析を始めましょう。</p>
-        <button class="btn btn-primary" onclick="window.location.hash='/input'">記録を入力する</button>
-      </div>`;
-    attachHomeReminderEvents();
+    if (!rendered) {
+      getMain().innerHTML = `
+        ${buildHomeReminderCard()}
+        <div class="empty-state">
+          <div class="icon">📝</div>
+          <p>今日の記録はまだありません。<br>行動記録を入力して分析を始めましょう。</p>
+          <button class="btn btn-primary" onclick="window.location.hash='/input'">記録を入力する</button>
+        </div>`;
+      attachHomeReminderEvents();
+    }
   }
 }
 
@@ -506,26 +570,27 @@ document.addEventListener("click", async (e) => {
 });
 
 // ===== ルーティング設定 =====
+// 各ルートは初回訪問時に動的 import（ホームのバンドルには含めない）
 
 addRoute("/", () => renderHome());
-addRoute("/input", () => renderInputForm(today()));
-addRoute("/input/:date", ({ date }) => renderInputForm(date));
-addRoute("/analysis/:date", ({ date }) => renderAnalysisView(date));
-addRoute("/history", () => renderHistoryList());
-addRoute("/weekly", () => renderWeeklyReport(null));
-addRoute("/weekly/:weekId", ({ weekId }) => renderWeeklyReport(weekId));
-addRoute("/suggestions", () => renderSuggestions());
-addRoute("/coach", () => renderCoachingChat());
-addRoute("/knowledge", () => renderKnowledgeGraph());
-addRoute("/monthly", () => renderMonthlyReport(null));
-addRoute("/monthly/:yearMonth", ({ yearMonth }) => renderMonthlyReport(yearMonth));
-addRoute("/journal", () => renderJournal(today()));
-addRoute("/journal/:date", ({ date }) => renderJournal(date));
-addRoute("/braindump", () => renderBraindump(today()));
-addRoute("/braindump/:date", ({ date }) => renderBraindump(date));
-addRoute("/task-stats", () => renderTaskStats());
-addRoute("/flashcards", () => renderFlashcardList());
-addRoute("/flashcards/study", () => renderFlashcardStudy());
+addRoute("/input", async () => (await loadInputForm()).renderInputForm(today()));
+addRoute("/input/:date", async ({ date }) => (await loadInputForm()).renderInputForm(date));
+addRoute("/analysis/:date", async ({ date }) => (await loadAnalysisView()).renderAnalysisView(date));
+addRoute("/history", async () => (await loadHistoryList()).renderHistoryList());
+addRoute("/weekly", async () => (await loadWeeklyReport()).renderWeeklyReport(null));
+addRoute("/weekly/:weekId", async ({ weekId }) => (await loadWeeklyReport()).renderWeeklyReport(weekId));
+addRoute("/suggestions", async () => (await loadSuggestions()).renderSuggestions());
+addRoute("/coach", async () => (await loadCoachingChat()).renderCoachingChat());
+addRoute("/knowledge", async () => (await loadKnowledgeGraph()).renderKnowledgeGraph());
+addRoute("/monthly", async () => (await loadMonthlyReport()).renderMonthlyReport(null));
+addRoute("/monthly/:yearMonth", async ({ yearMonth }) => (await loadMonthlyReport()).renderMonthlyReport(yearMonth));
+addRoute("/journal", async () => (await loadJournal()).renderJournal(today()));
+addRoute("/journal/:date", async ({ date }) => (await loadJournal()).renderJournal(date));
+addRoute("/braindump", async () => (await loadBraindump()).renderBraindump(today()));
+addRoute("/braindump/:date", async ({ date }) => (await loadBraindump()).renderBraindump(date));
+addRoute("/task-stats", async () => (await loadTaskStats()).renderTaskStats());
+addRoute("/flashcards", async () => (await loadFlashcardList()).renderFlashcardList());
+addRoute("/flashcards/study", async () => (await loadFlashcardStudy()).renderFlashcardStudy());
 
 // ===== 初期化 =====
 
@@ -542,6 +607,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // モバイルスワイプナビゲーション
   initSwipeNav();
+
+  // ネットワークアイドル時に主要ルートを先読み（体感高速化）
+  if ("requestIdleCallback" in window) {
+    requestIdleCallback(() => {
+      loadInputForm();
+      loadHistoryList();
+    }, { timeout: 3000 });
+  }
 });
 
 // ハッシュ変更時にデスクトップヘッダーも更新

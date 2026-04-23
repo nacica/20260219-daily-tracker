@@ -3,10 +3,26 @@
  * 1日に複数エントリ作成可能。各エントリに独立した分析・MD要約。
  */
 
-import { journalApi, diaryDialogueApi } from "../api.js?v=20260324c";
-import { showToast } from "../app.js?v=20260324c";
+import { journalApi, diaryDialogueApi } from "../api.js?v=20260424a";
+import { showToast } from "../app.js?v=20260424a";
 
 // ===== ユーティリティ =====
+
+/** marked.js を必要時に一度だけ読み込む。読み込み完了後に再描画したい場合は onReady を渡す */
+let _markedLoadPromise = null;
+function loadMarked() {
+  if (window.marked) return Promise.resolve(window.marked);
+  if (_markedLoadPromise) return _markedLoadPromise;
+  _markedLoadPromise = new Promise((resolve, reject) => {
+    const s = document.createElement("script");
+    s.src = "https://cdn.jsdelivr.net/npm/marked/marked.min.js";
+    s.async = true;
+    s.onload = () => resolve(window.marked);
+    s.onerror = () => { _markedLoadPromise = null; reject(new Error("marked.js の読込に失敗")); };
+    document.head.appendChild(s);
+  });
+  return _markedLoadPromise;
+}
 
 function renderMd(text) {
   if (!text || typeof text !== "string") return "";
@@ -16,6 +32,8 @@ function renderMd(text) {
     if (m.marked && typeof m.marked.parse === "function") return m.marked.parse(text);
     if (typeof m === "function") return m(text);
   }
+  // 未読込の場合は改行変換で応急描画し、非同期に marked をロードして次回以降に備える
+  loadMarked().catch(() => {});
   return text.replace(/\n/g, "<br>");
 }
 
@@ -105,11 +123,17 @@ export async function renderJournal(date) {
       <p>読み込み中...</p>
     </div>`;
 
+  // marked.js をデータ取得と並行してロード（API 応答待ち中に JS も降ってくる）
+  const markedPromise = loadMarked().catch(() => null);
+
   const [entriesResult, recentResult, diaryDialogueResult] = await Promise.allSettled([
     journalApi.listByDate(date),
     journalApi.list(getMonthStart(date), date),
     diaryDialogueApi.get(date),
   ]);
+
+  // API 応答時点で marked が未ロードなら、ここで待機（通常はすでにロード済み）
+  await markedPromise;
 
   const entries = entriesResult.status === "fulfilled" ? (entriesResult.value || []) : [];
   const recentEntries = recentResult.status === "fulfilled" ? recentResult.value : [];

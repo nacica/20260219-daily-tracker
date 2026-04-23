@@ -14,12 +14,23 @@
   <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
   <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png" />
   <link rel="icon" type="image/png" sizes="512x512" href="/icons/icon-512.png" />
+
+  <!-- Google Fonts を非同期ロード（レンダーブロッキング回避）。JS 無効時用の <noscript> fallback 付き -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Klee+One&display=swap" rel="stylesheet" />
+  <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Klee+One&display=swap"
+        media="print" onload="this.media='all'" />
+  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Klee+One&display=swap" /></noscript>
+
   <link rel="manifest" href="/manifest.json" />
-  <link rel="stylesheet" href="/css/style.css?v=20260419c" />
-  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <link rel="stylesheet" href="/css/style.css?v=20260424a" />
+
+  <!-- ホーム表示に必要なコアモジュールを先読み（並列 fetch で TTI を短縮） -->
+  <link rel="modulepreload" href="/js/app.js?v=20260424a" />
+  <link rel="modulepreload" href="/js/router.js?v=20260424a" />
+  <link rel="modulepreload" href="/js/api.js?v=20260424a" />
+  <link rel="modulepreload" href="/js/swipe-nav.js?v=20260424a" />
 
   <!-- FOUC防止: JSモジュール読み込み前にテーマを適用 -->
   <script>
@@ -209,10 +220,13 @@
   <!-- トースト通知コンテナ -->
   <div id="toast-container"></div>
 
-  <!-- Markdown レンダリング -->
-  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <!--
+    marked.js と D3.js は各コンポーネント（journal / knowledge-graph）が必要時に
+    動的に <script> を注入してロードする。ホーム初期ロードの負担を避けるため、
+    ここからは削除済み。
+  -->
 
   <!-- アプリのメインスクリプト（ES Modules） -->
-  <script type="module" src="/js/app.js?v=20260419c"></script>
+  <script type="module" src="/js/app.js?v=20260424a"></script>
 </body>
 </html>

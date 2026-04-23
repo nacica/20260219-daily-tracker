@@ -1,11 +1,15 @@
 /**
  * Service Worker
  * キャッシュ戦略:
- *   - 静的アセット（CSS/JS/HTML）: Cache First
+ *   - 静的アセット（CSS/JS/HTML）: Stale-While-Revalidate（キャッシュ即返し + 背景更新）
  *   - API リクエスト: Network First（オフライン時はキャッシュ）
+ *   - index.html / sw.js: Network First（新デプロイを即反映）
+ *
+ * JS/CSS は `?v=xxx` で URL が変わるとキャッシュキーも変わるため、
+ * SWR でも古いコードが出続けることはない（新バージョンは新 URL として取得される）。
  */
 
-const CACHE_NAME = "daily-tracker-v219";
+const CACHE_NAME = "daily-tracker-v220";
 const STATIC_ASSETS = [
   "/",
   "/index.html",
@@ -14,30 +18,18 @@ const STATIC_ASSETS = [
   "/js/api.js",
   "/js/router.js",
   "/js/swipe-nav.js",
-  "/js/components/input-form.js",
-  "/js/components/analysis-view.js",
-  "/js/components/history-list.js",
-  "/js/components/weekly-report.js",
-  "/js/components/screenshot-upload.js",
-  "/js/components/suggestions.js",
-  "/js/components/coaching-chat.js",
-  "/js/components/knowledge-graph.js",
-  "/js/components/monthly-report.js",
-  "/js/components/journal.js",
-  "/js/components/task-stats.js",
-  "/js/components/braindump.js",
-  "/js/components/flashcard-list.js",
-  "/js/components/flashcard-study.js",
   "/manifest.json",
   "/icons/icon-192.png",
   "/icons/icon-512.png",
   "/icons/apple-touch-icon.png",
 ];
 
-// インストール時に静的アセットをキャッシュ
+// インストール時に主要アセットをキャッシュ（失敗しても SW 起動は継続）
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(STATIC_ASSETS))
+    caches.open(CACHE_NAME).then((cache) =>
+      Promise.allSettled(STATIC_ASSETS.map((url) => cache.add(url)))
+    )
   );
   self.skipWaiting();
 });
@@ -57,6 +49,8 @@ self.addEventListener("activate", (event) => {
 // フェッチ処理
 self.addEventListener("fetch", (event) => {
   const { request } = event;
+  if (request.method !== "GET") return;
+
   const url = new URL(request.url);
 
   // API リクエストは Network First
@@ -65,13 +59,19 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // JS/CSS は Network First（デプロイ後すぐ反映させるため）
-  if (url.pathname.endsWith(".js") || url.pathname.endsWith(".css")) {
+  // index.html / ナビゲーションリクエストは Network First（新デプロイを即反映）
+  if (request.mode === "navigate" || url.pathname === "/" || url.pathname.endsWith("/index.html")) {
     event.respondWith(networkFirst(request));
     return;
   }
 
-  // その他の静的アセット（HTML, 画像, manifest等）は Cache First
+  // JS/CSS は Stale-While-Revalidate（キャッシュ即返し、背景で更新）
+  if (url.pathname.endsWith(".js") || url.pathname.endsWith(".css")) {
+    event.respondWith(staleWhileRevalidate(request));
+    return;
+  }
+
+  // その他の静的アセット（画像, manifest, フォント等）は Cache First
   event.respondWith(cacheFirst(request));
 });
 
@@ -105,4 +105,24 @@ async function networkFirst(request) {
       headers: { "Content-Type": "application/json" },
     });
   }
+}
+
+/**
+ * Stale-While-Revalidate
+ * 1. キャッシュがあれば即返す
+ * 2. 背景でネットワーク取得してキャッシュを更新
+ * 3. キャッシュがなければネットワーク結果を待つ
+ */
+async function staleWhileRevalidate(request) {
+  const cache = await caches.open(CACHE_NAME);
+  const cached = await cache.match(request);
+
+  const networkPromise = fetch(request)
+    .then((response) => {
+      if (response.ok) cache.put(request, response.clone());
+      return response;
+    })
+    .catch(() => null);
+
+  return cached || (await networkPromise) || new Response("オフラインです", { status: 503 });
 }
