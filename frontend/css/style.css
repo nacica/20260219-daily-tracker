@@ -6625,16 +6625,16 @@ main.swipe-enter-right {
   --bt-heart-period: 10s;
 }
 .bedtime-timer.bt-level-warn {
-  --bt-accent: var(--neon-amber);
-  --bt-accent-rgb: 255, 170, 0;
-  --bt-accent-soft: rgba(255, 170, 0, 0.16);
-  --bt-border: rgba(255, 170, 0, 0.38);
+  --bt-accent: #38bdf8;
+  --bt-accent-rgb: 56, 189, 248;
+  --bt-accent-soft: rgba(56, 189, 248, 0.16);
+  --bt-border: rgba(56, 189, 248, 0.4);
 }
 .bedtime-timer.bt-level-danger {
-  --bt-accent: var(--neon-red);
-  --bt-accent-rgb: 255, 51, 102;
-  --bt-accent-soft: rgba(255, 51, 102, 0.16);
-  --bt-border: rgba(255, 51, 102, 0.45);
+  --bt-accent: #6366f1;
+  --bt-accent-rgb: 99, 102, 241;
+  --bt-accent-soft: rgba(99, 102, 241, 0.2);
+  --bt-border: rgba(99, 102, 241, 0.55);
 }
 [data-theme="light"] .bedtime-timer {
   --bt-face-bg: rgba(248, 250, 252, 0.95);
@@ -6690,9 +6690,11 @@ main.swipe-enter-right {
   color: var(--text-primary);
 }
 .bedtime-timer.bt-level-warn .bt-countdown,
-.bedtime-timer.bt-level-warn .bt-status-label { color: var(--neon-amber); }
+.bedtime-timer.bt-level-warn .bt-status-label,
 .bedtime-timer.bt-level-danger .bt-countdown,
-.bedtime-timer.bt-level-danger .bt-status-label { color: var(--neon-red); }
+.bedtime-timer.bt-level-danger .bt-status-label {
+  color: var(--bt-accent);
+}
 
 /* コンパクト版の overdue 時の文字サイズ調整 */
 .bedtime-timer:not(.bedtime-inline).is-after-bedtime .bt-countdown {
@@ -6852,8 +6854,8 @@ main.swipe-enter-right {
 }
 .bedtime-inline.is-after-bedtime .bt-countdown {
   font-size: 1rem;
-  color: var(--neon-red);
-  text-shadow: 0 0 12px rgba(255, 51, 102, 0.5);
+  color: var(--bt-accent);
+  text-shadow: 0 0 12px rgba(var(--bt-accent-rgb), 0.55);
 }
 
 /* ===== プログレスバー（液体ウェーブ入り）===== */
