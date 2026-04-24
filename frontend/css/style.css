@@ -6615,26 +6615,26 @@ main.swipe-enter-right {
    就寝までウィジェット — Cyber HUD Edition
    ============================================================= */
 
-/* --- 共通環境変数 --- */
+/* --- 共通環境変数（ティファニーブルー系） --- */
 .bedtime-timer {
-  --bt-accent: var(--cyan);
-  --bt-accent-rgb: 0, 212, 255;
-  --bt-accent-soft: rgba(0, 212, 255, 0.16);
-  --bt-border: rgba(0, 212, 255, 0.22);
-  --bt-face-bg: rgba(5, 12, 28, 0.85);
+  --bt-accent: #81D8D0;
+  --bt-accent-rgb: 129, 216, 208;
+  --bt-accent-soft: rgba(129, 216, 208, 0.18);
+  --bt-border: rgba(129, 216, 208, 0.3);
+  --bt-face-bg: rgba(5, 16, 22, 0.88);
   --bt-heart-period: 10s;
 }
 .bedtime-timer.bt-level-warn {
-  --bt-accent: #38bdf8;
-  --bt-accent-rgb: 56, 189, 248;
-  --bt-accent-soft: rgba(56, 189, 248, 0.16);
-  --bt-border: rgba(56, 189, 248, 0.4);
+  --bt-accent: #0ABAB5;
+  --bt-accent-rgb: 10, 186, 181;
+  --bt-accent-soft: rgba(10, 186, 181, 0.18);
+  --bt-border: rgba(10, 186, 181, 0.45);
 }
 .bedtime-timer.bt-level-danger {
-  --bt-accent: #6366f1;
-  --bt-accent-rgb: 99, 102, 241;
-  --bt-accent-soft: rgba(99, 102, 241, 0.2);
-  --bt-border: rgba(99, 102, 241, 0.55);
+  --bt-accent: #0F766E;
+  --bt-accent-rgb: 15, 118, 110;
+  --bt-accent-soft: rgba(15, 118, 110, 0.25);
+  --bt-border: rgba(15, 118, 110, 0.65);
 }
 [data-theme="light"] .bedtime-timer {
   --bt-face-bg: rgba(248, 250, 252, 0.95);
