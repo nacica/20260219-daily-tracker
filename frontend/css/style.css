@@ -6615,15 +6615,15 @@ main.swipe-enter-right {
    就寝までウィジェット — Cyber HUD Edition
    ============================================================= */
 
-/* --- 共通環境変数（全レベル ティファニーブルー統一・緊急度は脈動速度のみ）--- */
+/* --- 共通環境変数（全レベル アプリのロゴ cyan で統一・緊急度は脈動速度のみ）--- */
 .bedtime-timer,
 .bedtime-timer.bt-level-warn,
 .bedtime-timer.bt-level-danger {
-  --bt-accent: #81D8D0;
-  --bt-accent-rgb: 129, 216, 208;
-  --bt-accent-soft: rgba(129, 216, 208, 0.18);
-  --bt-border: rgba(129, 216, 208, 0.35);
-  --bt-face-bg: rgba(5, 16, 22, 0.88);
+  --bt-accent: #00d4ff;
+  --bt-accent-rgb: 0, 212, 255;
+  --bt-accent-soft: rgba(0, 212, 255, 0.16);
+  --bt-border: rgba(0, 212, 255, 0.35);
+  --bt-face-bg: rgba(5, 12, 28, 0.88);
   --bt-heart-period: 10s;
 }
 [data-theme="light"] .bedtime-timer {

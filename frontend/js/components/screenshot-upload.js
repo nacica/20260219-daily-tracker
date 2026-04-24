@@ -3,7 +3,7 @@
  * iPhone のスクリーンタイム画像をアップロードして OCR 処理する
  */
 
-import { showToast } from "../app.js?v=20260424h";
+import { showToast } from "../app.js?v=20260424i";
 
 const API_BASE = window.API_BASE_URL || "http://localhost:8000/api/v1";
 
