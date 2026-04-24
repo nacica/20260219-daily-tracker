@@ -3,7 +3,7 @@
  * 過去の日次分析から改善提案を集約・フィルタリング表示する
  */
 
-import { analysisApi } from "../api.js?v=20260424d";
+import { analysisApi } from "../api.js?v=20260424e";
 
 /**
  * 改善提案アーカイブをメインエリアに描画する

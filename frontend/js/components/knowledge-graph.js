@@ -3,8 +3,8 @@
  * エンティティ・リレーションの一覧とグラフ表示
  */
 
-import { knowledgeApi } from "../api.js?v=20260424d";
-import { showToast } from "../app.js?v=20260424d";
+import { knowledgeApi } from "../api.js?v=20260424e";
+import { showToast } from "../app.js?v=20260424e";
 
 /** D3.js を必要時に一度だけロード（グローバル window.d3 を設定） */
 let _d3LoadPromise = null;

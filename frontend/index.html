@@ -24,14 +24,14 @@
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Klee+One&display=swap" /></noscript>
 
   <link rel="manifest" href="/manifest.json" />
-  <link rel="stylesheet" href="/css/style.css?v=20260424d" />
+  <link rel="stylesheet" href="/css/style.css?v=20260424e" />
 
   <!-- ホーム表示に必要なコアモジュールを先読み（並列 fetch で TTI を短縮） -->
-  <link rel="modulepreload" href="/js/app.js?v=20260424d" />
-  <link rel="modulepreload" href="/js/router.js?v=20260424d" />
-  <link rel="modulepreload" href="/js/api.js?v=20260424d" />
-  <link rel="modulepreload" href="/js/swipe-nav.js?v=20260424d" />
-  <link rel="modulepreload" href="/js/bedtime-timer.js?v=20260424d" />
+  <link rel="modulepreload" href="/js/app.js?v=20260424e" />
+  <link rel="modulepreload" href="/js/router.js?v=20260424e" />
+  <link rel="modulepreload" href="/js/api.js?v=20260424e" />
+  <link rel="modulepreload" href="/js/swipe-nav.js?v=20260424e" />
+  <link rel="modulepreload" href="/js/bedtime-timer.js?v=20260424e" />
 
   <!-- FOUC防止: JSモジュール読み込み前にテーマを適用 -->
   <script>
@@ -166,10 +166,25 @@
       <!-- サイドバー直下の就寝までウィジェット（デスクトップのみ／月次の下に常時表示） -->
       <div class="bedtime-timer bedtime-inline bedtime-inline-sidebar">
         <button class="bedtime-timer-trigger" type="button" aria-label="就寝までの残り時間詳細を表示">
-          <span class="bedtime-inline-title">就寝までの残り時間</span>
-          <span class="bt-countdown bedtime-inline-countdown">--</span>
-          <span class="bt-progress bedtime-inline-progress"><span class="bt-progress-fill"></span></span>
-          <span class="bt-clock bedtime-inline-clock"><svg viewBox="0 0 100 100"></svg></span>
+          <span class="bt-corner bt-corner-tl"></span>
+          <span class="bt-corner bt-corner-tr"></span>
+          <span class="bt-corner bt-corner-bl"></span>
+          <span class="bt-corner bt-corner-br"></span>
+          <span class="bt-scanline"></span>
+          <span class="bt-status-row">
+            <span class="bt-lamp"></span>
+            <span class="bt-status-label">TRACKING</span>
+          </span>
+          <span class="bt-caption">就寝まで</span>
+          <span class="bt-countdown">--:--:--</span>
+          <span class="bt-progress">
+            <span class="bt-progress-fill">
+              <svg class="bt-progress-wave" viewBox="0 0 200 10" preserveAspectRatio="none" aria-hidden="true">
+                <path d="M 0 5 Q 12.5 1 25 5 T 50 5 T 75 5 T 100 5 T 125 5 T 150 5 T 175 5 T 200 5 V 10 H 0 Z"/>
+              </svg>
+            </span>
+          </span>
+          <span class="bt-clock"><svg viewBox="0 0 100 100" aria-hidden="true"></svg></span>
         </button>
       </div>
       <button class="theme-toggle" id="theme-toggle" type="button" aria-label="テーマ切替">
@@ -181,11 +196,11 @@
         </svg>
       </button>
     </div>
-    <!-- 就寝までカウントダウン（モバイル専用: ナビ下段に細いバーとして表示） -->
+    <!-- 就寝までカウントダウン（モバイルナビ下段: HUD コンパクト版） -->
     <div class="bedtime-timer bedtime-timer-mobile">
-      <button class="bedtime-timer-trigger" type="button" aria-label="就寝までの残り時間を表示">
-        <span class="bt-moon">🌙</span>
-        <span class="bt-countdown">--</span>
+      <button class="bedtime-timer-trigger" type="button" aria-label="就寝までの残り時間詳細を表示">
+        <span class="bt-lamp"></span>
+        <span class="bt-countdown">--:--:--</span>
       </button>
     </div>
   </nav>
@@ -223,10 +238,11 @@
       <span class="desktop-header-breadcrumb" id="desktop-breadcrumb">ホーム</span>
     </div>
     <div class="desktop-header-right">
-      <!-- 就寝までウィジェット（デスクトップヘッダー: カウントダウンのみ／詳細はサイドバー＆モーダル） -->
+      <!-- 就寝までウィジェット（デスクトップヘッダー: HUD コンパクト版） -->
       <div class="bedtime-timer bedtime-timer-desktop">
         <button class="bedtime-timer-trigger" type="button" aria-label="就寝までの残り時間詳細を表示">
-          <span class="bt-countdown">--</span>
+          <span class="bt-lamp"></span>
+          <span class="bt-countdown">--:--:--</span>
         </button>
       </div>
       <span class="desktop-header-date" id="desktop-date"></span>
@@ -236,10 +252,25 @@
   <!-- モバイル専用: ページ上部に就寝までウィジェットをインライン表示 -->
   <div class="bedtime-timer bedtime-inline bedtime-inline-mobile-top">
     <button class="bedtime-timer-trigger" type="button" aria-label="就寝までの残り時間詳細を表示">
-      <span class="bedtime-inline-title">就寝までの残り時間</span>
-      <span class="bt-countdown bedtime-inline-countdown">--</span>
-      <span class="bt-progress bedtime-inline-progress"><span class="bt-progress-fill"></span></span>
-      <span class="bt-clock bedtime-inline-clock"><svg viewBox="0 0 100 100"></svg></span>
+      <span class="bt-corner bt-corner-tl"></span>
+      <span class="bt-corner bt-corner-tr"></span>
+      <span class="bt-corner bt-corner-bl"></span>
+      <span class="bt-corner bt-corner-br"></span>
+      <span class="bt-scanline"></span>
+      <span class="bt-status-row">
+        <span class="bt-lamp"></span>
+        <span class="bt-status-label">TRACKING</span>
+      </span>
+      <span class="bt-caption">就寝まで</span>
+      <span class="bt-countdown">--:--:--</span>
+      <span class="bt-progress">
+        <span class="bt-progress-fill">
+          <svg class="bt-progress-wave" viewBox="0 0 200 10" preserveAspectRatio="none" aria-hidden="true">
+            <path d="M 0 5 Q 12.5 1 25 5 T 50 5 T 75 5 T 100 5 T 125 5 T 150 5 T 175 5 T 200 5 V 10 H 0 Z"/>
+          </svg>
+        </span>
+      </span>
+      <span class="bt-clock"><svg viewBox="0 0 100 100" aria-hidden="true"></svg></span>
     </button>
   </div>
 
@@ -260,6 +291,6 @@
   -->
 
   <!-- アプリのメインスクリプト（ES Modules） -->
-  <script type="module" src="/js/app.js?v=20260424d"></script>
+  <script type="module" src="/js/app.js?v=20260424e"></script>
 </body>
 </html>

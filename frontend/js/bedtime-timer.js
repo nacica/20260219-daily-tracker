@@ -1,18 +1,23 @@
 /**
- * 就寝までの残り時間ウィジェット（ヘッダー常駐）
+ * 就寝までの残り時間ウィジェット — Cyber HUD Edition
  *
  * 機能:
- *   - カウントダウン（残り時間テキスト）
- *   - プログレスバー（その日の初回アクセス時刻〜22:00）
- *   - アナログ時計（12時間文字盤＋現在〜22:00の扇形）
- *   - 22:00以降は翌日扱いで非表示
- *   - クリック／タップで詳細モーダルを開く
+ *   - 24 時間文字盤のアナログ時計（球体風グラデーション）
+ *   - カウントダウン（HH:MM:SS 特大モノ数字）
+ *   - プログレスバー（液体ウェーブ入り、その日の初回アクセス時刻〜22:00）
  *   - 色分け: 残り >6h 通常 / 6h〜3h 黄 / <3h 赤
- *   - 1 秒ごとに更新
+ *   - 22:00 以降は「就寝時刻を過ぎています」を表示し、状態は維持
+ *   - クリック／タップで詳細モーダル（拡大＋起床/就寝/経過時間）
+ *   - 連続秒針 + 軌跡残像ゴースト
+ *   - マウント時に針が 0° → 現在位置へ回り込むアニメ
+ *   - 1 分ごとにパルス発光
+ *   - 残り時間が減るほど脈動が速くなる
  */
 
 const BEDTIME_HOUR = 22;
 const FIRST_OPEN_KEY_PREFIX = "bedtime_first_open_";
+const AFTER_BEDTIME_TEXT = "就寝時刻を過ぎています";
+const AFTER_BEDTIME_SHORT = "就寝超過";
 
 // ===== 時刻ユーティリティ =====
 
@@ -29,7 +34,6 @@ function isAfterBedtime() {
   return new Date() >= getBedtimeToday();
 }
 
-/** 今日の初回アクセス時刻を取得。未保存なら now を保存して返す。22:00 以降は null。 */
 function getOrInitFirstOpen() {
   const key = FIRST_OPEN_KEY_PREFIX + todayKey();
   const saved = localStorage.getItem(key);
@@ -45,26 +49,24 @@ function getOrInitFirstOpen() {
 
 // ===== フォーマット =====
 
-function formatRemaining(ms) {
-  const totalSec = Math.max(0, Math.floor(ms / 1000));
-  const h = Math.floor(totalSec / 3600);
-  const m = Math.floor((totalSec % 3600) / 60);
-  const s = totalSec % 60;
-  const mm = String(m).padStart(2, "0");
-  const ss = String(s).padStart(2, "0");
-  return h > 0 ? `残り ${h}時間${mm}分${ss}秒` : `残り ${mm}分${ss}秒`;
-}
-
-function formatElapsed(ms) {
-  const totalSec = Math.max(0, Math.floor(ms / 1000));
-  const h = Math.floor(totalSec / 3600);
-  const m = Math.floor((totalSec % 3600) / 60);
-  const s = totalSec % 60;
-  return `${h}時間${String(m).padStart(2, "0")}分${String(s).padStart(2, "0")}秒`;
+function formatHHMMSS(ms) {
+  const total = Math.max(0, Math.floor(ms / 1000));
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
 function formatHM(date) {
   return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+}
+
+function formatElapsedReadable(ms) {
+  const total = Math.max(0, Math.floor(ms / 1000));
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  return `${h}時間${String(m).padStart(2, "0")}分${String(s).padStart(2, "0")}秒`;
 }
 
 function getColorLevel(remainingMs) {
@@ -74,17 +76,75 @@ function getColorLevel(remainingMs) {
   return "danger";
 }
 
-// ===== 12時間文字盤 SVG =====
+// 残り時間に応じた脈動周期（小さいほど速い鼓動）
+function getHeartPeriodSec(remainingMs, afterBedtime) {
+  if (afterBedtime) return 0.9;
+  const h = remainingMs / 3_600_000;
+  if (h >= 6) return 9;
+  if (h >= 3) return 4.5;
+  if (h >= 1) return 2.4;
+  if (h >= 0.5) return 1.5;
+  return 1.0;
+}
 
-function buildClockSVG(now, bedtime, afterBedtime) {
-  const cx = 50, cy = 50, r = 42;
-  const currentDeg = ((now.getHours() % 12) + now.getMinutes() / 60 + now.getSeconds() / 3600) * 30;
-  const bedDeg = ((bedtime.getHours() % 12) + bedtime.getMinutes() / 60) * 30;
+// ===== 24 時間時計スケルトン =====
 
-  // 現在 → 就寝 の扇形（時計回り）
+function buildClockSkeleton() {
+  const cx = 50, cy = 50;
+  // 24 個のティック
+  let ticks = "";
+  for (let i = 0; i < 24; i++) {
+    const a = ((i * 15 - 90) * Math.PI) / 180;
+    const isMajor = i % 6 === 0;
+    const inner = isMajor ? 30 : 36;
+    const outer = 42;
+    const x1 = cx + inner * Math.cos(a);
+    const y1 = cy + inner * Math.sin(a);
+    const x2 = cx + outer * Math.cos(a);
+    const y2 = cy + outer * Math.sin(a);
+    ticks += `<line x1="${x1.toFixed(2)}" y1="${y1.toFixed(2)}" x2="${x2.toFixed(2)}" y2="${y2.toFixed(2)}" class="bt-tick${isMajor ? " bt-tick-major" : ""}"/>`;
+  }
+  // 主要時刻ラベル（0/6/12/18）
+  const labelPositions = [[0, 50, 14], [6, 87, 52], [12, 50, 93], [18, 13, 52]];
+  let labels = "";
+  for (const [h, x, y] of labelPositions) {
+    labels += `<text x="${x}" y="${y}" class="bt-hour-label" text-anchor="middle" dominant-baseline="middle">${h}</text>`;
+  }
+
+  return `
+    <defs>
+      <radialGradient id="bt-sphere" cx="0.35" cy="0.28" r="0.85">
+        <stop offset="0%" stop-color="rgba(80,190,255,0.28)"/>
+        <stop offset="55%" stop-color="rgba(8,14,30,0.9)"/>
+        <stop offset="100%" stop-color="rgba(0,0,0,1)"/>
+      </radialGradient>
+      <radialGradient id="bt-rim" cx="0.5" cy="0.5" r="0.5">
+        <stop offset="88%" stop-color="rgba(0,212,255,0)"/>
+        <stop offset="100%" stop-color="rgba(0,212,255,0.55)"/>
+      </radialGradient>
+    </defs>
+    <circle cx="50" cy="50" r="42" class="bt-clock-face" fill="url(#bt-sphere)"/>
+    <circle cx="50" cy="50" r="42" class="bt-clock-rim" fill="url(#bt-rim)"/>
+    <ellipse cx="45" cy="27" rx="22" ry="6.5" class="bt-clock-highlight"/>
+    <path class="bt-clock-sector" d=""/>
+    <g class="bt-clock-ticks">${ticks}</g>
+    <g class="bt-clock-labels">${labels}</g>
+    <line x1="50" y1="50" x2="50" y2="22" class="bt-hand bt-hand-ghost bt-hand-ghost-3"/>
+    <line x1="50" y1="50" x2="50" y2="22" class="bt-hand bt-hand-ghost bt-hand-ghost-2"/>
+    <line x1="50" y1="50" x2="50" y2="22" class="bt-hand bt-hand-ghost bt-hand-ghost-1"/>
+    <line x1="50" y1="50" x2="50" y2="30" class="bt-hand bt-hand-hour"/>
+    <line x1="50" y1="50" x2="50" y2="20" class="bt-hand bt-hand-minute"/>
+    <line x1="50" y1="50" x2="50" y2="16" class="bt-hand bt-hand-second"/>
+    <circle cx="50" cy="50" r="2.4" class="bt-clock-center"/>
+  `;
+}
+
+function computeSectorPath(currentDeg, bedDeg, afterBedtime) {
+  if (afterBedtime) return "";
+  const cx = 50, cy = 50, r = 40;
   let sweep = bedDeg - currentDeg;
   if (sweep < 0) sweep += 360;
-
+  if (sweep < 0.01) return "";
   const startRad = ((currentDeg - 90) * Math.PI) / 180;
   const endRad = ((bedDeg - 90) * Math.PI) / 180;
   const x1 = cx + r * Math.cos(startRad);
@@ -92,140 +152,155 @@ function buildClockSVG(now, bedtime, afterBedtime) {
   const x2 = cx + r * Math.cos(endRad);
   const y2 = cy + r * Math.sin(endRad);
   const largeArc = sweep > 180 ? 1 : 0;
-
-  const sectorPath = !afterBedtime && sweep > 0.01
-    ? `M ${cx} ${cy} L ${x1.toFixed(2)} ${y1.toFixed(2)} A ${r} ${r} 0 ${largeArc} 1 ${x2.toFixed(2)} ${y2.toFixed(2)} Z`
-    : "";
-
-  // 12個の目盛り
-  let ticks = "";
-  for (let i = 0; i < 12; i++) {
-    const a = ((i * 30 - 90) * Math.PI) / 180;
-    const isMajor = i % 3 === 0;
-    const inner = isMajor ? 32 : 37;
-    const outer = 42;
-    const x1t = cx + inner * Math.cos(a);
-    const y1t = cy + inner * Math.sin(a);
-    const x2t = cx + outer * Math.cos(a);
-    const y2t = cy + outer * Math.sin(a);
-    ticks += `<line x1="${x1t.toFixed(2)}" y1="${y1t.toFixed(2)}" x2="${x2t.toFixed(2)}" y2="${y2t.toFixed(2)}" class="bt-tick${isMajor ? " bt-tick-major" : ""}"/>`;
-  }
-
-  // 時計針
-  const hourRad = ((currentDeg - 90) * Math.PI) / 180;
-  const minRad = (((now.getMinutes() + now.getSeconds() / 60) * 6 - 90) * Math.PI) / 180;
-  const secRad = ((now.getSeconds() * 6 - 90) * Math.PI) / 180;
-
-  const hx = (cx + 22 * Math.cos(hourRad)).toFixed(2);
-  const hy = (cy + 22 * Math.sin(hourRad)).toFixed(2);
-  const mx = (cx + 30 * Math.cos(minRad)).toFixed(2);
-  const my = (cy + 30 * Math.sin(minRad)).toFixed(2);
-  const sx = (cx + 34 * Math.cos(secRad)).toFixed(2);
-  const sy = (cy + 34 * Math.sin(secRad)).toFixed(2);
-
-  return `
-    <circle cx="${cx}" cy="${cy}" r="${r}" class="bt-clock-face"/>
-    ${sectorPath ? `<path d="${sectorPath}" class="bt-clock-sector"/>` : ""}
-    ${ticks}
-    <line x1="${cx}" y1="${cy}" x2="${hx}" y2="${hy}" class="bt-hand bt-hand-hour"/>
-    <line x1="${cx}" y1="${cy}" x2="${mx}" y2="${my}" class="bt-hand bt-hand-minute"/>
-    <line x1="${cx}" y1="${cy}" x2="${sx}" y2="${sy}" class="bt-hand bt-hand-second"/>
-    <circle cx="${cx}" cy="${cy}" r="2" class="bt-clock-center"/>
-  `;
+  return `M ${cx} ${cy} L ${x1.toFixed(2)} ${y1.toFixed(2)} A ${r} ${r} 0 ${largeArc} 1 ${x2.toFixed(2)} ${y2.toFixed(2)} Z`;
 }
 
 // ===== 状態 =====
 
-let timerId = null;
 let modalEl = null;
+let initialized = false;
+let rafId = 0;
+let lastMinute = -1;
+const initializedSvgs = new WeakSet();
 
-// ===== 描画 =====
+function ensureClockInitialized(svgEl) {
+  if (initializedSvgs.has(svgEl)) return;
+  svgEl.innerHTML = buildClockSkeleton();
+  initializedSvgs.add(svgEl);
+}
 
 function applyLevel(el, level) {
   el.classList.remove("bt-level-normal", "bt-level-warn", "bt-level-danger");
   el.classList.add(`bt-level-${level}`);
 }
 
-const AFTER_BEDTIME_TEXT = "就寝時刻を過ぎています";
-
-function updateAll() {
+// 1 秒ごとの更新（テキスト、色、セクター、脈動周期、分変化パルス）
+function tickSecond() {
   const now = new Date();
   const bedtime = getBedtimeToday();
   const remaining = bedtime - now;
   const afterBedtime = remaining <= 0;
+  const level = afterBedtime ? "danger" : getColorLevel(remaining);
+  const heartPeriod = getHeartPeriodSec(remaining, afterBedtime);
 
-  const widgets = document.querySelectorAll(".bedtime-timer");
-
-  if (afterBedtime) {
-    widgets.forEach((el) => {
-      el.classList.remove("is-hidden");
-      el.classList.add("is-after-bedtime");
-      applyLevel(el, "danger");
-
-      const cd = el.querySelector(".bt-countdown");
-      if (cd) cd.textContent = AFTER_BEDTIME_TEXT;
-
-      const fill = el.querySelector(".bt-progress-fill");
-      if (fill) fill.style.width = "100%";
-
-      const clockSvg = el.querySelector(".bt-clock svg");
-      if (clockSvg) clockSvg.innerHTML = buildClockSVG(now, bedtime, true);
-    });
-
-    if (modalEl) updateModal(now, bedtime, null, 0, 100, "danger", true);
-    return;
-  }
-
-  widgets.forEach((el) => el.classList.remove("is-hidden", "is-after-bedtime"));
-
-  const firstOpen = getOrInitFirstOpen();
+  const firstOpen = afterBedtime ? null : getOrInitFirstOpen();
   let progress = 0;
-  if (firstOpen) {
+  if (afterBedtime) {
+    progress = 100;
+  } else if (firstOpen) {
     const total = bedtime - firstOpen;
     const elapsed = now - firstOpen;
     progress = total > 0 ? Math.min(100, Math.max(0, (elapsed / total) * 100)) : 0;
   }
-  const level = getColorLevel(remaining);
-  const remainingText = formatRemaining(remaining);
 
+  const currentDeg = (now.getHours() + now.getMinutes() / 60 + now.getSeconds() / 3600) * 15;
+  const bedDeg = BEDTIME_HOUR * 15;
+  const sectorPath = computeSectorPath(currentDeg, bedDeg, afterBedtime);
+
+  // 分変化の検出（B26 パルス）
+  const currentMinute = now.getMinutes();
+  const minuteChanged = currentMinute !== lastMinute && lastMinute !== -1;
+  lastMinute = currentMinute;
+
+  const widgets = document.querySelectorAll(".bedtime-timer");
   widgets.forEach((el) => {
     applyLevel(el, level);
+    el.classList.toggle("is-after-bedtime", afterBedtime);
+    el.style.setProperty("--bt-heart-period", `${heartPeriod}s`);
+
+    const isCompact = !el.classList.contains("bedtime-inline");
+
     const cd = el.querySelector(".bt-countdown");
-    if (cd) cd.textContent = remainingText;
+    if (cd) {
+      cd.textContent = afterBedtime
+        ? (isCompact ? AFTER_BEDTIME_SHORT : AFTER_BEDTIME_TEXT)
+        : formatHHMMSS(remaining);
+    }
+
+    const status = el.querySelector(".bt-status-label");
+    if (status) status.textContent = afterBedtime ? "OVERDUE" : "TRACKING";
 
     const fill = el.querySelector(".bt-progress-fill");
     if (fill) fill.style.width = `${progress.toFixed(2)}%`;
 
-    const clockSvg = el.querySelector(".bt-clock svg");
-    if (clockSvg) clockSvg.innerHTML = buildClockSVG(now, bedtime, false);
+    const svg = el.querySelector(".bt-clock svg");
+    if (svg) {
+      ensureClockInitialized(svg);
+      const sector = svg.querySelector(".bt-clock-sector");
+      if (sector) sector.setAttribute("d", sectorPath);
+    }
+
+    if (minuteChanged) {
+      el.classList.remove("bt-pulse-minute");
+      void el.offsetWidth;
+      el.classList.add("bt-pulse-minute");
+    }
   });
 
+  // モーダル
   if (modalEl) {
-    updateModal(now, bedtime, firstOpen, remaining, progress, level, false);
+    applyLevel(modalEl, level);
+    modalEl.classList.toggle("is-after-bedtime", afterBedtime);
+    modalEl.style.setProperty("--bt-heart-period", `${heartPeriod}s`);
+
+    const cd = modalEl.querySelector(".bt-countdown");
+    if (cd) cd.textContent = afterBedtime ? AFTER_BEDTIME_TEXT : formatHHMMSS(remaining);
+    const status = modalEl.querySelector(".bt-status-label");
+    if (status) status.textContent = afterBedtime ? "OVERDUE" : "TRACKING";
+    const fill = modalEl.querySelector(".bt-progress-fill");
+    if (fill) fill.style.width = `${progress.toFixed(2)}%`;
+
+    const svg = modalEl.querySelector(".bt-clock svg");
+    if (svg) {
+      ensureClockInitialized(svg);
+      const sector = svg.querySelector(".bt-clock-sector");
+      if (sector) sector.setAttribute("d", sectorPath);
+    }
+    const wake = modalEl.querySelector(".btm-wake");
+    if (wake) wake.textContent = firstOpen ? formatHM(firstOpen) : "--:--";
+    const bed = modalEl.querySelector(".btm-bed");
+    if (bed) bed.textContent = formatHM(bedtime);
+    const elapsed = modalEl.querySelector(".btm-elapsed");
+    if (elapsed) elapsed.textContent = firstOpen ? formatElapsedReadable(now - firstOpen) : "--";
   }
 }
 
-function updateModal(now, bedtime, firstOpen, remaining, progress, level, afterBedtime) {
-  applyLevel(modalEl, level);
-  modalEl.classList.toggle("is-after-bedtime", !!afterBedtime);
+// requestAnimationFrame ループ: 針の滑らかな回転 + 軌跡
+function tickFrame() {
+  const now = new Date();
+  const ms = now.getMilliseconds();
+  const secondsFloat = now.getSeconds() + ms / 1000;
+  const minutesFloat = now.getMinutes() + secondsFloat / 60;
+  const hoursFloat = now.getHours() + minutesFloat / 60;
 
-  const cd = modalEl.querySelector(".btm-countdown");
-  if (cd) cd.textContent = afterBedtime ? AFTER_BEDTIME_TEXT : formatRemaining(remaining);
+  // 24 時間文字盤: 時針 15°/h, 分針 6°/min, 秒針 6°/sec
+  const hourDeg = hoursFloat * 15;
+  const minuteDeg = minutesFloat * 6;
+  const secondDeg = secondsFloat * 6;
 
-  const fill = modalEl.querySelector(".btm-progress-fill");
-  if (fill) fill.style.width = `${progress.toFixed(2)}%`;
+  // 軌跡ゴースト（B18）
+  const ghost1Deg = (secondsFloat - 0.08) * 6;
+  const ghost2Deg = (secondsFloat - 0.2) * 6;
+  const ghost3Deg = (secondsFloat - 0.35) * 6;
 
-  const clockSvg = modalEl.querySelector(".btm-clock svg");
-  if (clockSvg) clockSvg.innerHTML = buildClockSVG(now, bedtime, afterBedtime);
+  const svgs = document.querySelectorAll(".bt-clock svg");
+  svgs.forEach((svg) => {
+    ensureClockInitialized(svg);
+    const hHand = svg.querySelector(".bt-hand-hour");
+    const mHand = svg.querySelector(".bt-hand-minute");
+    const sHand = svg.querySelector(".bt-hand-second");
+    const g1 = svg.querySelector(".bt-hand-ghost-1");
+    const g2 = svg.querySelector(".bt-hand-ghost-2");
+    const g3 = svg.querySelector(".bt-hand-ghost-3");
+    if (hHand) hHand.style.transform = `rotate(${hourDeg}deg)`;
+    if (mHand) mHand.style.transform = `rotate(${minuteDeg}deg)`;
+    if (sHand) sHand.style.transform = `rotate(${secondDeg}deg)`;
+    if (g1) g1.style.transform = `rotate(${ghost1Deg}deg)`;
+    if (g2) g2.style.transform = `rotate(${ghost2Deg}deg)`;
+    if (g3) g3.style.transform = `rotate(${ghost3Deg}deg)`;
+  });
 
-  const wake = modalEl.querySelector(".btm-wake");
-  if (wake) wake.textContent = firstOpen ? formatHM(firstOpen) : "--:--";
-
-  const bed = modalEl.querySelector(".btm-bed");
-  if (bed) bed.textContent = formatHM(bedtime);
-
-  const elapsed = modalEl.querySelector(".btm-elapsed");
-  if (elapsed) elapsed.textContent = firstOpen ? formatElapsed(now - firstOpen) : "--";
+  rafId = requestAnimationFrame(tickFrame);
 }
 
 // ===== モーダル =====
@@ -236,28 +311,41 @@ function openModal() {
   modalEl = document.createElement("div");
   modalEl.className = "bedtime-modal-overlay";
   modalEl.innerHTML = `
-    <div class="bedtime-modal" role="dialog" aria-modal="true" aria-labelledby="bedtime-modal-title">
+    <div class="bedtime-modal bedtime-timer bedtime-inline" role="dialog" aria-modal="true" aria-labelledby="bedtime-modal-title">
+      <span class="bt-corner bt-corner-tl"></span>
+      <span class="bt-corner bt-corner-tr"></span>
+      <span class="bt-corner bt-corner-bl"></span>
+      <span class="bt-corner bt-corner-br"></span>
+      <span class="bt-scanline"></span>
       <button class="bedtime-modal-close" type="button" aria-label="閉じる">×</button>
-      <h2 id="bedtime-modal-title" class="bedtime-modal-title">就寝までの残り時間</h2>
-      <div class="btm-countdown">--</div>
-      <div class="btm-progress"><div class="btm-progress-fill"></div></div>
-      <div class="btm-clock"><svg viewBox="0 0 100 100"></svg></div>
+      <div class="bt-status-row">
+        <span class="bt-lamp"></span>
+        <span class="bt-status-label">TRACKING</span>
+      </div>
+      <div id="bedtime-modal-title" class="bt-caption">就寝まで</div>
+      <div class="bt-countdown">--:--:--</div>
+      <div class="bt-progress">
+        <div class="bt-progress-fill">
+          <svg class="bt-progress-wave" viewBox="0 0 200 10" preserveAspectRatio="none">
+            <path d="M 0 5 Q 12.5 1 25 5 T 50 5 T 75 5 T 100 5 T 125 5 T 150 5 T 175 5 T 200 5 V 10 H 0 Z"/>
+          </svg>
+        </div>
+      </div>
+      <div class="bt-clock"><svg viewBox="0 0 100 100"></svg></div>
       <dl class="btm-meta">
-        <div class="btm-meta-row"><dt>起床時刻（本日の初回アクセス）</dt><dd class="btm-wake">--:--</dd></div>
+        <div class="btm-meta-row"><dt>起床時刻</dt><dd class="btm-wake">--:--</dd></div>
         <div class="btm-meta-row"><dt>就寝時刻</dt><dd class="btm-bed">22:00</dd></div>
-        <div class="btm-meta-row"><dt>起点からの経過時間</dt><dd class="btm-elapsed">--</dd></div>
+        <div class="btm-meta-row"><dt>起点からの経過</dt><dd class="btm-elapsed">--</dd></div>
       </dl>
     </div>
   `;
 
   modalEl.addEventListener("click", (e) => {
-    if (e.target === modalEl || e.target.closest(".bedtime-modal-close")) {
-      closeModal();
-    }
+    if (e.target === modalEl || e.target.closest(".bedtime-modal-close")) closeModal();
   });
 
   document.body.appendChild(modalEl);
-  updateAll();
+  tickSecond();
 }
 
 function closeModal() {
@@ -269,7 +357,9 @@ function closeModal() {
 // ===== 初期化 =====
 
 export function initBedtimeTimer() {
-  // クリック委任
+  if (initialized) return;
+  initialized = true;
+
   document.addEventListener("click", (e) => {
     const trigger = e.target.closest(".bedtime-timer-trigger");
     if (trigger) {
@@ -278,12 +368,18 @@ export function initBedtimeTimer() {
     }
   });
 
-  // Esc で閉じる
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && modalEl) closeModal();
   });
 
-  updateAll();
-  if (timerId) clearInterval(timerId);
-  timerId = setInterval(updateAll, 1000);
+  // 起動時の全クロック SVG を初期化
+  document.querySelectorAll(".bt-clock svg").forEach(ensureClockInitialized);
+
+  lastMinute = new Date().getMinutes(); // 最初の tick でパルスを発火しない
+  tickSecond();
+  setInterval(tickSecond, 1000);
+
+  // 針アニメーションループ（rAF）
+  cancelAnimationFrame(rafId);
+  rafId = requestAnimationFrame(tickFrame);
 }
