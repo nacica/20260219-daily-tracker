@@ -6910,3 +6910,124 @@ main.swipe-enter-right {
   font-feature-settings: "tnum";
   font-weight: 500;
 }
+
+/* =============================================================
+   就寝までウィジェット — インライン版（サイドバー & モバイル上部）
+   ============================================================= */
+
+.bedtime-inline {
+  width: 100%;
+  padding: 12px;
+  box-sizing: border-box;
+}
+
+.bedtime-inline .bedtime-timer-trigger {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  width: 100%;
+  padding: 14px 14px 16px;
+  background: rgba(0, 212, 255, 0.04);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.bedtime-inline .bedtime-timer-trigger:hover {
+  background: rgba(0, 212, 255, 0.08);
+  border-color: var(--border-bright);
+}
+
+.bedtime-inline-title {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  letter-spacing: 0.08em;
+  text-align: center;
+  font-weight: 500;
+}
+
+.bedtime-inline-countdown {
+  font-size: 1.05rem;
+  font-weight: 600;
+  text-align: center;
+  color: var(--text-primary);
+  font-feature-settings: "tnum";
+  letter-spacing: 0.01em;
+  line-height: 1.2;
+}
+
+.bedtime-inline-progress {
+  display: block;
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+[data-theme="light"] .bedtime-inline-progress { background: rgba(0, 0, 0, 0.08); }
+.bedtime-inline-progress .bt-progress-fill {
+  display: block;
+  height: 100%;
+  width: 0%;
+  background: var(--cyan);
+  border-radius: 3px;
+  transition: width 0.8s linear, background 0.3s;
+}
+
+.bedtime-inline-clock {
+  display: block;
+  width: 120px;
+  height: 120px;
+  margin: 4px auto 0;
+}
+.bedtime-inline-clock svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* 色レベル — インライン用の強調 */
+.bedtime-inline.bt-level-warn .bedtime-inline-countdown { color: var(--neon-amber); }
+.bedtime-inline.bt-level-danger .bedtime-inline-countdown { color: var(--neon-red); }
+
+/* 経過状態（22:00 以降） */
+.bedtime-inline.is-after-bedtime .bedtime-inline-countdown {
+  font-size: 0.92rem;
+  color: var(--neon-red);
+}
+
+/* サイドバー版（デスクトップのみ） */
+.bedtime-inline-sidebar {
+  display: none;
+  padding: 10px 14px 16px;
+  margin-top: 4px;
+  border-top: 1px solid var(--border);
+}
+@media (min-width: 1024px) {
+  .bedtime-inline-sidebar {
+    display: block;
+  }
+  .bedtime-inline-sidebar .bedtime-inline-clock {
+    width: 110px;
+    height: 110px;
+  }
+}
+
+/* モバイル上部版 */
+.bedtime-inline-mobile-top {
+  display: block;
+  padding: 10px 12px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-primary);
+}
+@media (min-width: 1024px) {
+  .bedtime-inline-mobile-top {
+    display: none;
+  }
+}
+
+/* ヘッダー側のカウントダウン — 経過状態の文字サイズを縮小（溢れ防止） */
+.bedtime-timer.is-after-bedtime:not(.bedtime-inline) .bt-countdown {
+  font-size: 0.76rem;
+}

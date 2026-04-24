@@ -3,7 +3,7 @@
  * カレンダービュー（月ごとのスコア色）＋リストビュー
  */
 
-import { recordsApi, analysisApi } from "../api.js?v=20260424c";
+import { recordsApi, analysisApi } from "../api.js?v=20260424d";
 
 /**
  * 履歴一覧画面をメインエリアに描画する

@@ -76,7 +76,7 @@ function getColorLevel(remainingMs) {
 
 // ===== 12時間文字盤 SVG =====
 
-function buildClockSVG(now, bedtime) {
+function buildClockSVG(now, bedtime, afterBedtime) {
   const cx = 50, cy = 50, r = 42;
   const currentDeg = ((now.getHours() % 12) + now.getMinutes() / 60 + now.getSeconds() / 3600) * 30;
   const bedDeg = ((bedtime.getHours() % 12) + bedtime.getMinutes() / 60) * 30;
@@ -93,7 +93,7 @@ function buildClockSVG(now, bedtime) {
   const y2 = cy + r * Math.sin(endRad);
   const largeArc = sweep > 180 ? 1 : 0;
 
-  const sectorPath = sweep > 0.01
+  const sectorPath = !afterBedtime && sweep > 0.01
     ? `M ${cx} ${cy} L ${x1.toFixed(2)} ${y1.toFixed(2)} A ${r} ${r} 0 ${largeArc} 1 ${x2.toFixed(2)} ${y2.toFixed(2)} Z`
     : "";
 
@@ -146,21 +146,37 @@ function applyLevel(el, level) {
   el.classList.add(`bt-level-${level}`);
 }
 
+const AFTER_BEDTIME_TEXT = "就寝時刻を過ぎています";
+
 function updateAll() {
   const now = new Date();
   const bedtime = getBedtimeToday();
   const remaining = bedtime - now;
+  const afterBedtime = remaining <= 0;
 
   const widgets = document.querySelectorAll(".bedtime-timer");
 
-  // 22:00 以降は全部非表示
-  if (remaining <= 0) {
-    widgets.forEach((el) => el.classList.add("is-hidden"));
-    if (modalEl) closeModal();
+  if (afterBedtime) {
+    widgets.forEach((el) => {
+      el.classList.remove("is-hidden");
+      el.classList.add("is-after-bedtime");
+      applyLevel(el, "danger");
+
+      const cd = el.querySelector(".bt-countdown");
+      if (cd) cd.textContent = AFTER_BEDTIME_TEXT;
+
+      const fill = el.querySelector(".bt-progress-fill");
+      if (fill) fill.style.width = "100%";
+
+      const clockSvg = el.querySelector(".bt-clock svg");
+      if (clockSvg) clockSvg.innerHTML = buildClockSVG(now, bedtime, true);
+    });
+
+    if (modalEl) updateModal(now, bedtime, null, 0, 100, "danger", true);
     return;
   }
 
-  widgets.forEach((el) => el.classList.remove("is-hidden"));
+  widgets.forEach((el) => el.classList.remove("is-hidden", "is-after-bedtime"));
 
   const firstOpen = getOrInitFirstOpen();
   let progress = 0;
@@ -181,25 +197,26 @@ function updateAll() {
     if (fill) fill.style.width = `${progress.toFixed(2)}%`;
 
     const clockSvg = el.querySelector(".bt-clock svg");
-    if (clockSvg) clockSvg.innerHTML = buildClockSVG(now, bedtime);
+    if (clockSvg) clockSvg.innerHTML = buildClockSVG(now, bedtime, false);
   });
 
   if (modalEl) {
-    updateModal(now, bedtime, firstOpen, remaining, progress, level);
+    updateModal(now, bedtime, firstOpen, remaining, progress, level, false);
   }
 }
 
-function updateModal(now, bedtime, firstOpen, remaining, progress, level) {
+function updateModal(now, bedtime, firstOpen, remaining, progress, level, afterBedtime) {
   applyLevel(modalEl, level);
+  modalEl.classList.toggle("is-after-bedtime", !!afterBedtime);
 
   const cd = modalEl.querySelector(".btm-countdown");
-  if (cd) cd.textContent = formatRemaining(remaining);
+  if (cd) cd.textContent = afterBedtime ? AFTER_BEDTIME_TEXT : formatRemaining(remaining);
 
   const fill = modalEl.querySelector(".btm-progress-fill");
   if (fill) fill.style.width = `${progress.toFixed(2)}%`;
 
   const clockSvg = modalEl.querySelector(".btm-clock svg");
-  if (clockSvg) clockSvg.innerHTML = buildClockSVG(now, bedtime);
+  if (clockSvg) clockSvg.innerHTML = buildClockSVG(now, bedtime, afterBedtime);
 
   const wake = modalEl.querySelector(".btm-wake");
   if (wake) wake.textContent = firstOpen ? formatHM(firstOpen) : "--:--";
@@ -215,7 +232,6 @@ function updateModal(now, bedtime, firstOpen, remaining, progress, level) {
 
 function openModal() {
   if (modalEl) return;
-  if (isAfterBedtime()) return;
 
   modalEl = document.createElement("div");
   modalEl.className = "bedtime-modal-overlay";
