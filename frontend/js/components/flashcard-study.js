@@ -4,8 +4,8 @@
  * 学習中のカード編集にも対応
  */
 
-import { flashcardsApi } from "../api.js?v=20260424b";
-import { showToast } from "../app.js?v=20260424b";
+import { flashcardsApi } from "../api.js?v=20260424c";
+import { showToast } from "../app.js?v=20260424c";
 
 const ORDER_STORAGE_KEY = "flashcard-study-order";
 

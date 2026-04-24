@@ -24,13 +24,14 @@
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Klee+One&display=swap" /></noscript>
 
   <link rel="manifest" href="/manifest.json" />
-  <link rel="stylesheet" href="/css/style.css?v=20260424b" />
+  <link rel="stylesheet" href="/css/style.css?v=20260424c" />
 
   <!-- ホーム表示に必要なコアモジュールを先読み（並列 fetch で TTI を短縮） -->
-  <link rel="modulepreload" href="/js/app.js?v=20260424b" />
-  <link rel="modulepreload" href="/js/router.js?v=20260424b" />
-  <link rel="modulepreload" href="/js/api.js?v=20260424b" />
-  <link rel="modulepreload" href="/js/swipe-nav.js?v=20260424b" />
+  <link rel="modulepreload" href="/js/app.js?v=20260424c" />
+  <link rel="modulepreload" href="/js/router.js?v=20260424c" />
+  <link rel="modulepreload" href="/js/api.js?v=20260424c" />
+  <link rel="modulepreload" href="/js/swipe-nav.js?v=20260424c" />
+  <link rel="modulepreload" href="/js/bedtime-timer.js?v=20260424c" />
 
   <!-- FOUC防止: JSモジュール読み込み前にテーマを適用 -->
   <script>
@@ -171,6 +172,13 @@
         </svg>
       </button>
     </div>
+    <!-- 就寝までカウントダウン（モバイル専用: ナビ下段に細いバーとして表示） -->
+    <div class="bedtime-timer bedtime-timer-mobile">
+      <button class="bedtime-timer-trigger" type="button" aria-label="就寝までの残り時間を表示">
+        <span class="bt-moon">🌙</span>
+        <span class="bt-countdown">--</span>
+      </button>
+    </div>
   </nav>
 
   <!-- テーマ切替ロジック（ES Module に依存しないインラインスクリプト） -->
@@ -206,6 +214,14 @@
       <span class="desktop-header-breadcrumb" id="desktop-breadcrumb">ホーム</span>
     </div>
     <div class="desktop-header-right">
+      <!-- 就寝までウィジェット（デスクトップ: カウントダウン + バー + アナログ時計） -->
+      <div class="bedtime-timer bedtime-timer-desktop">
+        <button class="bedtime-timer-trigger" type="button" aria-label="就寝までの残り時間を表示">
+          <span class="bt-countdown">--</span>
+          <span class="bt-progress"><span class="bt-progress-fill"></span></span>
+          <span class="bt-clock"><svg viewBox="0 0 100 100"></svg></span>
+        </button>
+      </div>
       <span class="desktop-header-date" id="desktop-date"></span>
     </div>
   </header>
@@ -227,6 +243,6 @@
   -->
 
   <!-- アプリのメインスクリプト（ES Modules） -->
-  <script type="module" src="/js/app.js?v=20260424b"></script>
+  <script type="module" src="/js/app.js?v=20260424c"></script>
 </body>
 </html>

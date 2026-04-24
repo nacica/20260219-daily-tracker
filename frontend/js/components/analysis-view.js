@@ -4,8 +4,8 @@
  * ソクラテス式対話UIにも対応
  */
 
-import { analysisApi, dialogueApi, recordsApi } from "../api.js?v=20260424b";
-import { showToast } from "../app.js?v=20260424b";
+import { analysisApi, dialogueApi, recordsApi } from "../api.js?v=20260424c";
+import { showToast } from "../app.js?v=20260424c";
 
 /** 日付を日本語表記にフォーマット */
 function formatDateJP(dateStr) {

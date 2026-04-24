@@ -6610,3 +6610,303 @@ main.swipe-enter-right {
 @keyframes fc-spin {
   to { transform: rotate(360deg); }
 }
+
+/* =============================================================
+   就寝までの残り時間ウィジェット（ヘッダー常駐）
+   ============================================================= */
+
+.bedtime-timer.is-hidden { display: none !important; }
+
+.bedtime-timer-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px;
+  border-radius: var(--radius-xs);
+  border: 1px solid var(--border);
+  background: rgba(0, 212, 255, 0.04);
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  font-feature-settings: "tnum";
+}
+
+.bedtime-timer-trigger:hover {
+  background: rgba(0, 212, 255, 0.1);
+  border-color: var(--border-bright);
+}
+
+.bedtime-timer .bt-countdown {
+  white-space: nowrap;
+}
+
+/* 色分け: 残り >6h 通常 / 6h〜3h 黄 / <3h 赤 */
+.bedtime-timer.bt-level-warn .bedtime-timer-trigger {
+  color: var(--neon-amber);
+  border-color: rgba(255, 170, 0, 0.35);
+  background: rgba(255, 170, 0, 0.06);
+}
+.bedtime-timer.bt-level-warn .bedtime-timer-trigger:hover {
+  background: rgba(255, 170, 0, 0.12);
+  border-color: rgba(255, 170, 0, 0.55);
+}
+.bedtime-timer.bt-level-warn .bt-progress-fill { background: var(--neon-amber); }
+.bedtime-timer.bt-level-warn .bt-clock-sector { fill: rgba(255, 170, 0, 0.22); stroke: rgba(255, 170, 0, 0.5); }
+
+.bedtime-timer.bt-level-danger .bedtime-timer-trigger {
+  color: var(--neon-red);
+  border-color: rgba(255, 51, 102, 0.45);
+  background: rgba(255, 51, 102, 0.08);
+  animation: bt-pulse 1.6s ease-in-out infinite;
+}
+.bedtime-timer.bt-level-danger .bedtime-timer-trigger:hover {
+  background: rgba(255, 51, 102, 0.14);
+}
+.bedtime-timer.bt-level-danger .bt-progress-fill { background: var(--neon-red); }
+.bedtime-timer.bt-level-danger .bt-clock-sector { fill: rgba(255, 51, 102, 0.25); stroke: rgba(255, 51, 102, 0.6); }
+
+.bedtime-timer.bt-level-normal .bt-progress-fill { background: var(--cyan); }
+.bedtime-timer.bt-level-normal .bt-clock-sector { fill: rgba(0, 212, 255, 0.18); stroke: rgba(0, 212, 255, 0.45); }
+
+@keyframes bt-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 51, 102, 0); }
+  50% { box-shadow: 0 0 0 4px rgba(255, 51, 102, 0.1); }
+}
+
+/* プログレスバー（デスクトップのみ） */
+.bt-progress {
+  display: inline-block;
+  width: 100px;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+[data-theme="light"] .bt-progress { background: rgba(0, 0, 0, 0.08); }
+
+.bt-progress-fill {
+  display: block;
+  height: 100%;
+  width: 0%;
+  background: var(--cyan);
+  border-radius: 3px;
+  transition: width 0.8s linear, background 0.3s;
+}
+
+/* アナログ時計（デスクトップのみ） */
+.bt-clock {
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+}
+.bt-clock svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.bt-clock-face {
+  fill: rgba(255, 255, 255, 0.03);
+  stroke: var(--border);
+  stroke-width: 1;
+}
+[data-theme="light"] .bt-clock-face { fill: rgba(0, 0, 0, 0.02); }
+
+.bt-clock-sector {
+  fill: rgba(0, 212, 255, 0.18);
+  stroke: rgba(0, 212, 255, 0.45);
+  stroke-width: 0.5;
+}
+
+.bt-tick {
+  stroke: var(--text-muted);
+  stroke-width: 0.8;
+}
+.bt-tick-major {
+  stroke: var(--text-secondary);
+  stroke-width: 1.5;
+}
+
+.bt-hand {
+  stroke: var(--text-primary);
+  stroke-linecap: round;
+}
+.bt-hand-hour { stroke-width: 2.5; }
+.bt-hand-minute { stroke-width: 1.8; }
+.bt-hand-second {
+  stroke: var(--cyan);
+  stroke-width: 1;
+}
+.bt-clock-center {
+  fill: var(--cyan);
+}
+
+/* モバイル版: ナビ直下の細いバー */
+.bedtime-timer-mobile {
+  display: flex;
+  justify-content: center;
+  padding: 4px 0 6px;
+  border-top: 1px solid var(--border);
+  margin-top: 2px;
+}
+.bedtime-timer-mobile .bedtime-timer-trigger {
+  font-size: 0.78rem;
+  padding: 4px 12px;
+  gap: 6px;
+}
+.bedtime-timer-mobile .bt-moon {
+  font-size: 0.82rem;
+}
+
+/* デスクトップ版: ヘッダー内のウィジェット */
+.bedtime-timer-desktop {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  /* デスクトップでは mobile 版を隠し、desktop 版を表示 */
+  .bedtime-timer-mobile { display: none; }
+  .bedtime-timer-desktop { display: inline-flex; align-items: center; }
+}
+
+/* =============================================================
+   就寝までの残り時間 — 詳細モーダル
+   ============================================================= */
+
+.bedtime-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(2, 4, 8, 0.7);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  animation: bt-fade-in 0.2s ease-out;
+}
+[data-theme="light"] .bedtime-modal-overlay { background: rgba(17, 24, 39, 0.5); }
+
+@keyframes bt-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.bedtime-modal {
+  position: relative;
+  background: var(--bg-card);
+  border: 1px solid var(--border-bright);
+  border-radius: var(--radius);
+  padding: 28px 24px 24px;
+  max-width: 420px;
+  width: 100%;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  animation: bt-slide-in 0.22s ease-out;
+}
+[data-theme="light"] .bedtime-modal { background: #ffffff; }
+
+@keyframes bt-slide-in {
+  from { opacity: 0; transform: translateY(20px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.bedtime-modal-close {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  width: 32px;
+  height: 32px;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1.6rem;
+  line-height: 1;
+  cursor: pointer;
+  border-radius: 50%;
+  transition: background 0.15s, color 0.15s;
+}
+.bedtime-modal-close:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-primary);
+}
+
+.bedtime-modal-title {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  letter-spacing: 0.04em;
+  text-align: center;
+  margin-bottom: 16px;
+}
+
+.btm-countdown {
+  font-size: 1.6rem;
+  font-weight: 600;
+  text-align: center;
+  color: var(--text-primary);
+  font-feature-settings: "tnum";
+  margin-bottom: 14px;
+  letter-spacing: 0.02em;
+}
+.bedtime-modal.bt-level-warn .btm-countdown { color: var(--neon-amber); }
+.bedtime-modal.bt-level-danger .btm-countdown { color: var(--neon-red); }
+
+.btm-progress {
+  width: 100%;
+  height: 10px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+  margin-bottom: 22px;
+}
+[data-theme="light"] .btm-progress { background: rgba(0, 0, 0, 0.08); }
+
+.btm-progress-fill {
+  height: 100%;
+  width: 0%;
+  background: var(--cyan);
+  border-radius: 5px;
+  transition: width 0.8s linear, background 0.3s;
+}
+.bedtime-modal.bt-level-warn .btm-progress-fill { background: var(--neon-amber); }
+.bedtime-modal.bt-level-danger .btm-progress-fill { background: var(--neon-red); }
+
+.btm-clock {
+  width: 180px;
+  height: 180px;
+  margin: 0 auto 22px;
+}
+.btm-clock svg {
+  width: 100%;
+  height: 100%;
+}
+.bedtime-modal.bt-level-warn .bt-clock-sector { fill: rgba(255, 170, 0, 0.22); stroke: rgba(255, 170, 0, 0.5); }
+.bedtime-modal.bt-level-danger .bt-clock-sector { fill: rgba(255, 51, 102, 0.25); stroke: rgba(255, 51, 102, 0.6); }
+
+.btm-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-top: 1px solid var(--border);
+  padding-top: 14px;
+}
+.btm-meta-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 0.84rem;
+}
+.btm-meta-row dt {
+  color: var(--text-muted);
+}
+.btm-meta-row dd {
+  color: var(--text-primary);
+  font-feature-settings: "tnum";
+  font-weight: 500;
+}
