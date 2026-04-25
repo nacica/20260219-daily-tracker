@@ -5187,13 +5187,13 @@ main.swipe-enter-right {
 .braindump-entries {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 14px;
   margin-top: 30px;
 }
 
 .braindump-entry {
   position: relative;
-  padding: 14px 18px 14px 22px;
+  padding: 18px 22px 18px 26px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.03);
@@ -5212,8 +5212,8 @@ main.swipe-enter-right {
   content: "";
   position: absolute;
   left: 0;
-  top: 10px;
-  bottom: 10px;
+  top: 14px;
+  bottom: 14px;
   width: 3px;
   border-radius: 0 2px 2px 0;
   background: linear-gradient(180deg, #00d4ff, #0099cc);
@@ -5233,8 +5233,8 @@ main.swipe-enter-right {
 
 .braindump-entry:hover::before {
   width: 5px;
-  top: 6px;
-  bottom: 6px;
+  top: 10px;
+  bottom: 10px;
   box-shadow: 0 0 14px rgba(0, 212, 255, 0.6);
 }
 
@@ -5250,8 +5250,8 @@ main.swipe-enter-right {
 
 .braindump-entry.active::before {
   width: 5px;
-  top: 6px;
-  bottom: 6px;
+  top: 10px;
+  bottom: 10px;
   box-shadow: 0 0 16px rgba(0, 212, 255, 0.7);
 }
 
