@@ -5336,6 +5336,9 @@ main.swipe-enter-right {
 /* 日付グループ（過去15日分表示） */
 
 .braindump-date-group {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
   margin-bottom: 14px;
 }
 
