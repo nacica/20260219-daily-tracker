@@ -3,15 +3,15 @@
  *
  * 機能:
  *   - カウントダウン（HH:MM:SS 特大モノ数字）
- *   - プログレスバー（液体ウェーブ入り、その日の初回アクセス時刻〜22:00）
+ *   - プログレスバー（液体ウェーブ入り、その日の初回アクセス時刻〜21:00）
  *   - 色分け: 残り >6h 通常 / 6h〜3h 黄 / <3h 赤
- *   - 22:00 以降は「就寝時刻を過ぎています」を表示し、状態は維持
+ *   - 21:00 以降は「就寝時刻を過ぎています」を表示し、状態は維持
  *   - クリック／タップで詳細モーダル（拡大＋起床/就寝/経過時間）
  *   - 1 分ごとにパルス発光
  *   - 残り時間が減るほど脈動が速くなる
  */
 
-const BEDTIME_HOUR = 22;
+const BEDTIME_HOUR = 21;
 const FIRST_OPEN_KEY_PREFIX = "bedtime_first_open_";
 const AFTER_BEDTIME_TEXT = "就寝時刻を過ぎています";
 const AFTER_BEDTIME_SHORT = "就寝超過";
@@ -199,7 +199,7 @@ function openModal() {
       </div>
       <dl class="btm-meta">
         <div class="btm-meta-row"><dt>起床時刻</dt><dd class="btm-wake">--:--</dd></div>
-        <div class="btm-meta-row"><dt>就寝時刻</dt><dd class="btm-bed">22:00</dd></div>
+        <div class="btm-meta-row"><dt>就寝時刻</dt><dd class="btm-bed">21:00</dd></div>
         <div class="btm-meta-row"><dt>起点からの経過</dt><dd class="btm-elapsed">--</dd></div>
       </dl>
     </div>
