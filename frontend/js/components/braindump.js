@@ -90,7 +90,7 @@ export async function renderBraindump() {
           <button class="btn btn-primary btn-sm" id="bd-new-btn">＋ 新しいメモ</button>
         </div>
         <div class="braindump-new-form" id="bd-new-form">
-          <textarea class="braindump-textarea" id="bd-new-textarea" placeholder="思いついたことを自由に書き出してください..." rows="18"></textarea>
+          <textarea class="braindump-textarea" id="bd-new-textarea" placeholder="思いついたことを自由に書き出してください..." rows="36"></textarea>
           <div class="braindump-form-actions">
             <button class="btn btn-danger btn-sm" id="bd-delete-btn" style="display: none;">🗑 削除</button>
             <button class="btn btn-outline btn-sm" id="bd-summarize-btn">📝 MD要約</button>
