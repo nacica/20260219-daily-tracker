@@ -5,9 +5,9 @@
  * 朝のタスク整理（ソクラテス式問答）統合
  */
 
-import { recordsApi, analysisApi, morningDialogueApi, remindersApi, categoriesApi } from "../api.js?v=20260426a";
-import { showToast } from "../app.js?v=20260426a";
-import { showTaskCompleteAnimation, buildTaskStatsCards } from "./task-stats.js?v=20260426a";
+import { recordsApi, analysisApi, morningDialogueApi, remindersApi, categoriesApi } from "../api.js?v=20260426b";
+import { showToast } from "../app.js?v=20260426b";
+import { showTaskCompleteAnimation } from "./task-stats.js?v=20260426b";
 
 /* ── カテゴリ管理 ── */
 
@@ -374,9 +374,7 @@ function _mergeTasks(existingRecord, morningDialogue, prevRecords) {
 /** フォームを描画してイベントを再アタッチする共通処理 */
 function _paintForm(main, date, existingRecord, morningDialogue, tasks, isRestDay, restReason) {
   const isEdit = !!existingRecord;
-  // タスク統計カードは後から差し込むためのプレースホルダ（スロット）を先頭に用意
-  main.innerHTML = `<div id="task-stats-slot"></div>` +
-    buildFormHTML(date, existingRecord, tasks, isEdit, morningDialogue, isRestDay, restReason);
+  main.innerHTML = buildFormHTML(date, existingRecord, tasks, isEdit, morningDialogue, isRestDay, restReason);
   attachFormEvents(date, isEdit);
   attachMorningDialogueEvents(date, morningDialogue);
   attachReminderEvents();
@@ -389,9 +387,8 @@ function _paintForm(main, date, existingRecord, morningDialogue, tasks, isRestDa
  *
  * 高速化戦略:
  *   1. localStorage キャッシュから即描画（スピナー回避）
- *   2. タスク統計カードは並行取得 → 準備でき次第スロットに差し込む（クリティカルパス外）
- *   3. クリティカルパスの API 5 本を並列: record / morning / reminders / categories / 直近7日の list
- *   4. reminders / categories は 5 分 TTL のセッションキャッシュで二重取得を回避
+ *   2. クリティカルパスの API 5 本を並列: record / morning / reminders / categories / 直近7日の list
+ *   3. reminders / categories は 5 分 TTL のセッションキャッシュで二重取得を回避
  */
 export async function renderInputForm(date) {
   const main = document.querySelector("main");
@@ -408,15 +405,7 @@ export async function renderInputForm(date) {
     main.innerHTML = `<div class="loading"><div class="spinner"></div><p>読み込み中...</p></div>`;
   }
 
-  // ── 2. タスク統計カードは並列で取得 → 準備でき次第スロットへ差し込む ──
-  const statsPromise = buildTaskStatsCards().catch(() => "");
-  statsPromise.then((html) => {
-    if (!html) return;
-    const slot = document.getElementById("task-stats-slot");
-    if (slot) slot.innerHTML = html;
-  });
-
-  // ── 3. クリティカルパスの API を 5 本並列実行 ──
+  // ── 2. クリティカルパスの API を 5 本並列実行 ──
   const startStr = _prevDateStr(date, 7);
   const endStr = _prevDateStr(date, 1);
 
@@ -449,11 +438,6 @@ export async function renderInputForm(date) {
     prevRecords,
     reminders: _remindersCache,
   });
-
-  // ── 6. 再描画でスロットが空になったため、ready な統計 HTML を差し込む ──
-  const html = await statsPromise;
-  const slot = document.getElementById("task-stats-slot");
-  if (slot && html) slot.innerHTML = html;
 }
 
 /* ── 付箋リマインダー ── */

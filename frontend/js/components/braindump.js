@@ -4,8 +4,8 @@
  * 自動保存、AIタイトル自動生成、画像貼り付け対応。
  */
 
-import { braindumpApi } from "../api.js?v=20260426a";
-import { showToast } from "../app.js?v=20260426a";
+import { braindumpApi } from "../api.js?v=20260426b";
+import { showToast } from "../app.js?v=20260426b";
 
 // ===== ユーティリティ =====
 
