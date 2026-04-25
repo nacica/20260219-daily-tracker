@@ -5187,7 +5187,7 @@ main.swipe-enter-right {
 .braindump-entries {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 22px;
   margin-top: 30px;
 }
 
