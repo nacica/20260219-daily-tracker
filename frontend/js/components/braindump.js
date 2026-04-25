@@ -4,8 +4,8 @@
  * 自動保存、AIタイトル自動生成、画像貼り付け対応。
  */
 
-import { braindumpApi } from "../api.js?v=20260425a";
-import { showToast } from "../app.js?v=20260425a";
+import { braindumpApi } from "../api.js?v=20260425b";
+import { showToast } from "../app.js?v=20260425b";
 
 // ===== ユーティリティ =====
 
@@ -136,9 +136,16 @@ function renderRecentEntries() {
     const dateEntries = grouped[date];
     const d = new Date(date + "T00:00:00");
     const weekdays = ["日", "月", "火", "水", "木", "金", "土"];
-    const dateLabel = `${d.getMonth() + 1}/${d.getDate()}（${weekdays[d.getDay()]}）`;
+    const md = `${d.getMonth() + 1}/${d.getDate()}`;
+    const wd = weekdays[d.getDay()];
     const isToday = date === today();
-    const badge = isToday ? ' <span class="braindump-today-badge">今日</span>' : '';
+    const dateHeader = `
+      <span class="braindump-date-pill">
+        <span class="braindump-date-pill-md">${md}</span>
+        <span class="braindump-date-pill-wd">${wd}</span>
+      </span>
+      ${isToday ? '<span class="braindump-today-badge"><span class="braindump-today-dot"></span>today</span>' : ''}
+    `;
 
     const entriesHTML = dateEntries.map(entry => {
       const time = entry.created_at ? entry.created_at.slice(11, 16) : "";
@@ -161,7 +168,7 @@ function renderRecentEntries() {
 
     return `
       <div class="braindump-date-group">
-        <div class="braindump-date-group-header">${dateLabel}${badge}</div>
+        <div class="braindump-date-group-header">${dateHeader}</div>
         ${entriesHTML}
       </div>`;
   }).join("");

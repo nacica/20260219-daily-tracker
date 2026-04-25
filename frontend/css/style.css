@@ -5182,39 +5182,84 @@ main.swipe-enter-right {
   justify-content: flex-end;
 }
 
-/* エントリ一覧 */
+/* エントリ一覧 — ガラス質モノリスカード */
 
 .braindump-entries {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
   margin-top: 30px;
 }
 
 .braindump-entry {
-  padding: 14px 16px;
-  border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
-  border-radius: 10px;
-  background: var(--bg-card, rgba(255, 255, 255, 0.04));
+  position: relative;
+  padding: 14px 18px 14px 22px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(12px) saturate(140%);
+  -webkit-backdrop-filter: blur(12px) saturate(140%);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.04) inset,
+    0 4px 16px rgba(0, 0, 0, 0.18);
   cursor: pointer;
-  transition: border-color 0.2s, background 0.2s;
+  overflow: hidden;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+}
+
+/* 左端アクセントバー（常時表示） */
+.braindump-entry::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 10px;
+  bottom: 10px;
+  width: 3px;
+  border-radius: 0 2px 2px 0;
+  background: linear-gradient(180deg, #00d4ff, #0099cc);
+  box-shadow: 0 0 6px rgba(0, 212, 255, 0.35);
+  transition: width 0.2s ease, box-shadow 0.2s ease, top 0.2s ease, bottom 0.2s ease;
 }
 
 .braindump-entry:hover {
-  border-color: var(--accent, #00d4ff);
+  transform: translateY(-2px);
+  border-color: rgba(0, 212, 255, 0.28);
   background: rgba(0, 212, 255, 0.04);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.06) inset,
+    0 10px 28px rgba(0, 0, 0, 0.28),
+    0 0 0 1px rgba(0, 212, 255, 0.08);
+}
+
+.braindump-entry:hover::before {
+  width: 5px;
+  top: 6px;
+  bottom: 6px;
+  box-shadow: 0 0 14px rgba(0, 212, 255, 0.6);
 }
 
 .braindump-entry.editing,
 .braindump-entry.active {
-  border-color: var(--accent, #00d4ff);
+  border-color: rgba(0, 212, 255, 0.4);
   background: rgba(0, 212, 255, 0.06);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.06) inset,
+    0 8px 22px rgba(0, 0, 0, 0.3),
+    0 0 0 1px rgba(0, 212, 255, 0.18);
+}
+
+.braindump-entry.active::before {
+  width: 5px;
+  top: 6px;
+  bottom: 6px;
+  box-shadow: 0 0 16px rgba(0, 212, 255, 0.7);
 }
 
 .braindump-entry-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 10px;
   margin-bottom: 4px;
 }
 
@@ -5222,11 +5267,18 @@ main.swipe-enter-right {
   font-weight: 600;
   font-size: 0.95rem;
   color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  flex: 1;
 }
 
 .braindump-entry-time {
-  font-size: 0.78rem;
-  color: var(--text-muted, rgba(255, 255, 255, 0.4));
+  font-family: "SFMono-Regular", "Menlo", "Consolas", "Liberation Mono", monospace;
+  font-size: 0.75rem;
+  letter-spacing: 0.02em;
+  color: rgba(255, 255, 255, 0.38);
   flex-shrink: 0;
 }
 
@@ -5284,30 +5336,63 @@ main.swipe-enter-right {
 /* 日付グループ（過去15日分表示） */
 
 .braindump-date-group {
-  margin-bottom: 12px;
+  margin-bottom: 14px;
 }
 
 .braindump-date-group-header {
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: var(--text-secondary, rgba(255, 255, 255, 0.6));
-  padding: 8px 4px 4px;
-  border-bottom: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
-  margin-bottom: 6px;
-  position: sticky;
-  top: 0;
-  background: var(--bg-primary, #1a1a2e);
-  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 2px 8px;
+  margin-bottom: 4px;
 }
 
-.braindump-today-badge {
-  background: var(--accent-color, #4cc9f0);
-  color: #000;
+/* ピル型日付バッジ（月日 + 曜日） */
+.braindump-date-pill {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.braindump-date-pill-md {
+  font-family: "SFMono-Regular", "Menlo", "Consolas", "Liberation Mono", monospace;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.75);
+  letter-spacing: 0.02em;
+}
+
+.braindump-date-pill-wd {
   font-size: 0.7rem;
-  padding: 1px 6px;
-  border-radius: 8px;
-  margin-left: 6px;
-  vertical-align: middle;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+/* 「today」バッジ — 文字色 + ドットで地味め */
+.braindump-today-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: "SFMono-Regular", "Menlo", "Consolas", "Liberation Mono", monospace;
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #00d4ff;
+}
+
+.braindump-today-dot {
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #00d4ff;
+  box-shadow: 0 0 4px rgba(0, 212, 255, 0.6);
 }
 
 /* ライトテーマ */
@@ -5318,25 +5403,73 @@ main.swipe-enter-right {
 }
 
 [data-theme="light"] .braindump-entry {
-  border-color: rgba(0, 0, 0, 0.1);
-  background: rgba(0, 0, 0, 0.02);
+  border-color: rgba(0, 0, 0, 0.08);
+  background: rgba(255, 255, 255, 0.7);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.9) inset,
+    0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+[data-theme="light"] .braindump-entry::before {
+  background: linear-gradient(180deg, #0088b8, #006a94);
+  box-shadow: 0 0 4px rgba(0, 136, 184, 0.3);
 }
 
 [data-theme="light"] .braindump-entry:hover {
-  border-color: #0078d4;
-  background: rgba(0, 120, 212, 0.04);
+  border-color: rgba(0, 136, 184, 0.3);
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.9) inset,
+    0 8px 20px rgba(0, 0, 0, 0.1),
+    0 0 0 1px rgba(0, 136, 184, 0.1);
+}
+
+[data-theme="light"] .braindump-entry:hover::before {
+  box-shadow: 0 0 10px rgba(0, 136, 184, 0.5);
 }
 
 [data-theme="light"] .braindump-entry.editing,
 [data-theme="light"] .braindump-entry.active {
-  border-color: #0078d4;
-  background: rgba(0, 120, 212, 0.06);
+  border-color: rgba(0, 136, 184, 0.4);
+  background: rgba(0, 136, 184, 0.04);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.9) inset,
+    0 6px 18px rgba(0, 0, 0, 0.08),
+    0 0 0 1px rgba(0, 136, 184, 0.2);
+}
+
+[data-theme="light"] .braindump-entry.active::before {
+  box-shadow: 0 0 12px rgba(0, 136, 184, 0.55);
+}
+
+[data-theme="light"] .braindump-entry-time {
+  color: rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="light"] .braindump-date-pill {
+  background: rgba(0, 0, 0, 0.04);
+  border-color: rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="light"] .braindump-date-pill-md {
+  color: rgba(0, 0, 0, 0.72);
+}
+
+[data-theme="light"] .braindump-date-pill-wd {
+  color: rgba(0, 0, 0, 0.5);
+}
+
+[data-theme="light"] .braindump-today-badge {
+  color: #0088b8;
+}
+
+[data-theme="light"] .braindump-today-dot {
+  background: #0088b8;
+  box-shadow: 0 0 3px rgba(0, 136, 184, 0.5);
 }
 
 [data-theme="light"] .braindump-date-group-header {
-  color: rgba(0, 0, 0, 0.55);
-  border-bottom-color: rgba(0, 0, 0, 0.1);
-  background: var(--bg-primary, #f5f6fa);
+  padding: 10px 2px 8px;
 }
 
 [data-theme="light"] .braindump-entry-delete {
