@@ -112,26 +112,11 @@ function buildClockSkeleton() {
   }
 
   return `
-    <defs>
-      <radialGradient id="bt-sphere" cx="0.35" cy="0.28" r="0.85">
-        <stop offset="0%" stop-color="rgba(80,190,255,0.28)"/>
-        <stop offset="55%" stop-color="rgba(8,14,30,0.9)"/>
-        <stop offset="100%" stop-color="rgba(0,0,0,1)"/>
-      </radialGradient>
-      <radialGradient id="bt-rim" cx="0.5" cy="0.5" r="0.5">
-        <stop offset="88%" stop-color="rgba(0,212,255,0)"/>
-        <stop offset="100%" stop-color="rgba(0,212,255,0.55)"/>
-      </radialGradient>
-    </defs>
-    <circle cx="50" cy="50" r="42" class="bt-clock-face" fill="url(#bt-sphere)"/>
-    <circle cx="50" cy="50" r="42" class="bt-clock-rim" fill="url(#bt-rim)"/>
-    <ellipse cx="45" cy="27" rx="22" ry="6.5" class="bt-clock-highlight"/>
+    <circle cx="50" cy="50" r="42" class="bt-clock-face"/>
+    <circle cx="50" cy="50" r="42" class="bt-clock-rim"/>
     <path class="bt-clock-sector" d=""/>
     <g class="bt-clock-ticks">${ticks}</g>
     <g class="bt-clock-labels">${labels}</g>
-    <line x1="50" y1="50" x2="50" y2="22" class="bt-hand bt-hand-ghost bt-hand-ghost-3"/>
-    <line x1="50" y1="50" x2="50" y2="22" class="bt-hand bt-hand-ghost bt-hand-ghost-2"/>
-    <line x1="50" y1="50" x2="50" y2="22" class="bt-hand bt-hand-ghost bt-hand-ghost-1"/>
     <line x1="50" y1="50" x2="50" y2="30" class="bt-hand bt-hand-hour"/>
     <line x1="50" y1="50" x2="50" y2="20" class="bt-hand bt-hand-minute"/>
     <line x1="50" y1="50" x2="50" y2="16" class="bt-hand bt-hand-second"/>
@@ -278,26 +263,15 @@ function tickFrame() {
   const minuteDeg = minutesFloat * 6;
   const secondDeg = secondsFloat * 6;
 
-  // 軌跡ゴースト（B18）
-  const ghost1Deg = (secondsFloat - 0.08) * 6;
-  const ghost2Deg = (secondsFloat - 0.2) * 6;
-  const ghost3Deg = (secondsFloat - 0.35) * 6;
-
   const svgs = document.querySelectorAll(".bt-clock svg");
   svgs.forEach((svg) => {
     ensureClockInitialized(svg);
     const hHand = svg.querySelector(".bt-hand-hour");
     const mHand = svg.querySelector(".bt-hand-minute");
     const sHand = svg.querySelector(".bt-hand-second");
-    const g1 = svg.querySelector(".bt-hand-ghost-1");
-    const g2 = svg.querySelector(".bt-hand-ghost-2");
-    const g3 = svg.querySelector(".bt-hand-ghost-3");
     if (hHand) hHand.style.transform = `rotate(${hourDeg}deg)`;
     if (mHand) mHand.style.transform = `rotate(${minuteDeg}deg)`;
     if (sHand) sHand.style.transform = `rotate(${secondDeg}deg)`;
-    if (g1) g1.style.transform = `rotate(${ghost1Deg}deg)`;
-    if (g2) g2.style.transform = `rotate(${ghost2Deg}deg)`;
-    if (g3) g3.style.transform = `rotate(${ghost3Deg}deg)`;
   });
 
   rafId = requestAnimationFrame(tickFrame);

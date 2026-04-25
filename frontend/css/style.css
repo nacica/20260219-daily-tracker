@@ -6982,7 +6982,7 @@ main.swipe-enter-right {
   to   { transform: translateX(-50%); }
 }
 
-/* ===== 24 時間 球体時計 ===== */
+/* ===== 24 時間 文字盤（ハイコントラスト・ライト調） ===== */
 .bedtime-inline .bt-clock {
   display: block;
   width: 150px;
@@ -6990,7 +6990,6 @@ main.swipe-enter-right {
   margin: 4px auto 0;
   position: relative;
   z-index: 2;
-  filter: drop-shadow(0 0 18px rgba(var(--bt-accent-rgb), 0.22));
 }
 .bedtime-inline .bt-clock svg {
   width: 100%;
@@ -6998,38 +6997,38 @@ main.swipe-enter-right {
   display: block;
 }
 
-/* クロック内部要素 */
+/* クロック内部要素 — オフホワイト盤 × 深青リム */
 .bt-clock-face {
-  stroke: rgba(var(--bt-accent-rgb), 0.4);
-  stroke-width: 0.5;
+  fill: #f4f6fa;
+  stroke: none;
 }
 .bt-clock-rim {
-  mix-blend-mode: screen;
-}
-.bt-clock-highlight {
-  fill: rgba(255, 255, 255, 0.08);
-  pointer-events: none;
+  fill: none;
+  stroke: #0a1f44;
+  stroke-width: 1.4;
 }
 .bt-clock-sector {
-  fill: rgba(var(--bt-accent-rgb), 0.22);
-  stroke: rgba(var(--bt-accent-rgb), 0.5);
+  fill: rgba(10, 31, 68, 0.12);
+  stroke: rgba(10, 31, 68, 0.45);
   stroke-width: 0.4;
 }
 
 .bt-tick {
-  stroke: rgba(var(--bt-accent-rgb), 0.5);
-  stroke-width: 0.6;
+  stroke: #0a1f44;
+  stroke-width: 0.8;
+  opacity: 0.7;
 }
 .bt-tick-major {
-  stroke: rgba(var(--bt-accent-rgb), 0.95);
-  stroke-width: 1.6;
+  stroke: #0a1f44;
+  stroke-width: 1.8;
+  opacity: 1;
 }
 
 .bt-hour-label {
   font-family: 'JetBrains Mono', 'SF Mono', monospace;
-  font-size: 5.5px;
+  font-size: 6px;
   font-weight: 700;
-  fill: var(--text-secondary);
+  fill: #0a1f44;
   letter-spacing: 0;
 }
 
@@ -7045,27 +7044,12 @@ main.swipe-enter-right {
   from { transform: rotate(0deg); }
 }
 
-.bt-hand-hour   { stroke: var(--text-primary); stroke-width: 2.6; }
-.bt-hand-minute { stroke: var(--text-primary); stroke-width: 1.6; }
-.bt-hand-second {
-  stroke: var(--bt-accent);
-  stroke-width: 1;
-  filter: drop-shadow(0 0 3px rgba(var(--bt-accent-rgb), 0.8));
-}
-
-/* 軌跡ゴースト (B18) */
-.bt-hand-ghost {
-  stroke: var(--bt-accent);
-  stroke-linecap: round;
-  pointer-events: none;
-}
-.bt-hand-ghost-1 { stroke-width: 0.8; opacity: 0.28; }
-.bt-hand-ghost-2 { stroke-width: 0.7; opacity: 0.16; }
-.bt-hand-ghost-3 { stroke-width: 0.6; opacity: 0.08; }
+.bt-hand-hour   { stroke: #0a1f44; stroke-width: 3.2; }
+.bt-hand-minute { stroke: #0a1f44; stroke-width: 2; }
+.bt-hand-second { stroke: #0a1f44; stroke-width: 1.2; }
 
 .bt-clock-center {
-  fill: var(--bt-accent);
-  filter: drop-shadow(0 0 4px rgba(var(--bt-accent-rgb), 0.9));
+  fill: #0a1f44;
 }
 
 /* 経過状態では扇形は描画されない（JS で空パスに）*/
