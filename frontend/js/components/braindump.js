@@ -4,8 +4,8 @@
  * 自動保存、AIタイトル自動生成、画像貼り付け対応。
  */
 
-import { braindumpApi } from "../api.js?v=20260425b";
-import { showToast } from "../app.js?v=20260425b";
+import { braindumpApi } from "../api.js?v=20260425j";
+import { showToast } from "../app.js?v=20260425j";
 
 // ===== ユーティリティ =====
 
@@ -195,6 +195,9 @@ function attachEvents() {
 
   // クリップボード画像の貼り付け対応
   document.getElementById("bd-new-textarea")?.addEventListener("paste", handlePasteImage);
+
+  // Tab キーでフォーカス移動を抑止し、タブ文字を挿入
+  document.getElementById("bd-new-textarea")?.addEventListener("keydown", handleTabInsert);
 
   // マークダウン要約ボタン
   document.getElementById("bd-summarize-btn")?.addEventListener("click", summarizeContent);
@@ -481,6 +484,19 @@ async function refreshEntries() {
   if (container) {
     container.innerHTML = renderRecentEntries();
   }
+}
+
+// ===== Tab キー処理 =====
+
+function handleTabInsert(e) {
+  if (e.key !== "Tab" || e.shiftKey || e.ctrlKey || e.metaKey || e.altKey) return;
+  e.preventDefault();
+  const ta = e.target;
+  const start = ta.selectionStart;
+  const end = ta.selectionEnd;
+  ta.value = ta.value.slice(0, start) + "\t" + ta.value.slice(end);
+  ta.selectionStart = ta.selectionEnd = start + 1;
+  ta.dispatchEvent(new Event("input", { bubbles: true }));
 }
 
 // ===== クリップボード画像貼り付け =====
