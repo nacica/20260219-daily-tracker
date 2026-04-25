@@ -5,9 +5,9 @@
  * 朝のタスク整理（ソクラテス式問答）統合
  */
 
-import { recordsApi, analysisApi, morningDialogueApi, remindersApi, categoriesApi } from "../api.js?v=20260425j";
-import { showToast } from "../app.js?v=20260425j";
-import { showTaskCompleteAnimation, buildTaskStatsCards } from "./task-stats.js?v=20260425j";
+import { recordsApi, analysisApi, morningDialogueApi, remindersApi, categoriesApi } from "../api.js?v=20260426a";
+import { showToast } from "../app.js?v=20260426a";
+import { showTaskCompleteAnimation, buildTaskStatsCards } from "./task-stats.js?v=20260426a";
 
 /* ── カテゴリ管理 ── */
 
@@ -236,9 +236,9 @@ function flattenMasonry(grid) {
 /* ── レイアウト永続化 ── */
 
 const DEFAULT_LAYOUT = {
-  "card-morning-dialogue": { order: 0 },
-  "card-reminder-board":   { order: 1 },
-  "card-activity-log":     { order: 2 },
+  "card-activity-log":     { order: 0 },
+  "card-morning-dialogue": { order: 1 },
+  "card-reminder-board":   { order: 2 },
   "card-task-mgmt":        { order: 3 },
   "card-backlog":          { order: 4 },
   "card-actions":          { order: 5 },
@@ -247,36 +247,28 @@ const DEFAULT_LAYOUT = {
 
 const CARD_IDS = Object.keys(DEFAULT_LAYOUT);
 
+// v2: 行動ログを最上段に昇格させた新デフォルト順序を配信するためキーをリネーム。
+// 旧キー("input-form-layout")は読まずに破棄し、全ユーザーに新デフォルトを適用する。
+const LAYOUT_STORAGE_KEY = "input-form-layout-v2";
+
 function getLayoutPreference() {
   try {
-    const saved = localStorage.getItem("input-form-layout");
+    const saved = localStorage.getItem(LAYOUT_STORAGE_KEY);
     if (saved) {
       const parsed = JSON.parse(saved);
-      // すべてのカードIDが存在するか検証
       for (const id of CARD_IDS) {
         if (!parsed[id] || typeof parsed[id].order !== "number") return DEFAULT_LAYOUT;
       }
-      // 旧フォーマット（column付き）を順序ベースに変換
-      const hasColumn = Object.values(parsed).some((v) => "column" in v);
-      if (hasColumn) {
-        const sorted = CARD_IDS.slice().sort((a, b) => {
-          const pa = parsed[a], pb = parsed[b];
-          if (pa.column !== pb.column) return (pa.column || 0) - (pb.column || 0);
-          return (pa.order || 0) - (pb.order || 0);
-        });
-        const migrated = {};
-        sorted.forEach((id, i) => { migrated[id] = { order: i }; });
-        saveLayoutPreference(migrated);
-        return migrated;
-      }
       return parsed;
     }
+    // 旧キーが残っていれば一度だけ掃除（次回以降の保存は新キーへ）
+    localStorage.removeItem("input-form-layout");
   } catch {}
   return DEFAULT_LAYOUT;
 }
 
 function saveLayoutPreference(layout) {
-  localStorage.setItem("input-form-layout", JSON.stringify(layout));
+  localStorage.setItem(LAYOUT_STORAGE_KEY, JSON.stringify(layout));
 }
 
 /* ── メインレンダリング ── */
