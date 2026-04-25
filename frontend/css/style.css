@@ -6982,78 +6982,6 @@ main.swipe-enter-right {
   to   { transform: translateX(-50%); }
 }
 
-/* ===== 24 時間 文字盤（ハイコントラスト・ライト調） ===== */
-.bedtime-inline .bt-clock {
-  display: block;
-  width: 150px;
-  height: 150px;
-  margin: 4px auto 0;
-  position: relative;
-  z-index: 2;
-}
-.bedtime-inline .bt-clock svg {
-  width: 100%;
-  height: 100%;
-  display: block;
-}
-
-/* クロック内部要素 — オフホワイト盤 × 深青リム */
-.bt-clock-face {
-  fill: #f4f6fa;
-  stroke: none;
-}
-.bt-clock-rim {
-  fill: none;
-  stroke: #0a1f44;
-  stroke-width: 1.4;
-}
-.bt-clock-sector {
-  fill: rgba(10, 31, 68, 0.12);
-  stroke: rgba(10, 31, 68, 0.45);
-  stroke-width: 0.4;
-}
-
-.bt-tick {
-  stroke: #0a1f44;
-  stroke-width: 0.8;
-  opacity: 0.7;
-}
-.bt-tick-major {
-  stroke: #0a1f44;
-  stroke-width: 1.8;
-  opacity: 1;
-}
-
-.bt-hour-label {
-  font-family: 'JetBrains Mono', 'SF Mono', monospace;
-  font-size: 6px;
-  font-weight: 700;
-  fill: #0a1f44;
-  letter-spacing: 0;
-}
-
-/* 針（CSS で回転。viewBox 基準の座標で回転させる）*/
-.bt-hand {
-  transform-box: view-box;
-  transform-origin: 50px 50px;
-  stroke-linecap: round;
-  will-change: transform;
-  animation: bt-hand-mount 1.1s cubic-bezier(0.3, 0, 0.2, 1);
-}
-@keyframes bt-hand-mount {
-  from { transform: rotate(0deg); }
-}
-
-.bt-hand-hour   { stroke: #0a1f44; stroke-width: 3.2; }
-.bt-hand-minute { stroke: #0a1f44; stroke-width: 2; }
-.bt-hand-second { stroke: #0a1f44; stroke-width: 1.2; }
-
-.bt-clock-center {
-  fill: #0a1f44;
-}
-
-/* 経過状態では扇形は描画されない（JS で空パスに）*/
-
 /* ===== サイドバー配置（デスクトップのみ） ===== */
 .bedtime-inline-sidebar {
   display: none;
@@ -7063,7 +6991,6 @@ main.swipe-enter-right {
 }
 @media (min-width: 1024px) {
   .bedtime-inline-sidebar { display: block; }
-  .bedtime-inline-sidebar .bt-clock { width: 130px; height: 130px; }
   .bedtime-inline-sidebar .bt-countdown { font-size: 1.55rem; }
 }
 
@@ -7139,7 +7066,6 @@ main.swipe-enter-right {
   to   { opacity: 1; transform: translateY(0) scale(1); }
 }
 
-.bedtime-modal .bt-clock { width: 200px; height: 200px; }
 .bedtime-modal .bt-countdown { font-size: 2.15rem; }
 
 .bedtime-modal-close {
