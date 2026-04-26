@@ -5,9 +5,9 @@
  * 朝のタスク整理（ソクラテス式問答）統合
  */
 
-import { recordsApi, analysisApi, morningDialogueApi, remindersApi, categoriesApi } from "../api.js?v=20260426b";
-import { showToast } from "../app.js?v=20260426b";
-import { showTaskCompleteAnimation } from "./task-stats.js?v=20260426b";
+import { recordsApi, analysisApi, morningDialogueApi, remindersApi, categoriesApi } from "../api.js?v=20260426c";
+import { showToast } from "../app.js?v=20260426c";
+import { showTaskCompleteAnimation } from "./task-stats.js?v=20260426c";
 
 /* ── カテゴリ管理 ── */
 
@@ -382,6 +382,30 @@ function _paintForm(main, date, existingRecord, morningDialogue, tasks, isRestDa
 }
 
 /**
+ * 行動ログの最初の入力欄にフォーカスする。
+ * Why: アプリ起動時に「すぐ入力できる状態」にするため（オートフォーカス）。
+ * 起動後に1度だけ呼ばれ、以降の再描画では呼ばれない（_hasAutofocused フラグで制御）。
+ */
+function focusFirstActivityInput() {
+  const freeform = document.getElementById("freeform-mode");
+  const timeline = document.getElementById("timeline-mode");
+
+  if (timeline && timeline.style.display !== "none") {
+    const empty = [...document.querySelectorAll("#timeline-rows .timeline-activity")]
+      .find((el) => !el.value.trim());
+    if (empty) { empty.focus(); return; }
+    const first = document.querySelector("#timeline-rows .timeline-activity");
+    if (first) first.focus();
+    return;
+  }
+
+  if (freeform && freeform.style.display !== "none") {
+    const ta = document.getElementById("raw-input");
+    if (ta) ta.focus();
+  }
+}
+
+/**
  * 入力フォームをメインエリアにレンダリングする
  * @param {string} date - 対象日 (YYYY-MM-DD)
  *
@@ -395,12 +419,17 @@ export async function renderInputForm(date) {
 
   // ── 1. 楽観描画: 前回のキャッシュから即描画 ──
   const cached = loadInputCache(date);
+  let didAutofocus = false;
   if (cached) {
     if (Array.isArray(cached.reminders)) _remindersCache = cached.reminders;
     // キャッシュ内容から tasks を合成（prevRecords はキャッシュ済みのものを使う）
     const cachedTasks = cached.tasks || _mergeTasks(cached.existingRecord, cached.morningDialogue, cached.prevRecords || []);
     _paintForm(main, date, cached.existingRecord || null, cached.morningDialogue || null, cachedTasks,
       !!cached.isRestDay, cached.restReason || "");
+    if (!cached.isRestDay) {
+      focusFirstActivityInput();
+      didAutofocus = true;
+    }
   } else {
     main.innerHTML = `<div class="loading"><div class="spinner"></div><p>読み込み中...</p></div>`;
   }
@@ -427,6 +456,10 @@ export async function renderInputForm(date) {
 
   // ── 4. フレッシュデータで再描画 ──
   _paintForm(main, date, existingRecord, morningDialogue, tasks, isRestDay, restReason);
+  // キャッシュからの初回描画でフォーカス済みなら、再描画ではスキップ（カーソル位置を奪わない）
+  if (!didAutofocus && !isRestDay) {
+    focusFirstActivityInput();
+  }
 
   // ── 5. キャッシュを更新（次回の楽観描画用）──
   saveInputCache(date, {
@@ -1174,14 +1207,16 @@ function buildFormHTML(date, record, tasks, isEdit, morningDialogue, isRestDay =
   ).join("");
 
   return `
-    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
-      <h2 style="margin: 0; font-size: 1.2rem;">${isEdit ? "記録を編集" : "行動を記録"}</h2>
-      ${isRestDay ? `` : `
-      <button class="btn btn-outline btn-sm rest-day-btn" id="btn-rest-day" style="white-space: nowrap;">
-        🌙 今日はおやすみ
-      </button>`}
+    <div class="input-page-header">
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
+        <h2 style="margin: 0; font-size: 1.2rem;">${isEdit ? "記録を編集" : "行動を記録"}</h2>
+        ${isRestDay ? `` : `
+        <button class="btn btn-outline btn-sm rest-day-btn" id="btn-rest-day" style="white-space: nowrap;">
+          🌙 今日はおやすみ
+        </button>`}
+      </div>
+      <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: var(--gap);">${dateLabel}</p>
     </div>
-    <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: var(--gap);">${dateLabel}</p>
 
     ${isRestDay ? `
     <div class="card rest-day-banner" id="rest-day-banner">

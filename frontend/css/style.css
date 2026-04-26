@@ -1041,6 +1041,24 @@ textarea {
   display: none; /* モバイルでは非表示 */
 }
 
+/* ===== /input ページヘッダー =====
+ * モバイルでは「行動を記録 / 日付」を非表示にし、行動ログ入力欄を
+ * ファーストビューに表示する。デスクトップは従来通り表示。
+ * 「今日はおやすみ」ボタンは残してアクセス可能にしておく。 */
+@media (max-width: 1023px) {
+  .input-page-header > div > h2,
+  .input-page-header > p {
+    display: none;
+  }
+  .input-page-header {
+    margin-bottom: 0;
+  }
+  .input-page-header > div {
+    justify-content: flex-end;
+    margin-bottom: 8px;
+  }
+}
+
 /* ===== 入力フォーム 2列グリッド（モバイルではフラット表示） ===== */
 
 .input-grid {
