@@ -5,9 +5,9 @@
  * 朝のタスク整理（ソクラテス式問答）統合
  */
 
-import { recordsApi, analysisApi, morningDialogueApi, remindersApi, categoriesApi } from "../api.js?v=20260426d";
-import { showToast } from "../app.js?v=20260426d";
-import { showTaskCompleteAnimation } from "./task-stats.js?v=20260426d";
+import { recordsApi, analysisApi, morningDialogueApi, remindersApi, categoriesApi } from "../api.js?v=20260426e";
+import { showToast } from "../app.js?v=20260426e";
+import { showTaskCompleteAnimation } from "./task-stats.js?v=20260426e";
 
 /* ── カテゴリ管理 ── */
 
@@ -527,8 +527,13 @@ function buildStickyNoteHTML(r, activeClass = "") {
 let stickyCurrentIndex = 0;
 let stickyRandomMode = false;
 
+function getDisplayReminders() {
+  // 新しい順（createdAt 降順）で表示する。createdAt 欠損は末尾。
+  return [...getReminders()].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+}
+
 function buildReminderBoardHTML() {
-  const reminders = getReminders();
+  const reminders = getDisplayReminders();
   // インデックスを範囲内に補正
   if (stickyCurrentIndex >= reminders.length) stickyCurrentIndex = Math.max(0, reminders.length - 1);
 
@@ -576,7 +581,7 @@ function attachReminderEvents() {
     const reminders = getReminders();
     reminders.push({ id: Date.now().toString(36), text, createdAt: Date.now() });
     saveReminders(reminders);
-    stickyCurrentIndex = reminders.length - 1; // 新規追加は最後に移動
+    stickyCurrentIndex = 0; // 新規追加分は降順ソートで先頭(1/N)に来る
     refreshStickyNotes();
     input.value = "";
     input.focus();
