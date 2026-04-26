@@ -1059,6 +1059,31 @@ textarea {
   }
 }
 
+/* ===== 行動ログカード タイトル行 =====
+ * card-title と「＋追加」ボタンを横並びにし、ボタンは右端にコンパクト配置。
+ * 上部の追加ボタンはモバイル限定（デスクトップは下部のフルサイズボタンで足りる）。 */
+.card-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.card-title-row > .card-title {
+  margin-bottom: 0;
+}
+.timeline-add-btn-top {
+  display: none;
+  white-space: nowrap;
+  padding: 4px 10px;
+  font-size: 0.82rem;
+}
+@media (max-width: 1023px) {
+  .timeline-add-btn-top {
+    display: inline-flex;
+  }
+}
+
 /* ===== 入力フォーム 2列グリッド（モバイルではフラット表示） ===== */
 
 .input-grid {

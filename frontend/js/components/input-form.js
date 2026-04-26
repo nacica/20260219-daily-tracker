@@ -5,9 +5,9 @@
  * 朝のタスク整理（ソクラテス式問答）統合
  */
 
-import { recordsApi, analysisApi, morningDialogueApi, remindersApi, categoriesApi } from "../api.js?v=20260426c";
-import { showToast } from "../app.js?v=20260426c";
-import { showTaskCompleteAnimation } from "./task-stats.js?v=20260426c";
+import { recordsApi, analysisApi, morningDialogueApi, remindersApi, categoriesApi } from "../api.js?v=20260426d";
+import { showToast } from "../app.js?v=20260426d";
+import { showTaskCompleteAnimation } from "./task-stats.js?v=20260426d";
 
 /* ── カテゴリ管理 ── */
 
@@ -1068,7 +1068,12 @@ function buildFormHTML(date, record, tasks, isEdit, morningDialogue, isRestDay =
     "card-activity-log": `
       <div class="card draggable-card" id="card-activity-log" draggable="false">
         <div class="card-drag-handle" title="ドラッグで移動">⠿</div>
-        <div class="card-title">行動ログ</div>
+        <div class="card-title-row">
+          <div class="card-title">行動ログ</div>
+          <button class="btn btn-outline btn-sm timeline-add-btn-top" id="btn-add-timeline-row-top" title="行動を追加">
+            ＋ 追加
+          </button>
+        </div>
         <div class="form-group">
           <div class="activity-log-mode-toggle">
             <button class="mode-toggle-btn active" id="btn-mode-timeline" data-mode="timeline">タイムライン</button>
@@ -1688,7 +1693,7 @@ function attachFormEvents(date, isEdit) {
     });
   }
 
-  // 行動追加ボタン
+  // 行動追加ボタン（下部 = 末尾に追加）
   const addRowBtn = document.getElementById("btn-add-timeline-row");
   if (addRowBtn) {
     addRowBtn.addEventListener("click", () => {
@@ -1700,6 +1705,18 @@ function attachFormEvents(date, isEdit) {
       timelineRows.insertAdjacentHTML("beforeend", buildTimelineRowHTML(lastEnd || nowStr, "", ""));
       // 新しい行の活動入力にフォーカス
       const newRow = timelineRows.lastElementChild;
+      newRow.querySelector(".timeline-activity").focus();
+    });
+  }
+
+  // 行動追加ボタン（上部・モバイル限定 = 先頭に追加）
+  const addRowBtnTop = document.getElementById("btn-add-timeline-row-top");
+  if (addRowBtnTop) {
+    addRowBtnTop.addEventListener("click", () => {
+      const now = new Date();
+      const nowStr = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+      timelineRows.insertAdjacentHTML("afterbegin", buildTimelineRowHTML(nowStr, "", ""));
+      const newRow = timelineRows.firstElementChild;
       newRow.querySelector(".timeline-activity").focus();
     });
   }
