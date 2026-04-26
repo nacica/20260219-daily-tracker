@@ -5181,7 +5181,7 @@ main.swipe-enter-right {
     max-height: calc(100vh - 100px);
     overflow-y: auto;
     padding-left: 16px;
-    padding-right: 16px;
+    padding-right: 25px;
   }
 }
 
