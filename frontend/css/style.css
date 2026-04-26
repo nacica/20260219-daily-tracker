@@ -5165,6 +5165,9 @@ main.swipe-enter-right {
   .braindump-container {
     flex-direction: row;
     align-items: flex-start;
+    /* 右カラムに左右16pxのpaddingを足した分（=32px）を、3/10の比率で逆算して
+       コンテナ幅を拡張し、カードの実幅を維持する（32 / (3/10) ≈ 107） */
+    max-width: 1307px;
   }
   .braindump-left {
     flex: 7;
@@ -5177,6 +5180,8 @@ main.swipe-enter-right {
     top: 80px;
     max-height: calc(100vh - 100px);
     overflow-y: auto;
+    padding-left: 16px;
+    padding-right: 16px;
   }
 }
 
