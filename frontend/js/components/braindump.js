@@ -4,8 +4,8 @@
  * 自動保存、AIタイトル自動生成、画像貼り付け対応。
  */
 
-import { braindumpApi } from "../api.js?v=20260426e";
-import { showToast } from "../app.js?v=20260426e";
+import { braindumpApi } from "../api.js?v=20260426i";
+import { showToast } from "../app.js?v=20260426i";
 
 // ===== ユーティリティ =====
 
@@ -409,28 +409,22 @@ async function saveNewEntry() {
 
   try {
     if (editingEntryId) {
-      // 既存メモの上書き保存
       await braindumpApi.update(editingEntryId, content);
-      showToast("保存しました");
-      resetToNewMode();
     } else if (newEntryId) {
-      // 既に自動保存済みのエントリがあれば更新
       await braindumpApi.update(newEntryId, content);
-      newEntryId = null;
-      currentImages = [];
-      renderImagePreview();
-      textarea.value = "";
-      textarea.focus();
     } else {
-      await braindumpApi.create(currentDate, content);
-      newEntryId = null;
-      currentImages = [];
-      renderImagePreview();
-      textarea.value = "";
-      textarea.focus();
+      const created = await braindumpApi.create(currentDate, content);
+      if (created && created.id) {
+        newEntryId = created.id;
+      }
     }
+    showToast("保存しました");
     entries = await braindumpApi.listByDate(currentDate) || [];
     refreshEntries();
+    if (editingEntryId) {
+      const activeEl = document.querySelector(`.braindump-entry[data-id="${editingEntryId}"]`);
+      if (activeEl) activeEl.classList.add("active");
+    }
   } catch (e) {
     showToast(`保存に失敗しました: ${e.message}`, "error");
   }
