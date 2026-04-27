@@ -7188,3 +7188,152 @@ main.swipe-enter-right {
 }
 .bedtime-modal .bt-status-row { margin-top: 4px; }
 .bedtime-modal .bt-caption { margin-bottom: -2px; }
+
+/* ===== 今日意識すること 拡大モーダル ===== */
+
+.sticky-expand-btn {
+  margin-left: 4px;
+  font-size: 13px;
+}
+
+.reminder-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  animation: rm-overlay-in 0.18s ease-out;
+}
+
+@keyframes rm-overlay-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.reminder-modal {
+  position: relative;
+  width: 100%;
+  max-width: 560px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg, 12px);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  padding: 24px 22px 18px;
+  animation: rm-in 0.22s cubic-bezier(0.3, 0, 0.2, 1);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+@keyframes rm-in {
+  from { transform: translateY(12px); opacity: 0; }
+  to   { transform: translateY(0); opacity: 1; }
+}
+
+.reminder-modal-close {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 1.6rem;
+  line-height: 1;
+  cursor: pointer;
+  border-radius: 50%;
+  transition: background 0.15s, color 0.15s;
+}
+
+.reminder-modal-close:hover {
+  background: var(--bg-input);
+  color: var(--text-primary);
+}
+
+.reminder-modal-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding-right: 28px;
+}
+
+.reminder-modal-title {
+  font-family: 'Klee One', cursive;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.reminder-modal-date {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.reminder-modal-textarea {
+  width: 100%;
+  min-height: 220px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-input);
+  color: var(--text-primary);
+  font-size: 1.4rem;
+  font-weight: 700;
+  font-family: 'Klee One', cursive;
+  line-height: 1.6;
+  resize: vertical;
+  box-sizing: border-box;
+}
+
+.reminder-modal-textarea:focus {
+  outline: none;
+  border-color: var(--cyan-dim);
+}
+
+.reminder-modal-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.reminder-modal-nav {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.reminder-modal-buttons {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+@media (max-width: 480px) {
+  .reminder-modal {
+    padding: 20px 16px 14px;
+  }
+  .reminder-modal-textarea {
+    font-size: 1.2rem;
+    min-height: 180px;
+  }
+  .reminder-modal-actions {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+  .reminder-modal-nav {
+    justify-content: center;
+  }
+  .reminder-modal-buttons {
+    justify-content: flex-end;
+  }
+}

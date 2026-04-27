@@ -5,9 +5,9 @@
  * 朝のタスク整理（ソクラテス式問答）統合
  */
 
-import { recordsApi, analysisApi, morningDialogueApi, remindersApi, categoriesApi } from "../api.js?v=20260426i";
-import { showToast } from "../app.js?v=20260426i";
-import { showTaskCompleteAnimation } from "./task-stats.js?v=20260426i";
+import { recordsApi, analysisApi, morningDialogueApi, remindersApi, categoriesApi } from "../api.js?v=20260427a";
+import { showToast } from "../app.js?v=20260427a";
+import { showTaskCompleteAnimation } from "./task-stats.js?v=20260427a";
 
 /* ── カテゴリ管理 ── */
 
@@ -543,12 +543,15 @@ function buildReminderBoardHTML() {
   }).join("");
 
   const randomActiveClass = stickyRandomMode ? " active" : "";
-  const navHTML = reminders.length > 1
+  const navHTML = reminders.length >= 1
     ? `<div class="sticky-nav">
-        <button class="sticky-nav-btn" id="sticky-prev">&#9664;</button>
-        <span class="sticky-counter" id="sticky-counter">${stickyCurrentIndex + 1} / ${reminders.length}</span>
-        <button class="sticky-nav-btn" id="sticky-next">&#9654;</button>
-        <button class="sticky-nav-btn sticky-random-btn${randomActiveClass}" id="sticky-random" title="ランダム">&#x1f500;</button>
+        ${reminders.length > 1 ? `
+          <button class="sticky-nav-btn" id="sticky-prev">&#9664;</button>
+          <span class="sticky-counter" id="sticky-counter">${stickyCurrentIndex + 1} / ${reminders.length}</span>
+          <button class="sticky-nav-btn" id="sticky-next">&#9654;</button>
+          <button class="sticky-nav-btn sticky-random-btn${randomActiveClass}" id="sticky-random" title="ランダム">&#x1f500;</button>
+        ` : ""}
+        <button class="sticky-nav-btn sticky-expand-btn" id="sticky-expand" title="拡大表示">&#x1f50d;</button>
       </div>`
     : "";
 
@@ -677,12 +680,14 @@ function attachStickyNavEvents() {
   const prevBtn = document.getElementById("sticky-prev");
   const nextBtn = document.getElementById("sticky-next");
   const randomBtn = document.getElementById("sticky-random");
+  const expandBtn = document.getElementById("sticky-expand");
   if (prevBtn) prevBtn.addEventListener("click", () => { navigateSticky(-1); });
   if (nextBtn) nextBtn.addEventListener("click", () => { navigateSticky(1); });
   if (randomBtn) randomBtn.addEventListener("click", () => {
     stickyRandomMode = !stickyRandomMode;
     randomBtn.classList.toggle("active", stickyRandomMode);
   });
+  if (expandBtn) expandBtn.addEventListener("click", openReminderModal);
 }
 
 function navigateSticky(delta) {
@@ -727,13 +732,16 @@ function refreshStickyNotes() {
 
   // ナビゲーション更新
   const existingNav = board.querySelector(".sticky-nav");
-  if (reminders.length > 1) {
+  if (reminders.length >= 1) {
     const randomActiveClass = stickyRandomMode ? " active" : "";
     const navHTML = `<div class="sticky-nav">
-      <button class="sticky-nav-btn" id="sticky-prev">&#9664;</button>
-      <span class="sticky-counter" id="sticky-counter">${stickyCurrentIndex + 1} / ${reminders.length}</span>
-      <button class="sticky-nav-btn" id="sticky-next">&#9654;</button>
-      <button class="sticky-nav-btn sticky-random-btn${randomActiveClass}" id="sticky-random" title="ランダム">&#x1f500;</button>
+      ${reminders.length > 1 ? `
+        <button class="sticky-nav-btn" id="sticky-prev">&#9664;</button>
+        <span class="sticky-counter" id="sticky-counter">${stickyCurrentIndex + 1} / ${reminders.length}</span>
+        <button class="sticky-nav-btn" id="sticky-next">&#9654;</button>
+        <button class="sticky-nav-btn sticky-random-btn${randomActiveClass}" id="sticky-random" title="ランダム">&#x1f500;</button>
+      ` : ""}
+      <button class="sticky-nav-btn sticky-expand-btn" id="sticky-expand" title="拡大表示">&#x1f50d;</button>
     </div>`;
     if (existingNav) {
       existingNav.outerHTML = navHTML;
@@ -778,6 +786,170 @@ function attachStickySwipeEvents() {
     if (Math.abs(dx) < 40 || Math.abs(dx) < Math.abs(dy)) return; // 横スワイプのみ
     navigateSticky(dx < 0 ? 1 : -1);
   }, { passive: true });
+}
+
+/* ── 拡大モーダル ── */
+
+let reminderModalKeyHandler = null;
+
+function openReminderModal() {
+  const reminders = getDisplayReminders();
+  if (reminders.length === 0) return;
+
+  // 既存モーダルがあれば閉じる
+  closeReminderModal();
+
+  const overlay = document.createElement("div");
+  overlay.id = "reminder-modal-overlay";
+  overlay.className = "reminder-modal-overlay";
+  overlay.innerHTML = `
+    <div class="reminder-modal" role="dialog" aria-modal="true" aria-label="今日意識すること">
+      <button class="reminder-modal-close" id="reminder-modal-close" aria-label="閉じる">&times;</button>
+      <div class="reminder-modal-header">
+        <span class="reminder-modal-title">今日意識すること</span>
+        <span class="reminder-modal-date" id="reminder-modal-date"></span>
+      </div>
+      <textarea class="reminder-modal-textarea" id="reminder-modal-textarea" rows="8"></textarea>
+      <div class="reminder-modal-actions">
+        <div class="reminder-modal-nav">
+          ${reminders.length > 1 ? `
+            <button class="sticky-nav-btn" id="reminder-modal-prev" title="前へ">&#9664;</button>
+            <span class="sticky-counter" id="reminder-modal-counter"></span>
+            <button class="sticky-nav-btn" id="reminder-modal-next" title="次へ">&#9654;</button>
+            <button class="sticky-nav-btn sticky-random-btn${stickyRandomMode ? ' active' : ''}" id="reminder-modal-random" title="ランダム">&#x1f500;</button>
+          ` : ""}
+        </div>
+        <div class="reminder-modal-buttons">
+          <button class="btn btn-danger btn-sm" id="reminder-modal-delete">🗑 削除</button>
+          <button class="btn btn-primary btn-sm" id="reminder-modal-save">保存</button>
+        </div>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  renderReminderModalContent();
+
+  // × ボタン
+  document.getElementById("reminder-modal-close")?.addEventListener("click", () => {
+    autoSaveModalEdit();
+    closeReminderModal();
+  });
+
+  // 背景クリック
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) {
+      autoSaveModalEdit();
+      closeReminderModal();
+    }
+  });
+
+  // ESC キー
+  reminderModalKeyHandler = (e) => {
+    if (e.key === "Escape") {
+      autoSaveModalEdit();
+      closeReminderModal();
+    }
+  };
+  document.addEventListener("keydown", reminderModalKeyHandler);
+
+  // 削除
+  document.getElementById("reminder-modal-delete")?.addEventListener("click", () => {
+    const list = getDisplayReminders();
+    const target = list[stickyCurrentIndex];
+    if (!target) return;
+    if (!confirm("このメモを削除しますか？")) return;
+    const remaining = getReminders().filter((r) => r.id !== target.id);
+    saveReminders(remaining);
+    if (remaining.length === 0) {
+      closeReminderModal();
+      refreshStickyNotes();
+      return;
+    }
+    if (stickyCurrentIndex >= getDisplayReminders().length) {
+      stickyCurrentIndex = Math.max(0, getDisplayReminders().length - 1);
+    }
+    refreshStickyNotes();
+    renderReminderModalContent();
+  });
+
+  // 保存
+  document.getElementById("reminder-modal-save")?.addEventListener("click", () => {
+    autoSaveModalEdit();
+    showToast("保存しました", "success");
+  });
+
+  // ナビ
+  document.getElementById("reminder-modal-prev")?.addEventListener("click", () => {
+    autoSaveModalEdit();
+    navigateSticky(-1);
+    renderReminderModalContent();
+  });
+  document.getElementById("reminder-modal-next")?.addEventListener("click", () => {
+    autoSaveModalEdit();
+    navigateSticky(1);
+    renderReminderModalContent();
+  });
+  document.getElementById("reminder-modal-random")?.addEventListener("click", (e) => {
+    stickyRandomMode = !stickyRandomMode;
+    e.currentTarget.classList.toggle("active", stickyRandomMode);
+    const boardRandomBtn = document.getElementById("sticky-random");
+    if (boardRandomBtn) boardRandomBtn.classList.toggle("active", stickyRandomMode);
+  });
+
+  // textarea にフォーカス
+  setTimeout(() => {
+    document.getElementById("reminder-modal-textarea")?.focus();
+  }, 50);
+}
+
+function renderReminderModalContent() {
+  const reminders = getDisplayReminders();
+  if (reminders.length === 0) {
+    closeReminderModal();
+    return;
+  }
+  if (stickyCurrentIndex >= reminders.length) stickyCurrentIndex = Math.max(0, reminders.length - 1);
+  const target = reminders[stickyCurrentIndex];
+  if (!target) return;
+
+  const textarea = document.getElementById("reminder-modal-textarea");
+  if (textarea) {
+    textarea.value = target.text;
+    textarea.dataset.id = target.id;
+    textarea.dataset.original = target.text;
+  }
+
+  const dateEl = document.getElementById("reminder-modal-date");
+  if (dateEl) dateEl.textContent = formatReminderDate(target.createdAt);
+
+  const counter = document.getElementById("reminder-modal-counter");
+  if (counter) counter.textContent = `${stickyCurrentIndex + 1} / ${reminders.length}`;
+}
+
+function autoSaveModalEdit() {
+  const textarea = document.getElementById("reminder-modal-textarea");
+  if (!textarea) return;
+  const id = textarea.dataset.id;
+  const original = textarea.dataset.original ?? "";
+  const newText = textarea.value.trim();
+  if (!id || !newText || newText === original) return;
+  const reminders = getReminders();
+  const target = reminders.find((r) => r.id === id);
+  if (!target) return;
+  target.text = newText;
+  saveReminders(reminders);
+  textarea.dataset.original = newText;
+  refreshStickyNotes();
+}
+
+function closeReminderModal() {
+  const overlay = document.getElementById("reminder-modal-overlay");
+  if (overlay) overlay.remove();
+  if (reminderModalKeyHandler) {
+    document.removeEventListener("keydown", reminderModalKeyHandler);
+    reminderModalKeyHandler = null;
+  }
 }
 
 /* ── おやすみモード ── */
