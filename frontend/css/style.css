@@ -7218,7 +7218,7 @@ main.swipe-enter-right {
 .reminder-modal {
   position: relative;
   width: 100%;
-  max-width: 560px;
+  max-width: 840px;
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg, 12px);
