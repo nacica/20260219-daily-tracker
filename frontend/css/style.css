@@ -7276,11 +7276,38 @@ main.swipe-enter-right {
   color: var(--text-muted);
 }
 
+.reminder-modal-body {
+  width: 100%;
+}
+
+.reminder-modal-text {
+  width: 100%;
+  min-height: 220px;
+  padding: 14px 16px;
+  border-radius: 10px;
+  background: var(--bg-input);
+  color: var(--text-primary);
+  font-size: 1.4rem;
+  font-weight: 700;
+  font-family: 'Klee One', cursive;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+  cursor: pointer;
+  box-sizing: border-box;
+  border: 1px solid transparent;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.reminder-modal-text:hover {
+  border-color: var(--cyan-dim);
+}
+
 .reminder-modal-textarea {
   width: 100%;
   min-height: 220px;
   padding: 14px 16px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--cyan-dim);
   border-radius: 10px;
   background: var(--bg-input);
   color: var(--text-primary);
@@ -7294,7 +7321,7 @@ main.swipe-enter-right {
 
 .reminder-modal-textarea:focus {
   outline: none;
-  border-color: var(--cyan-dim);
+  border-color: var(--cyan, var(--cyan-dim));
 }
 
 .reminder-modal-actions {

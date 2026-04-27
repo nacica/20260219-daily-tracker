@@ -5,9 +5,9 @@
  * 朝のタスク整理（ソクラテス式問答）統合
  */
 
-import { recordsApi, analysisApi, morningDialogueApi, remindersApi, categoriesApi } from "../api.js?v=20260427a";
-import { showToast } from "../app.js?v=20260427a";
-import { showTaskCompleteAnimation } from "./task-stats.js?v=20260427a";
+import { recordsApi, analysisApi, morningDialogueApi, remindersApi, categoriesApi } from "../api.js?v=20260427b";
+import { showToast } from "../app.js?v=20260427b";
+import { showTaskCompleteAnimation } from "./task-stats.js?v=20260427b";
 
 /* ── カテゴリ管理 ── */
 
@@ -791,6 +791,7 @@ function attachStickySwipeEvents() {
 /* ── 拡大モーダル ── */
 
 let reminderModalKeyHandler = null;
+let reminderModalEditing = false;
 
 function openReminderModal() {
   const reminders = getDisplayReminders();
@@ -798,6 +799,7 @@ function openReminderModal() {
 
   // 既存モーダルがあれば閉じる
   closeReminderModal();
+  reminderModalEditing = false;
 
   const overlay = document.createElement("div");
   overlay.id = "reminder-modal-overlay";
@@ -809,7 +811,7 @@ function openReminderModal() {
         <span class="reminder-modal-title">今日意識すること</span>
         <span class="reminder-modal-date" id="reminder-modal-date"></span>
       </div>
-      <textarea class="reminder-modal-textarea" id="reminder-modal-textarea" rows="8"></textarea>
+      <div class="reminder-modal-body" id="reminder-modal-body"></div>
       <div class="reminder-modal-actions">
         <div class="reminder-modal-nav">
           ${reminders.length > 1 ? `
@@ -819,74 +821,47 @@ function openReminderModal() {
             <button class="sticky-nav-btn sticky-random-btn${stickyRandomMode ? ' active' : ''}" id="reminder-modal-random" title="ランダム">&#x1f500;</button>
           ` : ""}
         </div>
-        <div class="reminder-modal-buttons">
-          <button class="btn btn-danger btn-sm" id="reminder-modal-delete">🗑 削除</button>
-          <button class="btn btn-primary btn-sm" id="reminder-modal-save">保存</button>
-        </div>
+        <div class="reminder-modal-buttons" id="reminder-modal-buttons"></div>
       </div>
     </div>
   `;
   document.body.appendChild(overlay);
 
   renderReminderModalContent();
+  renderReminderModalButtons();
 
   // × ボタン
   document.getElementById("reminder-modal-close")?.addEventListener("click", () => {
-    autoSaveModalEdit();
     closeReminderModal();
   });
 
   // 背景クリック
   overlay.addEventListener("click", (e) => {
     if (e.target === overlay) {
-      autoSaveModalEdit();
       closeReminderModal();
     }
   });
 
   // ESC キー
   reminderModalKeyHandler = (e) => {
-    if (e.key === "Escape") {
-      autoSaveModalEdit();
+    if (e.key !== "Escape") return;
+    if (reminderModalEditing) {
+      // 編集中は ESC で編集をキャンセル（破棄）
+      reminderModalEditing = false;
+      renderReminderModalContent();
+      renderReminderModalButtons();
+    } else {
       closeReminderModal();
     }
   };
   document.addEventListener("keydown", reminderModalKeyHandler);
 
-  // 削除
-  document.getElementById("reminder-modal-delete")?.addEventListener("click", () => {
-    const list = getDisplayReminders();
-    const target = list[stickyCurrentIndex];
-    if (!target) return;
-    if (!confirm("このメモを削除しますか？")) return;
-    const remaining = getReminders().filter((r) => r.id !== target.id);
-    saveReminders(remaining);
-    if (remaining.length === 0) {
-      closeReminderModal();
-      refreshStickyNotes();
-      return;
-    }
-    if (stickyCurrentIndex >= getDisplayReminders().length) {
-      stickyCurrentIndex = Math.max(0, getDisplayReminders().length - 1);
-    }
-    refreshStickyNotes();
-    renderReminderModalContent();
-  });
-
-  // 保存
-  document.getElementById("reminder-modal-save")?.addEventListener("click", () => {
-    autoSaveModalEdit();
-    showToast("保存しました", "success");
-  });
-
   // ナビ
   document.getElementById("reminder-modal-prev")?.addEventListener("click", () => {
-    autoSaveModalEdit();
     navigateSticky(-1);
     renderReminderModalContent();
   });
   document.getElementById("reminder-modal-next")?.addEventListener("click", () => {
-    autoSaveModalEdit();
     navigateSticky(1);
     renderReminderModalContent();
   });
@@ -896,11 +871,6 @@ function openReminderModal() {
     const boardRandomBtn = document.getElementById("sticky-random");
     if (boardRandomBtn) boardRandomBtn.classList.toggle("active", stickyRandomMode);
   });
-
-  // textarea にフォーカス
-  setTimeout(() => {
-    document.getElementById("reminder-modal-textarea")?.focus();
-  }, 50);
 }
 
 function renderReminderModalContent() {
@@ -913,11 +883,33 @@ function renderReminderModalContent() {
   const target = reminders[stickyCurrentIndex];
   if (!target) return;
 
-  const textarea = document.getElementById("reminder-modal-textarea");
-  if (textarea) {
-    textarea.value = target.text;
-    textarea.dataset.id = target.id;
-    textarea.dataset.original = target.text;
+  const body = document.getElementById("reminder-modal-body");
+  if (body) {
+    if (reminderModalEditing) {
+      body.innerHTML = `<textarea class="reminder-modal-textarea" id="reminder-modal-textarea" rows="8"></textarea>`;
+      const ta = document.getElementById("reminder-modal-textarea");
+      if (ta) {
+        ta.value = target.text;
+        ta.dataset.id = target.id;
+        ta.dataset.original = target.text;
+        setTimeout(() => {
+          ta.focus();
+          ta.setSelectionRange(ta.value.length, ta.value.length);
+        }, 30);
+      }
+    } else {
+      body.innerHTML = `<div class="reminder-modal-text" id="reminder-modal-text" data-id="${escapeHTML(target.id)}"></div>`;
+      const textEl = document.getElementById("reminder-modal-text");
+      if (textEl) {
+        textEl.textContent = target.text;
+        textEl.title = "クリックで次へ";
+        textEl.addEventListener("click", () => {
+          if (reminders.length <= 1) return;
+          navigateSticky(1);
+          renderReminderModalContent();
+        });
+      }
+    }
   }
 
   const dateEl = document.getElementById("reminder-modal-date");
@@ -927,7 +919,58 @@ function renderReminderModalContent() {
   if (counter) counter.textContent = `${stickyCurrentIndex + 1} / ${reminders.length}`;
 }
 
-function autoSaveModalEdit() {
+function renderReminderModalButtons() {
+  const container = document.getElementById("reminder-modal-buttons");
+  if (!container) return;
+  if (reminderModalEditing) {
+    container.innerHTML = `
+      <button class="btn btn-outline btn-sm" id="reminder-modal-cancel">キャンセル</button>
+      <button class="btn btn-primary btn-sm" id="reminder-modal-save">保存</button>
+    `;
+    document.getElementById("reminder-modal-cancel")?.addEventListener("click", () => {
+      reminderModalEditing = false;
+      renderReminderModalContent();
+      renderReminderModalButtons();
+    });
+    document.getElementById("reminder-modal-save")?.addEventListener("click", () => {
+      saveReminderModalEdit();
+      reminderModalEditing = false;
+      renderReminderModalContent();
+      renderReminderModalButtons();
+      showToast("保存しました", "success");
+    });
+  } else {
+    container.innerHTML = `
+      <button class="btn btn-danger btn-sm" id="reminder-modal-delete">🗑 削除</button>
+      <button class="btn btn-primary btn-sm" id="reminder-modal-edit">✎ 編集</button>
+    `;
+    document.getElementById("reminder-modal-edit")?.addEventListener("click", () => {
+      reminderModalEditing = true;
+      renderReminderModalContent();
+      renderReminderModalButtons();
+    });
+    document.getElementById("reminder-modal-delete")?.addEventListener("click", () => {
+      const list = getDisplayReminders();
+      const target = list[stickyCurrentIndex];
+      if (!target) return;
+      if (!confirm("このメモを削除しますか？")) return;
+      const remaining = getReminders().filter((r) => r.id !== target.id);
+      saveReminders(remaining);
+      if (remaining.length === 0) {
+        closeReminderModal();
+        refreshStickyNotes();
+        return;
+      }
+      if (stickyCurrentIndex >= getDisplayReminders().length) {
+        stickyCurrentIndex = Math.max(0, getDisplayReminders().length - 1);
+      }
+      refreshStickyNotes();
+      renderReminderModalContent();
+    });
+  }
+}
+
+function saveReminderModalEdit() {
   const textarea = document.getElementById("reminder-modal-textarea");
   if (!textarea) return;
   const id = textarea.dataset.id;
@@ -950,6 +993,7 @@ function closeReminderModal() {
     document.removeEventListener("keydown", reminderModalKeyHandler);
     reminderModalKeyHandler = null;
   }
+  reminderModalEditing = false;
 }
 
 /* ── おやすみモード ── */
