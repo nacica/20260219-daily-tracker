@@ -395,6 +395,42 @@ export const remindersApi = {
     apiFetch("/reminders", { method: "PUT", body: { items } }),
 };
 
+// ---- やりたいことリスト ----
+
+export const wishlistApi = {
+  /** 項目作成 */
+  create: (data) =>
+    apiFetch("/wishlist", { method: "POST", body: data }),
+
+  /** 一覧取得(completed=true/false でフィルタ。省略で全件) */
+  list: (completed) => {
+    const params = new URLSearchParams();
+    if (completed !== undefined && completed !== null) {
+      params.set("completed", completed ? "true" : "false");
+    }
+    const qs = params.toString();
+    return apiFetch(`/wishlist${qs ? `?${qs}` : ""}`);
+  },
+
+  /** 単一取得 */
+  get: (itemId) => apiFetch(`/wishlist/${itemId}`),
+
+  /** 更新 */
+  update: (itemId, data) =>
+    apiFetch(`/wishlist/${itemId}`, { method: "PUT", body: data }),
+
+  /** 削除 */
+  delete: (itemId) =>
+    apiFetch(`/wishlist/${itemId}`, { method: "DELETE" }),
+
+  /** 達成/未達成 マーク */
+  complete: (itemId, completed) =>
+    apiFetch(`/wishlist/${itemId}/complete`, {
+      method: "PUT",
+      body: { completed },
+    }),
+};
+
 // ---- 月次サマリー ----
 
 export const summariesApi = {

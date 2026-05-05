@@ -626,3 +626,57 @@ def delete_flashcard(card_id: str) -> bool:
         return False
     ref.delete()
     return True
+
+
+# ---- wishlist (やりたいことリスト) ----
+
+def list_wishlist(completed: Optional[bool] = None) -> list[dict]:
+    """
+    やりたいこと一覧を取得
+    completed=True で達成済みのみ、False で未達成のみ、None で全件
+    優先度高い順 → 作成日新しい順 で返す
+    """
+    db = get_db()
+    items = [doc.to_dict() for doc in db.collection("wishlist").stream()]
+    if completed is not None:
+        items = [x for x in items if bool(x.get("completed")) == completed]
+    # 優先度降順 → 作成日降順
+    items.sort(key=lambda x: x.get("created_at") or "", reverse=True)
+    items.sort(key=lambda x: x.get("priority") or 0, reverse=True)
+    return items
+
+
+def get_wishlist_item(item_id: str) -> Optional[dict]:
+    """指定IDのやりたいことを取得"""
+    db = get_db()
+    doc = db.collection("wishlist").document(item_id).get()
+    if doc.exists:
+        return doc.to_dict()
+    return None
+
+
+def create_wishlist_item(item_id: str, data: dict) -> dict:
+    """やりたいことを作成"""
+    db = get_db()
+    db.collection("wishlist").document(item_id).set(data)
+    return data
+
+
+def update_wishlist_item(item_id: str, data: dict) -> Optional[dict]:
+    """やりたいことを更新"""
+    db = get_db()
+    ref = db.collection("wishlist").document(item_id)
+    if not ref.get().exists:
+        return None
+    ref.update(data)
+    return ref.get().to_dict()
+
+
+def delete_wishlist_item(item_id: str) -> bool:
+    """やりたいことを削除"""
+    db = get_db()
+    ref = db.collection("wishlist").document(item_id)
+    if not ref.get().exists:
+        return False
+    ref.delete()
+    return True

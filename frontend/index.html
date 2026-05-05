@@ -24,14 +24,14 @@
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Klee+One&display=swap" /></noscript>
 
   <link rel="manifest" href="/manifest.json" />
-  <link rel="stylesheet" href="/css/style.css?v=20260505a" />
+  <link rel="stylesheet" href="/css/style.css?v=20260505b" />
 
   <!-- ホーム表示に必要なコアモジュールを先読み（並列 fetch で TTI を短縮） -->
-  <link rel="modulepreload" href="/js/app.js?v=20260505a" />
-  <link rel="modulepreload" href="/js/router.js?v=20260505a" />
-  <link rel="modulepreload" href="/js/api.js?v=20260505a" />
-  <link rel="modulepreload" href="/js/swipe-nav.js?v=20260505a" />
-  <link rel="modulepreload" href="/js/bedtime-timer.js?v=20260505a" />
+  <link rel="modulepreload" href="/js/app.js?v=20260505b" />
+  <link rel="modulepreload" href="/js/router.js?v=20260505b" />
+  <link rel="modulepreload" href="/js/api.js?v=20260505b" />
+  <link rel="modulepreload" href="/js/swipe-nav.js?v=20260505b" />
+  <link rel="modulepreload" href="/js/bedtime-timer.js?v=20260505b" />
 
   <!-- FOUC防止: JSモジュール読み込み前にテーマを適用 -->
   <script>
@@ -67,6 +67,15 @@
             <path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 1 1 7.072 0l-.548.547A3.374 3.374 0 0 0 14 18.469V19a2 2 0 1 1-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
           </svg>
           <span>ブレインダンプ</span>
+        </a>
+        <a class="nav-link" href="#/wishlist" data-route="/wishlist">
+          <!-- Target / wishlist icon -->
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/>
+            <circle cx="12" cy="12" r="6"/>
+            <circle cx="12" cy="12" r="2"/>
+          </svg>
+          <span>やりたい事</span>
         </a>
         <a class="nav-link" href="#/task-stats" data-route="/task-stats">
           <!-- Check-circle / task stats icon -->
@@ -281,6 +290,6 @@
   -->
 
   <!-- アプリのメインスクリプト（ES Modules） -->
-  <script type="module" src="/js/app.js?v=20260505a"></script>
+  <script type="module" src="/js/app.js?v=20260505b"></script>
 </body>
 </html>

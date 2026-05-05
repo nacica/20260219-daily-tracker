@@ -7,26 +7,27 @@
  *   - 各画面のコンポーネントはルート遷移時に動的 import（初期ロードを軽量化）
  */
 
-import { addRoute, navigate, updateNavActive } from "./router.js?v=20260505a";
-import { recordsApi, analysisApi, remindersApi } from "./api.js?v=20260505a";
-import { initSwipeNav } from "./swipe-nav.js?v=20260505a";
-import { initBedtimeTimer } from "./bedtime-timer.js?v=20260505a";
+import { addRoute, navigate, updateNavActive } from "./router.js?v=20260505b";
+import { recordsApi, analysisApi, remindersApi } from "./api.js?v=20260505b";
+import { initSwipeNav } from "./swipe-nav.js?v=20260505b";
+import { initBedtimeTimer } from "./bedtime-timer.js?v=20260505b";
 
 // ===== 動的 import ヘルパー =====
 // 各コンポーネントは初回訪問時に初めてネットワーク取得（以降は SW キャッシュから即応答）
-const loadInputForm       = () => import("./components/input-form.js?v=20260505a");
-const loadAnalysisView    = () => import("./components/analysis-view.js?v=20260505a");
-const loadHistoryList     = () => import("./components/history-list.js?v=20260505a");
-const loadWeeklyReport    = () => import("./components/weekly-report.js?v=20260505a");
-const loadSuggestions     = () => import("./components/suggestions.js?v=20260505a");
-const loadCoachingChat    = () => import("./components/coaching-chat.js?v=20260505a");
-const loadKnowledgeGraph  = () => import("./components/knowledge-graph.js?v=20260505a");
-const loadMonthlyReport   = () => import("./components/monthly-report.js?v=20260505a");
-const loadJournal         = () => import("./components/journal.js?v=20260505a");
-const loadBraindump       = () => import("./components/braindump.js?v=20260505a");
-const loadTaskStats       = () => import("./components/task-stats.js?v=20260505a");
-const loadFlashcardList   = () => import("./components/flashcard-list.js?v=20260505a");
-const loadFlashcardStudy  = () => import("./components/flashcard-study.js?v=20260505a");
+const loadInputForm       = () => import("./components/input-form.js?v=20260505b");
+const loadAnalysisView    = () => import("./components/analysis-view.js?v=20260505b");
+const loadHistoryList     = () => import("./components/history-list.js?v=20260505b");
+const loadWeeklyReport    = () => import("./components/weekly-report.js?v=20260505b");
+const loadSuggestions     = () => import("./components/suggestions.js?v=20260505b");
+const loadCoachingChat    = () => import("./components/coaching-chat.js?v=20260505b");
+const loadKnowledgeGraph  = () => import("./components/knowledge-graph.js?v=20260505b");
+const loadMonthlyReport   = () => import("./components/monthly-report.js?v=20260505b");
+const loadJournal         = () => import("./components/journal.js?v=20260505b");
+const loadBraindump       = () => import("./components/braindump.js?v=20260505b");
+const loadTaskStats       = () => import("./components/task-stats.js?v=20260505b");
+const loadFlashcardList   = () => import("./components/flashcard-list.js?v=20260505b");
+const loadFlashcardStudy  = () => import("./components/flashcard-study.js?v=20260505b");
+const loadWishlist        = () => import("./components/wishlist.js?v=20260505b");
 
 // ===== ユーティリティ =====
 
@@ -63,6 +64,7 @@ const ROUTE_TITLES = {
   "/braindump": { title: "ブレインダンプ", breadcrumb: "頭の整理メモ" },
   "/task-stats": { title: "タスク実績", breadcrumb: "タスク実績" },
   "/flashcards": { title: "単語帳", breadcrumb: "単語帳カード" },
+  "/wishlist": { title: "やりたいことリスト", breadcrumb: "Wishlist" },
 };
 
 /** デスクトップヘッダーのタイトルと日付を更新 */
@@ -618,6 +620,7 @@ addRoute("/braindump", async () => (await loadBraindump()).renderBraindump());
 addRoute("/task-stats", async () => (await loadTaskStats()).renderTaskStats());
 addRoute("/flashcards", async () => (await loadFlashcardList()).renderFlashcardList());
 addRoute("/flashcards/study", async () => (await loadFlashcardStudy()).renderFlashcardStudy());
+addRoute("/wishlist", async () => (await loadWishlist()).renderWishlist());
 
 // ===== 初期化 =====
 

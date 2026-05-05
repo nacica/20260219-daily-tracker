@@ -7383,3 +7383,495 @@ main.swipe-enter-right {
     justify-content: flex-end;
   }
 }
+
+/* ===== やりたいことリスト ===== */
+.wishlist-page {
+  padding: 0 0 80px;
+}
+.wl-header {
+  margin-bottom: var(--gap);
+}
+.wl-title {
+  font-size: 1.4rem;
+  font-weight: 700;
+  margin: 0 0 4px;
+  color: var(--text-primary);
+}
+.wl-subtitle {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.wl-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: var(--gap) 0;
+  flex-wrap: wrap;
+}
+.wl-tabs {
+  display: inline-flex;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 3px;
+  gap: 2px;
+}
+.wl-tab {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  padding: 8px 16px;
+  border-radius: var(--radius-xs);
+  font-size: 0.88rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.wl-tab:hover {
+  color: var(--text-primary);
+}
+.wl-tab.active {
+  background: var(--bg-card);
+  color: var(--text-primary);
+  box-shadow: 0 0 0 1px var(--border-bright);
+}
+
+.wl-view-toggle {
+  display: inline-flex;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 3px;
+  gap: 2px;
+}
+.wl-view-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  width: 36px;
+  height: 32px;
+  border-radius: var(--radius-xs);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, color 0.15s;
+}
+.wl-view-btn:hover {
+  color: var(--text-primary);
+}
+.wl-view-btn.active {
+  background: var(--bg-card);
+  color: var(--text-primary);
+  box-shadow: 0 0 0 1px var(--border-bright);
+}
+
+.wl-add-btn {
+  width: 100%;
+  margin-bottom: var(--gap);
+}
+
+.wl-empty {
+  padding: 48px 16px;
+  text-align: center;
+}
+.wl-empty .icon {
+  font-size: 3rem;
+  margin-bottom: 12px;
+}
+.wl-empty p {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+/* --- カード表示 --- */
+.wl-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 14px;
+}
+.wl-card {
+  position: relative;
+  background: var(--bg-card);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s;
+}
+.wl-card:hover {
+  border-color: var(--border-bright);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.18);
+}
+.wl-card-done {
+  opacity: 0.72;
+}
+.wl-card-image {
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  background: var(--bg-secondary);
+  overflow: hidden;
+}
+.wl-card-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.wl-card-body {
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1;
+}
+.wl-card-row-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+.wl-card-title {
+  font-size: 1rem;
+  font-weight: 700;
+  margin: 0;
+  color: var(--text-primary);
+  word-break: break-word;
+}
+.wl-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+}
+.wl-card-notes {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: var(--bg-secondary);
+  padding: 8px 10px;
+  border-radius: var(--radius-xs);
+  max-height: 100px;
+  overflow-y: auto;
+}
+.wl-card-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: auto;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+/* --- リスト表示 --- */
+.wl-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.wl-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  transition: border-color 0.15s;
+}
+.wl-row:hover {
+  border-color: var(--border-bright);
+}
+.wl-row-done {
+  opacity: 0.7;
+}
+.wl-row-thumb {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-xs);
+  overflow: hidden;
+  background: var(--bg-secondary);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.wl-row-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.wl-row-thumb-placeholder {
+  font-size: 1.4rem;
+}
+.wl-row-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.wl-row-line1 {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+.wl-row-title {
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: 0.95rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.wl-row-line2 {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+.wl-row-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+/* --- カテゴリ・コスト・タグ --- */
+.wl-category-tag {
+  display: inline-block;
+  padding: 2px 8px;
+  font-size: 0.72rem;
+  background: rgba(99, 102, 241, 0.18);
+  color: #a5b4fc;
+  border-radius: 999px;
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  font-weight: 500;
+}
+:root[data-theme="light"] .wl-category-tag {
+  background: rgba(99, 102, 241, 0.12);
+  color: #4f46e5;
+  border-color: rgba(99, 102, 241, 0.25);
+}
+.wl-meta-tag {
+  display: inline-block;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+.wl-cost {
+  font-weight: 700;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+}
+.wl-row-line2 .wl-cost {
+  font-size: 0.82rem;
+}
+.wl-completed-date {
+  display: inline-block;
+  padding: 2px 8px;
+  font-size: 0.72rem;
+  background: rgba(34, 197, 94, 0.18);
+  color: #86efac;
+  border-radius: 999px;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+:root[data-theme="light"] .wl-completed-date {
+  background: rgba(34, 197, 94, 0.12);
+  color: #15803d;
+  border-color: rgba(34, 197, 94, 0.3);
+}
+
+.wl-ref-link {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  text-decoration: none;
+  margin-right: auto;
+}
+.wl-ref-link:hover {
+  text-decoration: underline;
+  color: var(--text-primary);
+}
+
+/* --- ★ 優先度 --- */
+.wl-stars {
+  display: inline-flex;
+  gap: 1px;
+  align-items: center;
+}
+.wl-star {
+  font-size: 1rem;
+  line-height: 1;
+  color: #4b5563;
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: default;
+}
+.wl-star-on {
+  color: #fbbf24;
+}
+.wl-stars-input .wl-star {
+  cursor: pointer;
+  font-size: 1.6rem;
+  padding: 2px 4px;
+  transition: transform 0.1s;
+}
+.wl-stars-input .wl-star:hover {
+  transform: scale(1.15);
+}
+.wl-stars-sm .wl-star {
+  font-size: 0.85rem;
+}
+
+/* --- チェックボタン(達成切替) --- */
+.wl-check-btn {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid var(--border-bright);
+  background: rgba(0, 0, 0, 0.45);
+  color: #86efac;
+  font-size: 0.95rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 2;
+  transition: background 0.15s, transform 0.15s;
+  backdrop-filter: blur(6px);
+}
+.wl-check-btn:hover {
+  background: rgba(34, 197, 94, 0.35);
+  transform: scale(1.08);
+}
+.wl-card-done .wl-check-btn {
+  background: rgba(34, 197, 94, 0.7);
+  color: #fff;
+  border-color: rgba(34, 197, 94, 0.9);
+}
+.wl-check-btn-row {
+  position: static;
+  flex-shrink: 0;
+}
+.wl-row-done .wl-check-btn-row {
+  background: rgba(34, 197, 94, 0.7);
+  color: #fff;
+  border-color: rgba(34, 197, 94, 0.9);
+}
+:root[data-theme="light"] .wl-check-btn {
+  background: rgba(255, 255, 255, 0.85);
+  color: #15803d;
+  border-color: rgba(34, 197, 94, 0.5);
+}
+
+/* --- アクションボタン --- */
+.wl-action-btn {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  padding: 4px 10px;
+  font-size: 0.78rem;
+  border-radius: var(--radius-xs);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.wl-action-btn:hover {
+  color: var(--text-primary);
+  border-color: var(--border-bright);
+}
+.wl-action-danger:hover {
+  color: #fca5a5;
+  border-color: rgba(248, 113, 113, 0.4);
+}
+
+/* --- フォーム --- */
+.wl-form {
+  margin-bottom: var(--gap);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.wl-form-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+.wl-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.wl-field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.wl-field-label {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+.wl-required {
+  color: #fca5a5;
+}
+.wl-field input[type="text"],
+.wl-field input[type="number"],
+.wl-field input[type="url"],
+.wl-field textarea {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  padding: 8px 10px;
+  border-radius: var(--radius-xs);
+  font-size: 0.9rem;
+  font-family: inherit;
+  width: 100%;
+  box-sizing: border-box;
+}
+.wl-field input:focus,
+.wl-field textarea:focus {
+  outline: none;
+  border-color: var(--border-bright);
+}
+.wl-field textarea {
+  resize: vertical;
+  min-height: 60px;
+}
+.wl-form-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+
+@media (max-width: 600px) {
+  .wl-field-row {
+    grid-template-columns: 1fr;
+  }
+  .wl-card-grid {
+    grid-template-columns: 1fr;
+  }
+  .wl-controls {
+    gap: 8px;
+  }
+  .wl-tab {
+    padding: 7px 12px;
+    font-size: 0.82rem;
+  }
+  .wl-row-actions {
+    flex-direction: column;
+  }
+}
