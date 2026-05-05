@@ -7474,6 +7474,152 @@ main.swipe-enter-right {
   margin-bottom: var(--gap);
 }
 
+/* --- クイック追加 (タブ直下に常設) --- */
+.wl-quick-add {
+  background: var(--bg-card);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius);
+  padding: 14px 16px 12px;
+  margin-bottom: var(--gap);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.06);
+}
+:root[data-theme="dark"] .wl-quick-add {
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.25);
+}
+.wl-quick-input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.wl-quick-pen {
+  font-size: 1.15rem;
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+.wl-quick-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  border-bottom: 2px dashed var(--border);
+  color: var(--text-primary);
+  font-size: 1rem;
+  font-weight: 500;
+  padding: 8px 4px;
+  font-family: inherit;
+  min-width: 0;
+}
+.wl-quick-input::placeholder {
+  color: var(--text-secondary);
+  opacity: 0.7;
+}
+.wl-quick-input:focus {
+  outline: none;
+  border-bottom-color: var(--accent, #6366f1);
+  border-bottom-style: solid;
+}
+.wl-quick-detail {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  padding: 6px 12px;
+  font-size: 0.78rem;
+  border-radius: 999px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.wl-quick-detail:hover {
+  color: var(--text-primary);
+  border-color: var(--border-bright);
+}
+
+/* --- チップ行 --- */
+.wl-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+.wl-chip-row-verbs {
+  margin-top: 6px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border);
+}
+.wl-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  padding: 5px 10px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s, transform 0.1s;
+  font-family: inherit;
+  white-space: nowrap;
+}
+.wl-chip:hover {
+  color: var(--text-primary);
+  border-color: var(--border-bright);
+  transform: translateY(-1px);
+}
+.wl-chip-icon {
+  font-size: 0.95rem;
+  line-height: 1;
+}
+.wl-chip-cat.is-active {
+  background: var(--accent, #6366f1);
+  color: #fff;
+  border-color: var(--accent, #6366f1);
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.35);
+}
+.wl-chip-verb {
+  background: transparent;
+  border-style: dashed;
+  color: var(--text-secondary);
+  font-size: 0.76rem;
+}
+.wl-chip-verb:hover {
+  background: var(--bg-secondary);
+  border-style: solid;
+}
+
+/* --- カテゴリ別アクセント色 (CSS 変数で各カードに注入) --- */
+.wl-theme-housing  { --wl-accent: #fb7185; --wl-accent-soft: rgba(251, 113, 133, 0.14); --wl-accent-border: rgba(251, 113, 133, 0.45); }
+.wl-theme-appliance{ --wl-accent: #a78bfa; --wl-accent-soft: rgba(167, 139, 250, 0.14); --wl-accent-border: rgba(167, 139, 250, 0.45); }
+.wl-theme-hobby    { --wl-accent: #fb923c; --wl-accent-soft: rgba(251, 146, 60, 0.14);  --wl-accent-border: rgba(251, 146, 60, 0.45); }
+.wl-theme-travel   { --wl-accent: #2dd4bf; --wl-accent-soft: rgba(45, 212, 191, 0.14);  --wl-accent-border: rgba(45, 212, 191, 0.45); }
+.wl-theme-learn    { --wl-accent: #facc15; --wl-accent-soft: rgba(250, 204, 21, 0.14);  --wl-accent-border: rgba(250, 204, 21, 0.55); }
+.wl-theme-other    { --wl-accent: #94a3b8; --wl-accent-soft: rgba(148, 163, 184, 0.14); --wl-accent-border: rgba(148, 163, 184, 0.45); }
+
+/* カードに細い色帯 (上端 4px) を表示 */
+.wl-card-accent {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: var(--wl-accent, #94a3b8);
+  z-index: 1;
+}
+.wl-card[class*="wl-theme-"] {
+  border-color: var(--wl-accent-border, var(--border-card));
+}
+.wl-card[class*="wl-theme-"] .wl-category-tag {
+  background: var(--wl-accent-soft);
+  color: var(--wl-accent);
+  border-color: var(--wl-accent-border);
+}
+:root[data-theme="light"] .wl-card[class*="wl-theme-"] .wl-category-tag {
+  filter: brightness(0.85);
+}
+.wl-cat-icon {
+  margin-right: 2px;
+}
+
 .wl-empty {
   padding: 48px 16px;
   text-align: center;
@@ -7487,11 +7633,11 @@ main.swipe-enter-right {
   font-size: 0.9rem;
 }
 
-/* --- カード表示 --- */
+/* --- カード表示 (雑誌風グリッド) --- */
 .wl-card-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 14px;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 18px;
 }
 .wl-card {
   position: relative;
@@ -7501,11 +7647,54 @@ main.swipe-enter-right {
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.15s;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
 }
 .wl-card:hover {
+  border-color: var(--wl-accent-border, var(--border-bright));
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  transform: translateY(-2px);
+}
+:root[data-theme="dark"] .wl-card:hover {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+/* 末尾の「次の夢を書こう」プレースホルダーカード */
+.wl-card-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 220px;
+  background: transparent;
+  border: 2px dashed var(--border);
+  border-radius: var(--radius);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-family: inherit;
+  padding: 24px 16px;
+  transition: background 0.15s, border-color 0.15s, color 0.15s, transform 0.15s;
+}
+.wl-card-placeholder:hover {
+  background: var(--bg-secondary);
   border-color: var(--border-bright);
-  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.18);
+  color: var(--text-primary);
+  transform: translateY(-2px);
+}
+.wl-placeholder-plus {
+  font-size: 2.2rem;
+  font-weight: 300;
+  line-height: 1;
+  opacity: 0.6;
+}
+.wl-placeholder-text {
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+.wl-placeholder-hint {
+  font-size: 0.75rem;
+  opacity: 0.7;
 }
 .wl-card-done {
   opacity: 0.72;
@@ -7523,10 +7712,10 @@ main.swipe-enter-right {
   display: block;
 }
 .wl-card-body {
-  padding: 14px;
+  padding: 18px 18px 16px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
   flex: 1;
 }
 .wl-card-row-top {
@@ -7541,11 +7730,13 @@ main.swipe-enter-right {
   padding-left: 0;
 }
 .wl-card-title {
-  font-size: 1rem;
+  font-size: 1.12rem;
   font-weight: 700;
   margin: 0;
   color: var(--text-primary);
   word-break: break-word;
+  line-height: 1.4;
+  letter-spacing: 0.01em;
 }
 .wl-card-meta {
   display: flex;

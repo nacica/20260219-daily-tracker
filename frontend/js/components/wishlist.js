@@ -8,12 +8,42 @@
  * - 編集・削除メニュー(各項目)
  */
 
-import { wishlistApi } from "../api.js?v=20260505c";
-import { showToast } from "../app.js?v=20260505c";
+import { wishlistApi } from "../api.js?v=20260505d";
+import { showToast } from "../app.js?v=20260505d";
 
 const PRESET_CATEGORIES = ["住居", "家電", "趣味・ガジェット", "旅行・体験", "学び", "その他"];
 const VIEW_MODE_KEY = "wishlist_view_mode_v1"; // "card" | "list"
 const TAB_KEY = "wishlist_tab_v1";             // "active" | "done"
+
+// カテゴリごとの絵文字アイコン(チップ表示用)
+const CATEGORY_ICON = {
+  "住居": "🏠",
+  "家電": "📺",
+  "趣味・ガジェット": "🎮",
+  "旅行・体験": "✈️",
+  "学び": "📚",
+  "その他": "✨",
+};
+
+// カテゴリごとのテーマクラス(色アクセント)
+const CATEGORY_THEME_CLASS = {
+  "住居": "wl-theme-housing",
+  "家電": "wl-theme-appliance",
+  "趣味・ガジェット": "wl-theme-hobby",
+  "旅行・体験": "wl-theme-travel",
+  "学び": "wl-theme-learn",
+  "その他": "wl-theme-other",
+};
+
+// 「動詞」プリセット(クイック入力時にタイトル先頭に挿入)
+const VERB_PRESETS = [
+  { icon: "🛒", label: "買いたい" },
+  { icon: "🚶", label: "行きたい" },
+  { icon: "🎯", label: "やってみたい" },
+  { icon: "💬", label: "会いたい" },
+  { icon: "📖", label: "学びたい" },
+  { icon: "🏡", label: "住みたい" },
+];
 
 const state = {
   items: [],
@@ -22,6 +52,7 @@ const state = {
   viewMode: "card",
   editingId: null,
   formOpen: false,
+  quickCategory: "その他", // クイック追加で選択中のカテゴリ
 };
 
 // ===== ユーティリティ =====
@@ -103,10 +134,53 @@ function buildSkeleton() {
         </div>
       </div>
 
-      <button class="btn btn-primary wl-add-btn" id="wl-add-btn" type="button">＋ やりたいことを追加</button>
+      <div id="wl-quick-add-container"></div>
 
       <div id="wl-form-container"></div>
       <div id="wl-list-container" class="wl-list-container"></div>
+    </div>
+  `;
+}
+
+function renderQuickAdd() {
+  const wrap = document.getElementById("wl-quick-add-container");
+  if (!wrap) return;
+  if (state.tab !== "active") {
+    wrap.innerHTML = "";
+    return;
+  }
+  wrap.innerHTML = buildQuickAddHTML();
+  attachQuickAddEvents();
+}
+
+function buildQuickAddHTML() {
+  const catChips = PRESET_CATEGORIES.map((c) => {
+    const active = c === state.quickCategory ? " is-active" : "";
+    const icon = CATEGORY_ICON[c] || "✨";
+    return `<button type="button" class="wl-chip wl-chip-cat${active}" data-quick-cat="${escapeAttr(c)}">
+      <span class="wl-chip-icon">${icon}</span>${escapeHtml(c)}
+    </button>`;
+  }).join("");
+
+  const verbChips = VERB_PRESETS.map((v) => `
+    <button type="button" class="wl-chip wl-chip-verb" data-quick-verb="${escapeAttr(v.label)}">
+      <span class="wl-chip-icon">${v.icon}</span>${escapeHtml(v.label)}
+    </button>
+  `).join("");
+
+  return `
+    <div class="wl-quick-add" id="wl-quick-add">
+      <div class="wl-quick-input-row">
+        <span class="wl-quick-pen" aria-hidden="true">✏️</span>
+        <input type="text" id="wl-quick-input" class="wl-quick-input"
+               maxlength="200"
+               placeholder="思いついたやりたいことを書いて Enter…" />
+        <button type="button" class="wl-quick-detail" id="wl-quick-detail" title="詳細を入力して追加">
+          詳細 ▾
+        </button>
+      </div>
+      <div class="wl-chip-row" id="wl-quick-cats">${catChips}</div>
+      <div class="wl-chip-row wl-chip-row-verbs">${verbChips}</div>
     </div>
   `;
 }
@@ -115,27 +189,48 @@ function renderList() {
   const container = document.getElementById("wl-list-container");
   if (!container) return;
 
+  const isActive = state.tab === "active";
+
   if (state.items.length === 0) {
-    container.innerHTML = `
-      <div class="empty-state wl-empty">
-        <div class="icon">${state.tab === "active" ? "🎯" : "🏆"}</div>
-        <p>${state.tab === "active"
-            ? "まだ何も登録されていません。<br>欲しい物や行きたい場所を書き出してみましょう。"
-            : "まだ達成済みの項目はありません。"}</p>
-      </div>`;
+    if (isActive && state.viewMode === "card") {
+      // 0件 でもクイック追加への導線として点線カードを 1 枚出す
+      container.innerHTML = `<div class="wl-card-grid">${buildPlaceholderCardHTML()}</div>`;
+    } else {
+      container.innerHTML = `
+        <div class="empty-state wl-empty">
+          <div class="icon">${isActive ? "🎯" : "🏆"}</div>
+          <p>${isActive
+              ? "まだ何も登録されていません。<br>上の入力欄に思いついたものを書いてみましょう。"
+              : "まだ達成済みの項目はありません。"}</p>
+        </div>`;
+    }
     return;
   }
 
   if (state.viewMode === "card") {
-    container.innerHTML = `<div class="wl-card-grid">${state.items.map(buildCardHTML).join("")}</div>`;
+    const cards = state.items.map(buildCardHTML).join("");
+    const placeholder = isActive ? buildPlaceholderCardHTML() : "";
+    container.innerHTML = `<div class="wl-card-grid">${cards}${placeholder}</div>`;
   } else {
     container.innerHTML = `<div class="wl-list">${state.items.map(buildRowHTML).join("")}</div>`;
   }
 }
 
+function buildPlaceholderCardHTML() {
+  return `
+    <button type="button" class="wl-card-placeholder" id="wl-placeholder-card" aria-label="新しいやりたいことを追加">
+      <div class="wl-placeholder-plus">＋</div>
+      <div class="wl-placeholder-text">ここに次の夢を書こう</div>
+      <div class="wl-placeholder-hint">タップで入力欄へ</div>
+    </button>
+  `;
+}
+
 function buildCardHTML(item) {
   const cost = formatYen(item.estimated_cost);
   const completedClass = item.completed ? " wl-card-done" : "";
+  const themeClass = " " + (CATEGORY_THEME_CLASS[item.category] || "wl-theme-other");
+  const catIcon = CATEGORY_ICON[item.category] || "✨";
   const completedDate = item.completed && item.completed_at
     ? `<span class="wl-completed-date">達成: ${formatDate(item.completed_at)}</span>`
     : "";
@@ -150,7 +245,8 @@ function buildCardHTML(item) {
     : "";
 
   return `
-    <div class="wl-card${completedClass}" data-id="${escapeAttr(item.id)}">
+    <div class="wl-card${completedClass}${themeClass}" data-id="${escapeAttr(item.id)}">
+      <div class="wl-card-accent" aria-hidden="true"></div>
       <button class="wl-check-btn" data-action="toggle-complete" data-id="${escapeAttr(item.id)}"
               title="${item.completed ? "やりたいに戻す" : "達成済みにする"}"
               aria-label="${item.completed ? "やりたいに戻す" : "達成済みにする"}">
@@ -161,7 +257,9 @@ function buildCardHTML(item) {
         : ""}
       <div class="wl-card-body">
         <div class="wl-card-row-top">
-          <span class="wl-category-tag">${escapeHtml(item.category || "その他")}</span>
+          <span class="wl-category-tag">
+            <span class="wl-cat-icon">${catIcon}</span>${escapeHtml(item.category || "その他")}
+          </span>
           <div class="wl-stars">${buildStarsHTML(item.priority)}</div>
         </div>
         <h3 class="wl-card-title">${escapeHtml(item.title)}</h3>
@@ -381,16 +479,89 @@ async function loadItems() {
 
 // ===== イベント委任 =====
 
-function attachEvents() {
-  // 追加ボタン
-  document.getElementById("wl-add-btn")?.addEventListener("click", () => {
-    if (state.formOpen && !state.editingId) {
-      closeForm();
-    } else {
-      showForm(null);
-    }
+function attachQuickAddEvents() {
+  const wrap = document.getElementById("wl-quick-add");
+  if (!wrap) return;
+
+  const input = wrap.querySelector("#wl-quick-input");
+
+  // カテゴリチップ
+  wrap.querySelectorAll("[data-quick-cat]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      state.quickCategory = btn.dataset.quickCat;
+      wrap.querySelectorAll("[data-quick-cat]").forEach((b) =>
+        b.classList.toggle("is-active", b.dataset.quickCat === state.quickCategory)
+      );
+      input?.focus();
+    });
   });
 
+  // 動詞チップ → タイトル先頭に挿入
+  wrap.querySelectorAll("[data-quick-verb]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      if (!input) return;
+      const verb = btn.dataset.quickVerb;
+      const cur = input.value.trim();
+      const stripped = cur.replace(/^(買いたい|行きたい|やってみたい|会いたい|学びたい|住みたい)[::]\s*/, "");
+      input.value = `${verb}: ${stripped}`;
+      input.focus();
+      // カーソルを末尾に
+      const len = input.value.length;
+      try { input.setSelectionRange(len, len); } catch (_) {}
+    });
+  });
+
+  // Enter で即追加
+  input?.addEventListener("keydown", async (e) => {
+    if (e.key !== "Enter" || e.isComposing) return;
+    e.preventDefault();
+    await submitQuickAdd();
+  });
+
+  // 詳細ボタン → 既存の詳細フォームを開く
+  document.getElementById("wl-quick-detail")?.addEventListener("click", () => {
+    const draftTitle = (input?.value || "").trim();
+    showForm(null);
+    // 入力中のテキストを引き継ぎ
+    const titleInput = document.querySelector('#wl-form input[name="title"]');
+    if (titleInput && draftTitle) titleInput.value = draftTitle;
+    const catInput = document.querySelector('#wl-form input[name="category"]');
+    if (catInput) catInput.value = state.quickCategory || "その他";
+    titleInput?.focus();
+  });
+}
+
+async function submitQuickAdd() {
+  const input = document.getElementById("wl-quick-input");
+  if (!input) return;
+  const title = input.value.trim();
+  if (!title) {
+    input.focus();
+    return;
+  }
+  const data = {
+    title,
+    estimated_cost: null,
+    category: state.quickCategory || "その他",
+    priority: 3,
+    target_period: null,
+    notes: null,
+    image_url: null,
+    reference_url: null,
+  };
+  try {
+    await wishlistApi.create(data);
+    input.value = "";
+    showToast("追加しました ✨", "success");
+    await loadItems();
+    renderList();
+    input.focus();
+  } catch (err) {
+    showToast(`追加に失敗: ${err.message}`, "error");
+  }
+}
+
+function attachEvents() {
   // タブ切替
   document.querySelectorAll(".wl-tab").forEach((btn) => {
     btn.addEventListener("click", async () => {
@@ -402,6 +573,7 @@ function attachEvents() {
         b.classList.toggle("active", b.dataset.tab === next)
       );
       closeForm();
+      renderQuickAdd();
       await loadItems();
       renderList();
     });
@@ -421,8 +593,18 @@ function attachEvents() {
     });
   });
 
-  // 一覧内のアクション(編集/削除/達成切替)
+  // 一覧内のアクション(編集/削除/達成切替/プレースホルダー)
   document.getElementById("wl-list-container")?.addEventListener("click", async (e) => {
+    // 末尾のプレースホルダーカード → クイック入力欄にフォーカス
+    if (e.target.closest("#wl-placeholder-card")) {
+      const input = document.getElementById("wl-quick-input");
+      if (input) {
+        input.scrollIntoView({ behavior: "smooth", block: "center" });
+        setTimeout(() => input.focus(), 250);
+      }
+      return;
+    }
+
     const actionBtn = e.target.closest("[data-action]");
     if (!actionBtn) return;
     const id = actionBtn.dataset.id;
@@ -470,6 +652,7 @@ export async function renderWishlist() {
   state.editingId = null;
 
   main.innerHTML = buildSkeleton();
+  renderQuickAdd();
   await loadItems();
   renderList();
   attachEvents();
