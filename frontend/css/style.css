@@ -7534,6 +7534,11 @@ main.swipe-enter-right {
   justify-content: space-between;
   align-items: center;
   gap: 8px;
+  padding-left: 38px;
+  min-height: 28px;
+}
+.wl-card-image + .wl-card-body .wl-card-row-top {
+  padding-left: 0;
 }
 .wl-card-title {
   font-size: 1rem;
@@ -7734,16 +7739,18 @@ main.swipe-enter-right {
 /* --- チェックボタン(達成切替) --- */
 .wl-check-btn {
   position: absolute;
-  top: 8px;
-  left: 8px;
-  width: 28px;
-  height: 28px;
+  top: 10px;
+  left: 10px;
+  width: 26px;
+  height: 26px;
+  padding: 0;
   border-radius: 50%;
   border: 2px solid var(--border-bright);
   background: rgba(0, 0, 0, 0.45);
   color: #86efac;
-  font-size: 0.95rem;
+  font-size: 0.85rem;
   font-weight: 700;
+  line-height: 1;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -7751,6 +7758,7 @@ main.swipe-enter-right {
   z-index: 2;
   transition: background 0.15s, transform 0.15s;
   backdrop-filter: blur(6px);
+  flex-shrink: 0;
 }
 .wl-check-btn:hover {
   background: rgba(34, 197, 94, 0.35);
@@ -7764,6 +7772,8 @@ main.swipe-enter-right {
 .wl-check-btn-row {
   position: static;
   flex-shrink: 0;
+  width: 28px;
+  height: 28px;
 }
 .wl-row-done .wl-check-btn-row {
   background: rgba(34, 197, 94, 0.7);

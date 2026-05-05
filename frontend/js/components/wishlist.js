@@ -8,8 +8,8 @@
  * - 編集・削除メニュー(各項目)
  */
 
-import { wishlistApi } from "../api.js?v=20260505b";
-import { showToast } from "../app.js?v=20260505b";
+import { wishlistApi } from "../api.js?v=20260505c";
+import { showToast } from "../app.js?v=20260505c";
 
 const PRESET_CATEGORIES = ["住居", "家電", "趣味・ガジェット", "旅行・体験", "学び", "その他"];
 const VIEW_MODE_KEY = "wishlist_view_mode_v1"; // "card" | "list"
