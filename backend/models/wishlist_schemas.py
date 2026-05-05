@@ -20,7 +20,9 @@ class WishlistCreate(BaseModel):
     priority: int = Field(3, ge=1, le=5, description="優先度 ★1-5")
     target_period: Optional[str] = Field(None, max_length=50, description="目標時期(例: 2027年内)")
     notes: Optional[str] = Field(None, max_length=2000, description="メモ")
-    image_url: Optional[str] = Field(None, max_length=2000, description="画像URL")
+    # 画像はクリップボード貼り付けの data URL を直接受け取る
+    # Firestore 1 ドキュメント 1MB 制限内に収めるためクライアント側で ~900KB に圧縮
+    image_url: Optional[str] = Field(None, max_length=950_000, description="画像URL or data URL")
     reference_url: Optional[str] = Field(None, max_length=2000, description="参考リンク")
 
 
@@ -32,7 +34,7 @@ class WishlistUpdate(BaseModel):
     priority: Optional[int] = Field(None, ge=1, le=5)
     target_period: Optional[str] = Field(None, max_length=50)
     notes: Optional[str] = Field(None, max_length=2000)
-    image_url: Optional[str] = Field(None, max_length=2000)
+    image_url: Optional[str] = Field(None, max_length=950_000)
     reference_url: Optional[str] = Field(None, max_length=2000)
 
 

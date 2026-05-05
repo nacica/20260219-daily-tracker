@@ -8058,6 +8058,110 @@ main.swipe-enter-right {
   margin-top: 4px;
 }
 
+/* --- 画像ドロップゾーン (ペースト/D&D) --- */
+.wl-image-drop {
+  position: relative;
+  min-height: 140px;
+  background: var(--bg-input);
+  border: 2px dashed var(--border);
+  border-radius: var(--radius-xs);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.15s, background 0.15s;
+  overflow: hidden;
+}
+.wl-image-drop:hover,
+.wl-image-drop:focus {
+  border-color: var(--border-bright);
+  background: var(--bg-secondary);
+}
+.wl-image-drop.is-dragover {
+  border-color: #6366f1;
+  background: rgba(99, 102, 241, 0.08);
+}
+.wl-image-drop.is-busy {
+  pointer-events: none;
+  opacity: 0.6;
+}
+.wl-image-drop.has-image {
+  cursor: default;
+  background: #000;
+  border-style: solid;
+}
+.wl-image-drop.has-image:hover {
+  background: #000;
+}
+.wl-image-hint {
+  text-align: center;
+  padding: 16px 12px;
+  color: var(--text-secondary);
+  pointer-events: none;
+}
+.wl-image-hint-icon {
+  font-size: 1.8rem;
+  margin-bottom: 6px;
+}
+.wl-image-hint-text {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+.wl-image-hint-text kbd {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-size: 0.75rem;
+  font-family: inherit;
+  margin: 0 2px;
+}
+.wl-image-hint-sub {
+  font-size: 0.75rem;
+  margin-top: 4px;
+  opacity: 0.8;
+}
+.wl-image-file {
+  pointer-events: auto;
+  display: block;
+  margin: 8px auto 0;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  max-width: 220px;
+}
+.wl-image-preview {
+  max-width: 100%;
+  max-height: 320px;
+  display: block;
+  object-fit: contain;
+}
+.wl-image-remove {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+  backdrop-filter: blur(4px);
+  transition: background 0.15s, transform 0.15s;
+}
+.wl-image-remove:hover {
+  background: rgba(220, 38, 38, 0.85);
+  transform: scale(1.06);
+}
+
 @media (max-width: 600px) {
   .wl-field-row {
     grid-template-columns: 1fr;

@@ -8,8 +8,8 @@
  * - 編集・削除メニュー(各項目)
  */
 
-import { wishlistApi } from "../api.js?v=20260505d";
-import { showToast } from "../app.js?v=20260505d";
+import { wishlistApi } from "../api.js?v=20260505e";
+import { showToast } from "../app.js?v=20260505e";
 
 const PRESET_CATEGORIES = ["住居", "家電", "趣味・ガジェット", "旅行・体験", "学び", "その他"];
 const VIEW_MODE_KEY = "wishlist_view_mode_v1"; // "card" | "list"
@@ -360,10 +360,21 @@ function buildFormHTML(item) {
         <input type="hidden" name="priority" value="${data.priority || 3}" />
       </div>
 
-      <label class="wl-field">
-        <span class="wl-field-label">画像URL</span>
-        <input type="url" name="image_url" maxlength="2000" value="${escapeAttr(data.image_url || "")}" placeholder="https://..." />
-      </label>
+      <div class="wl-field">
+        <span class="wl-field-label">画像（コピーした画像をここに貼り付け）</span>
+        <div class="wl-image-drop ${data.image_url ? "has-image" : ""}" id="wl-image-drop" tabindex="0">
+          ${data.image_url
+            ? `<img class="wl-image-preview" src="${escapeAttr(data.image_url)}" alt="貼り付けた画像" />
+               <button type="button" class="wl-image-remove" id="wl-image-remove" aria-label="画像を削除">×</button>`
+            : `<div class="wl-image-hint">
+                 <div class="wl-image-hint-icon">🖼️</div>
+                 <div class="wl-image-hint-text">ここをクリックして <kbd>Ctrl</kbd>+<kbd>V</kbd>／ドラッグ&ドロップ</div>
+                 <div class="wl-image-hint-sub">スマホはファイルから選択 ↓</div>
+                 <input type="file" id="wl-image-file" accept="image/*" class="wl-image-file" />
+               </div>`}
+        </div>
+        <input type="hidden" name="image_url" id="wl-image-url-input" value="${escapeAttr(data.image_url || "")}" />
+      </div>
 
       <label class="wl-field">
         <span class="wl-field-label">参考リンク</span>
@@ -402,6 +413,154 @@ function closeForm() {
   if (container) container.innerHTML = "";
 }
 
+// ===== 画像ペースト/D&D + 自動圧縮 =====
+
+// Firestore 1MB ドキュメント上限を考慮し、data URL を ~900KB 以下に収める
+const IMAGE_MAX_DATA_URL_LEN = 900_000;
+const IMAGE_RESIZE_STEPS = [
+  { maxSide: 1280, quality: 0.82 },
+  { maxSide: 1024, quality: 0.78 },
+  { maxSide: 800,  quality: 0.74 },
+  { maxSide: 640,  quality: 0.7  },
+  { maxSide: 512,  quality: 0.65 },
+];
+
+async function fileToCompressedDataURL(blob) {
+  const bitmap = await createImageBitmap(blob).catch(() => null);
+  let imgEl = null;
+  let srcW, srcH;
+  if (bitmap) {
+    srcW = bitmap.width; srcH = bitmap.height;
+  } else {
+    // createImageBitmap 非対応のブラウザは <img> 経由でフォールバック
+    imgEl = await new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(blob);
+      const im = new Image();
+      im.onload = () => { URL.revokeObjectURL(url); resolve(im); };
+      im.onerror = (e) => { URL.revokeObjectURL(url); reject(e); };
+      im.src = url;
+    });
+    srcW = imgEl.naturalWidth; srcH = imgEl.naturalHeight;
+  }
+  if (!srcW || !srcH) throw new Error("画像サイズを取得できませんでした");
+
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
+
+  for (const step of IMAGE_RESIZE_STEPS) {
+    const longest = Math.max(srcW, srcH);
+    const scale = longest > step.maxSide ? step.maxSide / longest : 1;
+    const w = Math.round(srcW * scale);
+    const h = Math.round(srcH * scale);
+    canvas.width = w; canvas.height = h;
+    ctx.clearRect(0, 0, w, h);
+    if (bitmap) ctx.drawImage(bitmap, 0, 0, w, h);
+    else ctx.drawImage(imgEl, 0, 0, w, h);
+    const dataUrl = canvas.toDataURL("image/jpeg", step.quality);
+    if (dataUrl.length <= IMAGE_MAX_DATA_URL_LEN) {
+      bitmap?.close?.();
+      return dataUrl;
+    }
+  }
+  bitmap?.close?.();
+  throw new Error("画像が大きすぎます (圧縮後も上限を超えました)");
+}
+
+function attachImageDropzone(form) {
+  const drop = form.querySelector("#wl-image-drop");
+  const hidden = form.querySelector("#wl-image-url-input");
+  if (!drop || !hidden) return;
+
+  async function setImageFromBlob(blob) {
+    if (!blob || !blob.type || !blob.type.startsWith("image/")) return false;
+    drop.classList.add("is-busy");
+    try {
+      const dataUrl = await fileToCompressedDataURL(blob);
+      hidden.value = dataUrl;
+      drop.classList.remove("is-busy");
+      drop.classList.add("has-image");
+      drop.innerHTML = `
+        <img class="wl-image-preview" src="${escapeAttr(dataUrl)}" alt="貼り付けた画像" />
+        <button type="button" class="wl-image-remove" id="wl-image-remove" aria-label="画像を削除">×</button>
+      `;
+      drop.querySelector("#wl-image-remove")?.addEventListener("click", clearImage);
+      return true;
+    } catch (err) {
+      drop.classList.remove("is-busy");
+      showToast(`画像処理に失敗: ${err.message}`, "error");
+      return false;
+    }
+  }
+
+  function clearImage(e) {
+    e?.stopPropagation();
+    hidden.value = "";
+    drop.classList.remove("has-image");
+    drop.innerHTML = `
+      <div class="wl-image-hint">
+        <div class="wl-image-hint-icon">🖼️</div>
+        <div class="wl-image-hint-text">ここをクリックして <kbd>Ctrl</kbd>+<kbd>V</kbd>／ドラッグ&ドロップ</div>
+        <div class="wl-image-hint-sub">スマホはファイルから選択 ↓</div>
+        <input type="file" id="wl-image-file" accept="image/*" class="wl-image-file" />
+      </div>
+    `;
+    bindFileInput();
+  }
+
+  function bindFileInput() {
+    const fileInput = drop.querySelector("#wl-image-file");
+    if (!fileInput) return;
+    fileInput.addEventListener("change", async () => {
+      const f = fileInput.files?.[0];
+      if (f) await setImageFromBlob(f);
+    });
+  }
+  bindFileInput();
+  drop.querySelector("#wl-image-remove")?.addEventListener("click", clearImage);
+
+  // クリックでフォーカスが当たり、貼り付けを受け付けやすくする
+  drop.addEventListener("click", (e) => {
+    // ファイル input への透過クリック以外は dropzone をフォーカス
+    if (e.target === drop || e.target.classList.contains("wl-image-hint") ||
+        e.target.classList.contains("wl-image-hint-text") ||
+        e.target.classList.contains("wl-image-hint-icon") ||
+        e.target.classList.contains("wl-image-hint-sub")) {
+      drop.focus();
+    }
+  });
+
+  // フォーム全体での paste をフックして画像があれば取り込む
+  form.addEventListener("paste", async (e) => {
+    const items = e.clipboardData?.items || [];
+    for (const it of items) {
+      if (it.kind === "file" && it.type && it.type.startsWith("image/")) {
+        e.preventDefault();
+        const blob = it.getAsFile();
+        await setImageFromBlob(blob);
+        return;
+      }
+    }
+  });
+
+  // ドラッグ&ドロップ
+  ["dragenter", "dragover"].forEach((evt) =>
+    drop.addEventListener(evt, (e) => {
+      e.preventDefault(); e.stopPropagation();
+      drop.classList.add("is-dragover");
+    })
+  );
+  ["dragleave", "drop"].forEach((evt) =>
+    drop.addEventListener(evt, (e) => {
+      e.preventDefault(); e.stopPropagation();
+      drop.classList.remove("is-dragover");
+    })
+  );
+  drop.addEventListener("drop", async (e) => {
+    const f = e.dataTransfer?.files?.[0];
+    if (f) await setImageFromBlob(f);
+  });
+}
+
 function attachFormEvents() {
   const form = document.getElementById("wl-form");
   if (!form) return;
@@ -422,6 +581,9 @@ function attachFormEvents() {
   }
 
   document.getElementById("wl-form-cancel")?.addEventListener("click", closeForm);
+
+  // 画像ドロップゾーン (貼り付け / D&D / ファイル選択)
+  attachImageDropzone(form);
 
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
