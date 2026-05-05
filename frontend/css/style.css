@@ -7862,6 +7862,10 @@ main.swipe-enter-right {
   font-size: 0.78rem;
   color: var(--text-secondary);
 }
+.wl-created-at {
+  opacity: 0.75;
+  font-size: 0.74rem;
+}
 .wl-cost {
   font-weight: 700;
   color: var(--text-primary);

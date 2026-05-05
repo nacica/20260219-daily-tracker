@@ -8,8 +8,8 @@
  * - 編集・削除メニュー(各項目)
  */
 
-import { wishlistApi } from "../api.js?v=20260505e";
-import { showToast } from "../app.js?v=20260505e";
+import { wishlistApi } from "../api.js?v=20260505f";
+import { showToast } from "../app.js?v=20260505f";
 
 const PRESET_CATEGORIES = ["住居", "家電", "趣味・ガジェット", "旅行・体験", "学び", "その他"];
 const VIEW_MODE_KEY = "wishlist_view_mode_v1"; // "card" | "list"
@@ -80,6 +80,13 @@ function formatDate(iso) {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "";
   return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
+}
+
+function formatDateJa(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`;
 }
 
 function buildStarsHTML(priority, interactive = false) {
@@ -243,6 +250,9 @@ function buildCardHTML(item) {
   const targetPeriod = item.target_period
     ? `<span class="wl-meta-tag">📅 ${escapeHtml(item.target_period)}</span>`
     : "";
+  const createdAt = item.created_at
+    ? `<span class="wl-meta-tag wl-created-at" title="作成日">📝 ${formatDateJa(item.created_at)}</span>`
+    : "";
 
   return `
     <div class="wl-card${completedClass}${themeClass}" data-id="${escapeAttr(item.id)}">
@@ -266,6 +276,7 @@ function buildCardHTML(item) {
         <div class="wl-card-meta">
           ${cost ? `<span class="wl-cost">${cost}</span>` : ""}
           ${targetPeriod}
+          ${createdAt}
           ${completedDate}
         </div>
         ${notes}
@@ -303,6 +314,7 @@ function buildRowHTML(item) {
           <span class="wl-category-tag">${escapeHtml(item.category || "その他")}</span>
           ${cost ? `<span class="wl-cost">${cost}</span>` : ""}
           ${item.target_period ? `<span class="wl-meta-tag">📅 ${escapeHtml(item.target_period)}</span>` : ""}
+          ${item.created_at ? `<span class="wl-meta-tag wl-created-at" title="作成日">📝 ${formatDateJa(item.created_at)}</span>` : ""}
           ${item.completed && item.completed_at ? `<span class="wl-completed-date">達成: ${formatDate(item.completed_at)}</span>` : ""}
         </div>
       </div>
