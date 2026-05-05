@@ -4,8 +4,8 @@
  * 自動保存、AIタイトル自動生成、画像貼り付け対応。
  */
 
-import { braindumpApi } from "../api.js?v=20260427d";
-import { showToast } from "../app.js?v=20260427d";
+import { braindumpApi } from "../api.js?v=20260505a";
+import { showToast } from "../app.js?v=20260505a";
 
 // ===== ユーティリティ =====
 
@@ -177,10 +177,8 @@ function renderRecentEntries() {
 // ===== イベントハンドリング =====
 
 function attachEvents() {
-  // 新しいメモボタン（テキストエリアにフォーカス）
-  document.getElementById("bd-new-btn")?.addEventListener("click", () => {
-    document.getElementById("bd-new-textarea")?.focus();
-  });
+  // 新しいメモボタン（書きかけ内容を保存してから新規モードへリセット）
+  document.getElementById("bd-new-btn")?.addEventListener("click", startNewMemo);
 
   // ページ表示時に自動フォーカス
   setTimeout(() => {
@@ -299,6 +297,25 @@ function updateHeaderForEditing(entry) {
   if (deleteBtn) deleteBtn.style.display = "";
 }
 
+async function startNewMemo() {
+  // 進行中の autosave タイマーをキャンセル（書きかけ内容は下で同期保存する）
+  if (newAutoSaveTimer) {
+    clearTimeout(newAutoSaveTimer);
+    newAutoSaveTimer = null;
+  }
+  const textarea = document.getElementById("bd-new-textarea");
+  const hasText = textarea && textarea.value.trim().length > 0;
+  const hasImages = currentImages.length > 0;
+  if (hasText || hasImages) {
+    if (editingEntryId) {
+      await autoSaveExistingEntry(editingEntryId);
+    } else {
+      await autoSaveNewEntry();
+    }
+  }
+  resetToNewMode();
+}
+
 function resetToNewMode() {
   editingEntryId = null;
   newEntryId = null;
@@ -314,9 +331,7 @@ function resetToNewMode() {
       <h2 class="braindump-title">ブレインダンプ</h2>
       <button class="btn btn-primary btn-sm" id="bd-new-btn">＋ 新しいメモ</button>
     `;
-    document.getElementById("bd-new-btn")?.addEventListener("click", () => {
-      document.getElementById("bd-new-textarea")?.focus();
-    });
+    document.getElementById("bd-new-btn")?.addEventListener("click", startNewMemo);
   }
 
   // フォーム内の削除ボタンを非表示
