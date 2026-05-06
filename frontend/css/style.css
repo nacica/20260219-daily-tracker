@@ -3161,6 +3161,7 @@ textarea {
 .sticky-edit-area {
   width: 100%;
   min-height: 60px;
+  max-height: 70vh;
   padding: 6px 8px;
   border: 1px solid var(--cyan-dim);
   border-radius: var(--radius-sm);
@@ -3170,7 +3171,9 @@ textarea {
   font-weight: var(--reminder-text-weight);
   font-family: var(--reminder-font);
   line-height: 1.4;
-  resize: vertical;
+  resize: none;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   outline: none;
 }
 
@@ -7348,7 +7351,8 @@ main.swipe-enter-right {
   display: flex;
   flex-direction: column;
   gap: 14px;
-  overflow: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   min-height: 0;
 }
 
@@ -7401,15 +7405,17 @@ main.swipe-enter-right {
 
 .reminder-modal-body {
   width: 100%;
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   min-height: 180px;
-  display: flex;
-  overflow: hidden;
+  display: block;
+  overflow: visible;
 }
 
 .reminder-modal-text {
   width: 100%;
-  flex: 1 1 auto;
+  flex: 0 1 auto;
+  min-height: 180px;
+  max-height: 70vh;
   padding: 14px 16px;
   border-radius: 10px;
   background: var(--bg-input);
@@ -7434,7 +7440,9 @@ main.swipe-enter-right {
 
 .reminder-modal-textarea {
   width: 100%;
-  flex: 1 1 auto;
+  flex: 0 0 auto;
+  min-height: 180px;
+  max-height: 70vh;
   padding: 14px 16px;
   border: 1px solid var(--cyan-dim);
   border-radius: 10px;

@@ -5,9 +5,9 @@
  * 朝のタスク整理（ソクラテス式問答）統合
  */
 
-import { recordsApi, analysisApi, morningDialogueApi, remindersApi, categoriesApi } from "../api.js?v=20260505h";
-import { showToast } from "../app.js?v=20260505h";
-import { showTaskCompleteAnimation } from "./task-stats.js?v=20260505h";
+import { recordsApi, analysisApi, morningDialogueApi, remindersApi, categoriesApi } from "../api.js?v=20260505i";
+import { showToast } from "../app.js?v=20260505i";
+import { showTaskCompleteAnimation } from "./task-stats.js?v=20260505i";
 
 /* ── カテゴリ管理 ── */
 
@@ -543,6 +543,13 @@ function saveReminderStyle(style) {
 // モジュール読み込み時に保存済みスタイルを反映
 applyReminderStyle();
 
+/** textarea を内容に合わせて自動リサイズする（max-height は CSS 側で制御）。 */
+function autoResizeTextarea(ta) {
+  if (!ta) return;
+  ta.style.height = "auto";
+  ta.style.height = ta.scrollHeight + "px";
+}
+
 
 function formatReminderDate(timestamp) {
   if (!timestamp) return "";
@@ -713,6 +720,9 @@ function attachReminderEvents() {
         textarea.value = target.text;
         textEl.replaceWith(textarea);
         textarea.focus();
+        // 内容に合わせて高さを伸ばす（max-height は CSS で 70vh）
+        autoResizeTextarea(textarea);
+        textarea.addEventListener("input", () => autoResizeTextarea(textarea));
 
         // 編集ボタンを「保存」に変更
         editBtn.innerHTML = "&#10003;";
@@ -1040,9 +1050,12 @@ function renderReminderModalContent() {
         ta.value = target.text;
         ta.dataset.id = target.id;
         ta.dataset.original = target.text;
+        autoResizeTextarea(ta);
+        ta.addEventListener("input", () => autoResizeTextarea(ta));
         setTimeout(() => {
           ta.focus();
           ta.setSelectionRange(ta.value.length, ta.value.length);
+          autoResizeTextarea(ta);
         }, 30);
       }
     } else {
