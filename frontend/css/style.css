@@ -54,6 +54,12 @@
   /* Typography */
   --font: 'Space Grotesk', 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
 
+  /* Reminder body text (今日意識すること) — adjustable via gear panel */
+  --reminder-font: "Yu Gothic Medium", "游ゴシック Medium", YuGothic, "Yu Gothic", "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, sans-serif;
+  --reminder-text-size: 18px;
+  --reminder-modal-text-size: 23px;
+  --reminder-text-weight: 700;
+
   /* Layout */
   --radius: 16px;
   --radius-sm: 10px;
@@ -2964,9 +2970,9 @@ textarea {
   border-radius: 10px;
   background: var(--bg-input);
   border: 1px solid var(--border);
-  font-size: 1.1rem;
-  font-weight: 700;
-  font-family: 'Klee One', cursive;
+  font-size: var(--reminder-text-size);
+  font-weight: var(--reminder-text-weight);
+  font-family: var(--reminder-font);
   line-height: 1.4;
   color: var(--text-primary);
   word-break: break-word;
@@ -3006,6 +3012,115 @@ textarea {
   justify-content: space-between;
   align-self: stretch;
   flex-shrink: 0;
+}
+
+/* ── 文字スタイル設定（歯車ボタン + パネル）── */
+.sticky-style-btn {
+  font-size: 14px;
+  margin-left: 4px;
+}
+
+.sticky-style-btn.active {
+  background: var(--cyan-dim);
+  border-color: var(--cyan);
+  color: var(--text-primary);
+}
+
+.sticky-style-panel {
+  position: relative;
+  margin: 0 0 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--border-bright);
+  border-radius: 10px;
+  background: var(--bg-input);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sticky-style-panel[hidden] {
+  display: none;
+}
+
+.sticky-style-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.sticky-style-label {
+  flex: 0 0 50px;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.sticky-style-controls {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.sticky-style-controls input[type="range"] {
+  flex: 1 1 auto;
+  min-width: 80px;
+}
+
+.sticky-style-stepper {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  font-size: 1rem;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+}
+
+.sticky-style-stepper:hover {
+  border-color: var(--cyan-dim);
+}
+
+.sticky-style-controls input[type="number"] {
+  width: 56px;
+  height: 28px;
+  text-align: center;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  -moz-appearance: textfield;
+}
+
+.sticky-style-controls input[type="number"]::-webkit-outer-spin-button,
+.sticky-style-controls input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.sticky-style-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.sticky-style-reset {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+.sticky-style-reset:hover {
+  color: var(--text-primary);
+  border-color: var(--cyan-dim);
 }
 
 .sticky-edit,
@@ -7298,9 +7413,9 @@ main.swipe-enter-right {
   border-radius: 10px;
   background: var(--bg-input);
   color: var(--text-primary);
-  font-size: 1.4rem;
-  font-weight: 700;
-  font-family: 'Klee One', cursive;
+  font-size: var(--reminder-modal-text-size);
+  font-weight: var(--reminder-text-weight);
+  font-family: var(--reminder-font);
   line-height: 1.6;
   white-space: pre-wrap;
   word-break: break-word;
@@ -7324,9 +7439,9 @@ main.swipe-enter-right {
   border-radius: 10px;
   background: var(--bg-input);
   color: var(--text-primary);
-  font-size: 1.4rem;
-  font-weight: 700;
-  font-family: 'Klee One', cursive;
+  font-size: var(--reminder-modal-text-size);
+  font-weight: var(--reminder-text-weight);
+  font-family: var(--reminder-font);
   line-height: 1.6;
   resize: none;
   box-sizing: border-box;
@@ -7370,7 +7485,7 @@ main.swipe-enter-right {
   }
   .reminder-modal-text,
   .reminder-modal-textarea {
-    font-size: 1.2rem;
+    /* font-size はユーザー設定（--reminder-modal-text-size）を優先 */
   }
   .reminder-modal-actions {
     flex-direction: column-reverse;

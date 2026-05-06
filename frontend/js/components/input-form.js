@@ -5,9 +5,9 @@
  * 朝のタスク整理（ソクラテス式問答）統合
  */
 
-import { recordsApi, analysisApi, morningDialogueApi, remindersApi, categoriesApi } from "../api.js?v=20260505f";
-import { showToast } from "../app.js?v=20260505f";
-import { showTaskCompleteAnimation } from "./task-stats.js?v=20260505f";
+import { recordsApi, analysisApi, morningDialogueApi, remindersApi, categoriesApi } from "../api.js?v=20260505g";
+import { showToast } from "../app.js?v=20260505g";
+import { showTaskCompleteAnimation } from "./task-stats.js?v=20260505g";
 
 /* ── カテゴリ管理 ── */
 
@@ -497,6 +497,52 @@ async function syncRemindersFromServer() {
   }
 }
 
+/* ── 文字スタイル設定（サイズ・太さ）── */
+const REMINDER_STYLE_KEY = "reminder-text-style";
+const REMINDER_STYLE_DEFAULT = { size: 18, weight: 700 };
+const REMINDER_STYLE_LIMITS = { sizeMin: 12, sizeMax: 32, weightMin: 300, weightMax: 900 };
+let stickyStylePanelOpen = false;
+
+function clampNum(v, min, max) {
+  v = Number(v);
+  if (!Number.isFinite(v)) return min;
+  return Math.min(max, Math.max(min, v));
+}
+
+function getReminderStyle() {
+  try {
+    const raw = localStorage.getItem(REMINDER_STYLE_KEY);
+    if (!raw) return { ...REMINDER_STYLE_DEFAULT };
+    const obj = JSON.parse(raw) || {};
+    return {
+      size: clampNum(obj.size ?? REMINDER_STYLE_DEFAULT.size, REMINDER_STYLE_LIMITS.sizeMin, REMINDER_STYLE_LIMITS.sizeMax),
+      weight: clampNum(obj.weight ?? REMINDER_STYLE_DEFAULT.weight, REMINDER_STYLE_LIMITS.weightMin, REMINDER_STYLE_LIMITS.weightMax),
+    };
+  } catch {
+    return { ...REMINDER_STYLE_DEFAULT };
+  }
+}
+
+function applyReminderStyle(style) {
+  const s = style || getReminderStyle();
+  const root = document.documentElement;
+  root.style.setProperty("--reminder-text-size", `${s.size}px`);
+  root.style.setProperty("--reminder-modal-text-size", `${Math.round(s.size * 1.3)}px`);
+  root.style.setProperty("--reminder-text-weight", String(s.weight));
+}
+
+function saveReminderStyle(style) {
+  try {
+    localStorage.setItem(REMINDER_STYLE_KEY, JSON.stringify(style));
+  } catch {
+    // localStorage が使えなくても表示反映は行う
+  }
+  applyReminderStyle(style);
+}
+
+// モジュール読み込み時に保存済みスタイルを反映
+applyReminderStyle();
+
 
 function formatReminderDate(timestamp) {
   if (!timestamp) return "";
@@ -508,6 +554,35 @@ function formatReminderDate(timestamp) {
   const h = d.getHours().toString().padStart(2, "0");
   const min = d.getMinutes().toString().padStart(2, "0");
   return `${m}/${day}(${w}) ${h}:${min}`;
+}
+
+function buildStyleSettingsPanelHTML() {
+  const s = getReminderStyle();
+  const { sizeMin, sizeMax, weightMin, weightMax } = REMINDER_STYLE_LIMITS;
+  const hidden = stickyStylePanelOpen ? "" : " hidden";
+  return `<div class="sticky-style-panel" id="sticky-style-panel"${hidden}>
+    <div class="sticky-style-row">
+      <label class="sticky-style-label" for="sticky-style-size-range">サイズ</label>
+      <div class="sticky-style-controls">
+        <input type="range" id="sticky-style-size-range" min="${sizeMin}" max="${sizeMax}" step="1" value="${s.size}">
+        <button class="sticky-style-stepper" data-target="size" data-step="-1" type="button">&minus;</button>
+        <input type="number" id="sticky-style-size-number" min="${sizeMin}" max="${sizeMax}" step="1" value="${s.size}">
+        <button class="sticky-style-stepper" data-target="size" data-step="1" type="button">&plus;</button>
+      </div>
+    </div>
+    <div class="sticky-style-row">
+      <label class="sticky-style-label" for="sticky-style-weight-range">太さ</label>
+      <div class="sticky-style-controls">
+        <input type="range" id="sticky-style-weight-range" min="${weightMin}" max="${weightMax}" step="100" value="${s.weight}">
+        <button class="sticky-style-stepper" data-target="weight" data-step="-100" type="button">&minus;</button>
+        <input type="number" id="sticky-style-weight-number" min="${weightMin}" max="${weightMax}" step="100" value="${s.weight}">
+        <button class="sticky-style-stepper" data-target="weight" data-step="100" type="button">&plus;</button>
+      </div>
+    </div>
+    <div class="sticky-style-actions">
+      <button class="sticky-style-reset" id="sticky-style-reset" type="button">デフォルトに戻す</button>
+    </div>
+  </div>`;
 }
 
 function buildStickyNoteHTML(r, activeClass = "") {
@@ -543,6 +618,7 @@ function buildReminderBoardHTML() {
   }).join("");
 
   const randomActiveClass = stickyRandomMode ? " active" : "";
+  const styleActiveClass = stickyStylePanelOpen ? " active" : "";
   const navHTML = reminders.length >= 1
     ? `<div class="sticky-nav">
         ${reminders.length > 1 ? `
@@ -552,6 +628,7 @@ function buildReminderBoardHTML() {
           <button class="sticky-nav-btn sticky-random-btn${randomActiveClass}" id="sticky-random" title="ランダム">&#x1f500;</button>
         ` : ""}
         <button class="sticky-nav-btn sticky-expand-btn" id="sticky-expand" title="拡大表示">&#x1f50d;</button>
+        <button class="sticky-nav-btn sticky-style-btn${styleActiveClass}" id="sticky-style-btn" title="文字スタイル">&#x2699;&#xfe0f;</button>
       </div>`
     : "";
 
@@ -560,6 +637,7 @@ function buildReminderBoardHTML() {
       <div class="card-drag-handle" title="ドラッグで移動">⠿</div>
       <div class="card-title">今日意識すること</div>
       ${navHTML}
+      ${buildStyleSettingsPanelHTML()}
       <div class="sticky-notes" id="sticky-notes">
         ${notesHTML || '<p class="sticky-empty">まだメモがありません。<br>下から追加してみましょう。</p>'}
       </div>
@@ -672,8 +750,70 @@ function attachReminderEvents() {
   // ◀ ▶ ボタン
   attachStickyNavEvents();
 
+  // 文字スタイル設定パネル
+  attachStyleSettingsEvents();
+
   // スワイプ対応
   attachStickySwipeEvents();
+}
+
+function attachStyleSettingsEvents() {
+  const btn = document.getElementById("sticky-style-btn");
+  const panel = document.getElementById("sticky-style-panel");
+  if (!btn || !panel) return;
+
+  btn.addEventListener("click", () => {
+    stickyStylePanelOpen = !stickyStylePanelOpen;
+    panel.hidden = !stickyStylePanelOpen;
+    btn.classList.toggle("active", stickyStylePanelOpen);
+  });
+
+  const sizeRange = document.getElementById("sticky-style-size-range");
+  const sizeNum = document.getElementById("sticky-style-size-number");
+  const wRange = document.getElementById("sticky-style-weight-range");
+  const wNum = document.getElementById("sticky-style-weight-number");
+  const resetBtn = document.getElementById("sticky-style-reset");
+
+  function update(target, rawValue) {
+    const cur = getReminderStyle();
+    const limits = REMINDER_STYLE_LIMITS;
+    if (target === "size") {
+      cur.size = clampNum(rawValue, limits.sizeMin, limits.sizeMax);
+      if (sizeRange) sizeRange.value = String(cur.size);
+      if (sizeNum) sizeNum.value = String(cur.size);
+    } else if (target === "weight") {
+      // step 100 に丸める
+      const w = Math.round(clampNum(rawValue, limits.weightMin, limits.weightMax) / 100) * 100;
+      cur.weight = clampNum(w, limits.weightMin, limits.weightMax);
+      if (wRange) wRange.value = String(cur.weight);
+      if (wNum) wNum.value = String(cur.weight);
+    }
+    saveReminderStyle(cur);
+  }
+
+  if (sizeRange) sizeRange.addEventListener("input", (e) => update("size", e.target.value));
+  if (sizeNum) sizeNum.addEventListener("input", (e) => update("size", e.target.value));
+  if (wRange) wRange.addEventListener("input", (e) => update("weight", e.target.value));
+  if (wNum) wNum.addEventListener("input", (e) => update("weight", e.target.value));
+
+  panel.querySelectorAll(".sticky-style-stepper").forEach((b) => {
+    b.addEventListener("click", () => {
+      const target = b.dataset.target;
+      const step = Number(b.dataset.step) || 0;
+      const cur = getReminderStyle();
+      update(target, (target === "size" ? cur.size : cur.weight) + step);
+    });
+  });
+
+  if (resetBtn) {
+    resetBtn.addEventListener("click", () => {
+      saveReminderStyle({ ...REMINDER_STYLE_DEFAULT });
+      if (sizeRange) sizeRange.value = String(REMINDER_STYLE_DEFAULT.size);
+      if (sizeNum) sizeNum.value = String(REMINDER_STYLE_DEFAULT.size);
+      if (wRange) wRange.value = String(REMINDER_STYLE_DEFAULT.weight);
+      if (wNum) wNum.value = String(REMINDER_STYLE_DEFAULT.weight);
+    });
+  }
 }
 
 function attachStickyNavEvents() {
@@ -734,6 +874,7 @@ function refreshStickyNotes() {
   const existingNav = board.querySelector(".sticky-nav");
   if (reminders.length >= 1) {
     const randomActiveClass = stickyRandomMode ? " active" : "";
+    const styleActiveClass = stickyStylePanelOpen ? " active" : "";
     const navHTML = `<div class="sticky-nav">
       ${reminders.length > 1 ? `
         <button class="sticky-nav-btn" id="sticky-prev">&#9664;</button>
@@ -742,6 +883,7 @@ function refreshStickyNotes() {
         <button class="sticky-nav-btn sticky-random-btn${randomActiveClass}" id="sticky-random" title="ランダム">&#x1f500;</button>
       ` : ""}
       <button class="sticky-nav-btn sticky-expand-btn" id="sticky-expand" title="拡大表示">&#x1f50d;</button>
+      <button class="sticky-nav-btn sticky-style-btn${styleActiveClass}" id="sticky-style-btn" title="文字スタイル">&#x2699;&#xfe0f;</button>
     </div>`;
     if (existingNav) {
       existingNav.outerHTML = navHTML;
@@ -749,7 +891,13 @@ function refreshStickyNotes() {
       const title = board.querySelector(".card-title");
       if (title) title.insertAdjacentHTML("afterend", navHTML);
     }
+    // パネルが未生成なら追加（初回起動時に reminders 0 件 → 1件目追加 のケース）
+    if (!board.querySelector(".sticky-style-panel")) {
+      const navEl = board.querySelector(".sticky-nav");
+      if (navEl) navEl.insertAdjacentHTML("afterend", buildStyleSettingsPanelHTML());
+    }
     attachStickyNavEvents();
+    attachStyleSettingsEvents();
   } else if (existingNav) {
     existingNav.remove();
   }
