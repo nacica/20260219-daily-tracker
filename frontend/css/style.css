@@ -3166,9 +3166,9 @@ textarea {
   border-radius: var(--radius-sm);
   background: var(--bg-input);
   color: var(--text-primary);
-  font-size: 1.1rem;
-  font-weight: 700;
-  font-family: 'Klee One', cursive;
+  font-size: var(--reminder-text-size);
+  font-weight: var(--reminder-text-weight);
+  font-family: var(--reminder-font);
   line-height: 1.4;
   resize: vertical;
   outline: none;
@@ -3199,8 +3199,9 @@ textarea {
   border-radius: var(--radius-sm);
   background: var(--bg-input);
   color: var(--text-primary);
-  font-size: 0.84rem;
-  font-family: 'Klee One', cursive;
+  font-size: var(--reminder-text-size);
+  font-weight: var(--reminder-text-weight);
+  font-family: var(--reminder-font);
   outline: none;
   transition: border-color 0.2s;
   resize: none;
