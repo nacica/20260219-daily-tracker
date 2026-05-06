@@ -3124,7 +3124,9 @@ textarea {
 }
 
 .sticky-edit,
-.sticky-delete {
+.sticky-delete,
+.sticky-archive,
+.sticky-restore {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -3156,6 +3158,81 @@ textarea {
   color: #c62828;
   border-color: #c62828;
   background: rgba(198, 40, 40, 0.1);
+}
+
+.sticky-archive {
+  font-size: 0.95rem;
+}
+
+.sticky-archive:hover {
+  color: #f59e0b;
+  border-color: #f59e0b;
+  background: rgba(245, 158, 11, 0.1);
+}
+
+.sticky-restore {
+  font-size: 0.95rem;
+}
+
+.sticky-restore:hover {
+  color: #10b981;
+  border-color: #10b981;
+  background: rgba(16, 185, 129, 0.1);
+}
+
+/* ── アクティブ / アーカイブ タブ ── */
+.sticky-tabs {
+  display: flex;
+  gap: 0;
+  margin: 4px 0 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.sticky-tab {
+  flex: 1;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-muted);
+  padding: 8px 10px;
+  font-size: 0.85rem;
+  font-family: inherit;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  margin-bottom: -1px;
+}
+
+.sticky-tab:hover {
+  color: var(--text-primary);
+}
+
+.sticky-tab.active {
+  color: var(--text-primary);
+  border-bottom-color: var(--cyan);
+}
+
+.sticky-tab-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 18px;
+  padding: 0 6px;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  line-height: 1;
+}
+
+.sticky-tab.active .sticky-tab-count {
+  color: var(--cyan);
+  border-color: var(--cyan-dim);
 }
 
 .sticky-edit-area {

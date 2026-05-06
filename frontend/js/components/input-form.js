@@ -5,9 +5,9 @@
  * 朝のタスク整理（ソクラテス式問答）統合
  */
 
-import { recordsApi, analysisApi, morningDialogueApi, remindersApi, categoriesApi } from "../api.js?v=20260505i";
-import { showToast } from "../app.js?v=20260505i";
-import { showTaskCompleteAnimation } from "./task-stats.js?v=20260505i";
+import { recordsApi, analysisApi, morningDialogueApi, remindersApi, categoriesApi } from "../api.js?v=20260506a";
+import { showToast } from "../app.js?v=20260506a";
+import { showTaskCompleteAnimation } from "./task-stats.js?v=20260506a";
 
 /* ── カテゴリ管理 ── */
 
@@ -594,6 +594,9 @@ function buildStyleSettingsPanelHTML() {
 
 function buildStickyNoteHTML(r, activeClass = "") {
   const dateStr = formatReminderDate(r.createdAt);
+  const archiveActionHTML = r.archived
+    ? `<button class="sticky-restore" title="アクティブに戻す">&#x21a9;&#xfe0f;</button>`
+    : `<button class="sticky-archive" title="アーカイブ">&#x1f4e5;</button>`;
   return `<div class="sticky-note${activeClass}" data-id="${escapeHTML(r.id)}">
     <div class="sticky-note-body">
       ${dateStr ? `<div class="sticky-note-date">${dateStr}</div>` : ""}
@@ -601,6 +604,7 @@ function buildStickyNoteHTML(r, activeClass = "") {
     </div>
     <div class="sticky-actions">
       <button class="sticky-delete" title="削除">&times;</button>
+      ${archiveActionHTML}
       <button class="sticky-edit" title="編集">&#9998;</button>
     </div>
   </div>`;
@@ -609,9 +613,35 @@ function buildStickyNoteHTML(r, activeClass = "") {
 let stickyCurrentIndex = 0;
 let stickyRandomMode = false;
 
+// アクティブ / アーカイブの表示切替
+let currentReminderTab = "active"; // "active" | "archived"
+
+function getActiveReminders() {
+  return getReminders().filter((r) => !r.archived);
+}
+
+function getArchivedReminders() {
+  return getReminders().filter((r) => r.archived);
+}
+
 function getDisplayReminders() {
-  // 新しい順（createdAt 降順）で表示する。createdAt 欠損は末尾。
-  return [...getReminders()].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  // 現在のタブでフィルタしてから新しい順（createdAt 降順）で表示する。
+  const list = currentReminderTab === "archived" ? getArchivedReminders() : getActiveReminders();
+  return [...list].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+}
+
+function buildReminderTabsHTML() {
+  const activeCount = getActiveReminders().length;
+  const archivedCount = getArchivedReminders().length;
+  const isArchive = currentReminderTab === "archived";
+  return `<div class="sticky-tabs" role="tablist">
+    <button type="button" class="sticky-tab${!isArchive ? " active" : ""}" data-tab="active" role="tab" aria-selected="${!isArchive}">
+      アクティブ <span class="sticky-tab-count">${activeCount}</span>
+    </button>
+    <button type="button" class="sticky-tab${isArchive ? " active" : ""}" data-tab="archived" role="tab" aria-selected="${isArchive}">
+      アーカイブ <span class="sticky-tab-count">${archivedCount}</span>
+    </button>
+  </div>`;
 }
 
 function buildReminderBoardHTML() {
@@ -639,16 +669,22 @@ function buildReminderBoardHTML() {
       </div>`
     : "";
 
+  const isArchive = currentReminderTab === "archived";
+  const emptyHTML = isArchive
+    ? '<p class="sticky-empty">アーカイブされたメモはまだありません。</p>'
+    : '<p class="sticky-empty">まだメモがありません。<br>下から追加してみましょう。</p>';
+
   return `
     <div class="card draggable-card reminder-board-card" id="card-reminder-board" draggable="false">
       <div class="card-drag-handle" title="ドラッグで移動">⠿</div>
       <div class="card-title">今日意識すること</div>
+      ${buildReminderTabsHTML()}
       ${navHTML}
       ${buildStyleSettingsPanelHTML()}
       <div class="sticky-notes" id="sticky-notes">
-        ${notesHTML || '<p class="sticky-empty">まだメモがありません。<br>下から追加してみましょう。</p>'}
+        ${notesHTML || emptyHTML}
       </div>
-      <div class="sticky-add-area">
+      <div class="sticky-add-area" id="sticky-add-area"${isArchive ? " hidden" : ""}>
         <div class="sticky-add-row">
           <textarea id="sticky-input" class="sticky-input" placeholder="" rows="1"></textarea>
           <button class="btn btn-primary btn-sm" id="btn-add-sticky">追加</button>
@@ -658,6 +694,9 @@ function buildReminderBoardHTML() {
 }
 
 function attachReminderEvents() {
+  // タブ切替（アクティブ / アーカイブ）。入力欄が無くてもタブだけは動かしたいので addBtn ガードより前に配線。
+  attachReminderTabEvents();
+
   const addBtn = document.getElementById("btn-add-sticky");
   const input = document.getElementById("sticky-input");
   if (!addBtn || !input) return;
@@ -667,8 +706,9 @@ function attachReminderEvents() {
     const text = input.value.trim();
     if (!text) return;
     const reminders = getReminders();
-    reminders.push({ id: Date.now().toString(36), text, createdAt: Date.now() });
+    reminders.push({ id: Date.now().toString(36), text, createdAt: Date.now(), archived: false });
     saveReminders(reminders);
+    currentReminderTab = "active"; // アーカイブ閲覧中に追加した場合もアクティブへ戻す
     stickyCurrentIndex = 0; // 新規追加分は降順ソートで先頭(1/N)に来る
     refreshStickyNotes();
     input.value = "";
@@ -684,19 +724,55 @@ function attachReminderEvents() {
     input.style.height = input.scrollHeight + "px";
   });
 
-  // 削除・編集（イベント委譲）
+  // 削除・編集・アーカイブ・復元（イベント委譲）
   const container = document.getElementById("sticky-notes");
   if (container) {
     container.addEventListener("click", (e) => {
-      // 削除
+      // 削除（×）。アーカイブと取り違えないよう確認ダイアログを出す。
       const delBtn = e.target.closest(".sticky-delete");
       if (delBtn) {
         const note = delBtn.closest(".sticky-note");
         if (!note) return;
         const id = note.dataset.id;
+        if (!confirm("このメモを完全に削除しますか？\n（アーカイブで残したい場合はキャンセルして 📥 ボタンを使ってください）")) return;
         const reminders = getReminders().filter((r) => r.id !== id);
         saveReminders(reminders);
-        if (stickyCurrentIndex >= reminders.length) stickyCurrentIndex = Math.max(0, reminders.length - 1);
+        const dispLen = getDisplayReminders().length;
+        if (stickyCurrentIndex >= dispLen) stickyCurrentIndex = Math.max(0, dispLen - 1);
+        refreshStickyNotes();
+        return;
+      }
+
+      // アーカイブ
+      const archBtn = e.target.closest(".sticky-archive");
+      if (archBtn) {
+        const note = archBtn.closest(".sticky-note");
+        if (!note) return;
+        const id = note.dataset.id;
+        const reminders = getReminders();
+        const target = reminders.find((r) => r.id === id);
+        if (!target) return;
+        target.archived = true;
+        saveReminders(reminders);
+        const dispLen = getDisplayReminders().length;
+        if (stickyCurrentIndex >= dispLen) stickyCurrentIndex = Math.max(0, dispLen - 1);
+        refreshStickyNotes();
+        return;
+      }
+
+      // 復元（アーカイブ → アクティブ）
+      const restoreBtn = e.target.closest(".sticky-restore");
+      if (restoreBtn) {
+        const note = restoreBtn.closest(".sticky-note");
+        if (!note) return;
+        const id = note.dataset.id;
+        const reminders = getReminders();
+        const target = reminders.find((r) => r.id === id);
+        if (!target) return;
+        target.archived = false;
+        saveReminders(reminders);
+        const dispLen = getDisplayReminders().length;
+        if (stickyCurrentIndex >= dispLen) stickyCurrentIndex = Math.max(0, dispLen - 1);
         refreshStickyNotes();
         return;
       }
@@ -840,9 +916,24 @@ function attachStickyNavEvents() {
   if (expandBtn) expandBtn.addEventListener("click", openReminderModal);
 }
 
+function attachReminderTabEvents() {
+  const board = document.getElementById("card-reminder-board");
+  if (!board) return;
+  board.querySelectorAll(".sticky-tab").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const tab = btn.dataset.tab;
+      if (!tab || tab === currentReminderTab) return;
+      currentReminderTab = tab;
+      stickyCurrentIndex = 0;
+      refreshStickyNotes();
+    });
+  });
+}
+
 function navigateSticky(delta) {
-  const reminders = getReminders();
+  const reminders = getDisplayReminders();
   const len = reminders.length;
+  if (len === 0) return;
   if (stickyRandomMode && len > 1) {
     let next;
     do { next = Math.floor(Math.random() * len); } while (next === stickyCurrentIndex);
@@ -875,10 +966,25 @@ function showStickyAtIndex() {
 function refreshStickyNotes() {
   const board = document.getElementById("card-reminder-board");
   if (!board) return;
-  const reminders = getReminders();
+  const reminders = getDisplayReminders();
 
   // インデックス補正
   if (stickyCurrentIndex >= reminders.length) stickyCurrentIndex = Math.max(0, reminders.length - 1);
+
+  // タブ更新（カウント表示と active 状態）
+  const existingTabs = board.querySelector(".sticky-tabs");
+  const tabsHTML = buildReminderTabsHTML();
+  if (existingTabs) {
+    existingTabs.outerHTML = tabsHTML;
+  } else {
+    const title = board.querySelector(".card-title");
+    if (title) title.insertAdjacentHTML("afterend", tabsHTML);
+  }
+  attachReminderTabEvents();
+
+  // 入力欄表示制御（アーカイブ閲覧中は非表示）
+  const addArea = board.querySelector("#sticky-add-area");
+  if (addArea) addArea.hidden = currentReminderTab === "archived";
 
   // ナビゲーション更新
   const existingNav = board.querySelector(".sticky-nav");
@@ -898,8 +1004,8 @@ function refreshStickyNotes() {
     if (existingNav) {
       existingNav.outerHTML = navHTML;
     } else {
-      const title = board.querySelector(".card-title");
-      if (title) title.insertAdjacentHTML("afterend", navHTML);
+      const tabsEl = board.querySelector(".sticky-tabs");
+      if (tabsEl) tabsEl.insertAdjacentHTML("afterend", navHTML);
     }
     // パネルが未生成なら追加（初回起動時に reminders 0 件 → 1件目追加 のケース）
     if (!board.querySelector(".sticky-style-panel")) {
@@ -916,7 +1022,10 @@ function refreshStickyNotes() {
   const container = document.getElementById("sticky-notes");
   if (!container) return;
   if (reminders.length === 0) {
-    container.innerHTML = '<p class="sticky-empty">まだメモがありません。<br>下から追加してみましょう。</p>';
+    const emptyHTML = currentReminderTab === "archived"
+      ? '<p class="sticky-empty">アーカイブされたメモはまだありません。</p>'
+      : '<p class="sticky-empty">まだメモがありません。<br>下から追加してみましょう。</p>';
+    container.innerHTML = emptyHTML;
     return;
   }
   container.innerHTML = reminders.map((r, i) => {
@@ -1101,8 +1210,13 @@ function renderReminderModalButtons() {
       showToast("保存しました", "success");
     });
   } else {
+    const isArchive = currentReminderTab === "archived";
+    const archiveBtnHTML = isArchive
+      ? `<button class="btn btn-outline btn-sm" id="reminder-modal-restore">↩ 戻す</button>`
+      : `<button class="btn btn-outline btn-sm" id="reminder-modal-archive">📥 アーカイブ</button>`;
     container.innerHTML = `
       <button class="btn btn-danger btn-sm" id="reminder-modal-delete">🗑 削除</button>
+      ${archiveBtnHTML}
       <button class="btn btn-primary btn-sm" id="reminder-modal-edit">✎ 編集</button>
     `;
     document.getElementById("reminder-modal-edit")?.addEventListener("click", () => {
@@ -1117,7 +1231,7 @@ function renderReminderModalButtons() {
       if (!confirm("このメモを削除しますか？")) return;
       const remaining = getReminders().filter((r) => r.id !== target.id);
       saveReminders(remaining);
-      if (remaining.length === 0) {
+      if (getDisplayReminders().length === 0) {
         closeReminderModal();
         refreshStickyNotes();
         return;
@@ -1127,6 +1241,51 @@ function renderReminderModalButtons() {
       }
       refreshStickyNotes();
       renderReminderModalContent();
+      renderReminderModalButtons();
+    });
+    document.getElementById("reminder-modal-archive")?.addEventListener("click", () => {
+      const list = getDisplayReminders();
+      const target = list[stickyCurrentIndex];
+      if (!target) return;
+      const reminders = getReminders();
+      const found = reminders.find((r) => r.id === target.id);
+      if (!found) return;
+      found.archived = true;
+      saveReminders(reminders);
+      if (getDisplayReminders().length === 0) {
+        closeReminderModal();
+        refreshStickyNotes();
+        return;
+      }
+      if (stickyCurrentIndex >= getDisplayReminders().length) {
+        stickyCurrentIndex = Math.max(0, getDisplayReminders().length - 1);
+      }
+      refreshStickyNotes();
+      renderReminderModalContent();
+      renderReminderModalButtons();
+      showToast("アーカイブしました", "success");
+    });
+    document.getElementById("reminder-modal-restore")?.addEventListener("click", () => {
+      const list = getDisplayReminders();
+      const target = list[stickyCurrentIndex];
+      if (!target) return;
+      const reminders = getReminders();
+      const found = reminders.find((r) => r.id === target.id);
+      if (!found) return;
+      found.archived = false;
+      saveReminders(reminders);
+      if (getDisplayReminders().length === 0) {
+        closeReminderModal();
+        refreshStickyNotes();
+        return;
+      }
+      if (stickyCurrentIndex >= getDisplayReminders().length) {
+        stickyCurrentIndex = Math.max(0, getDisplayReminders().length - 1);
+      }
+      refreshStickyNotes();
+      renderReminderModalContent();
+      renderReminderModalButtons();
+      showToast("アクティブに戻しました", "success");
     });
   }
 }

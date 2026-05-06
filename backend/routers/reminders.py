@@ -16,6 +16,7 @@ class ReminderItem(BaseModel):
     id: str
     text: str
     createdAt: int  # Unix ms
+    archived: bool = False
 
 
 class RemindersSaveRequest(BaseModel):

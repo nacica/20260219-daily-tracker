@@ -7,27 +7,27 @@
  *   - 各画面のコンポーネントはルート遷移時に動的 import（初期ロードを軽量化）
  */
 
-import { addRoute, navigate, updateNavActive } from "./router.js?v=20260505i";
-import { recordsApi, analysisApi, remindersApi } from "./api.js?v=20260505i";
-import { initSwipeNav } from "./swipe-nav.js?v=20260505i";
-import { initBedtimeTimer } from "./bedtime-timer.js?v=20260505i";
+import { addRoute, navigate, updateNavActive } from "./router.js?v=20260506a";
+import { recordsApi, analysisApi, remindersApi } from "./api.js?v=20260506a";
+import { initSwipeNav } from "./swipe-nav.js?v=20260506a";
+import { initBedtimeTimer } from "./bedtime-timer.js?v=20260506a";
 
 // ===== 動的 import ヘルパー =====
 // 各コンポーネントは初回訪問時に初めてネットワーク取得（以降は SW キャッシュから即応答）
-const loadInputForm       = () => import("./components/input-form.js?v=20260505i");
-const loadAnalysisView    = () => import("./components/analysis-view.js?v=20260505i");
-const loadHistoryList     = () => import("./components/history-list.js?v=20260505i");
-const loadWeeklyReport    = () => import("./components/weekly-report.js?v=20260505i");
-const loadSuggestions     = () => import("./components/suggestions.js?v=20260505i");
-const loadCoachingChat    = () => import("./components/coaching-chat.js?v=20260505i");
-const loadKnowledgeGraph  = () => import("./components/knowledge-graph.js?v=20260505i");
-const loadMonthlyReport   = () => import("./components/monthly-report.js?v=20260505i");
-const loadJournal         = () => import("./components/journal.js?v=20260505i");
-const loadBraindump       = () => import("./components/braindump.js?v=20260505i");
-const loadTaskStats       = () => import("./components/task-stats.js?v=20260505i");
-const loadFlashcardList   = () => import("./components/flashcard-list.js?v=20260505i");
-const loadFlashcardStudy  = () => import("./components/flashcard-study.js?v=20260505i");
-const loadWishlist        = () => import("./components/wishlist.js?v=20260505i");
+const loadInputForm       = () => import("./components/input-form.js?v=20260506a");
+const loadAnalysisView    = () => import("./components/analysis-view.js?v=20260506a");
+const loadHistoryList     = () => import("./components/history-list.js?v=20260506a");
+const loadWeeklyReport    = () => import("./components/weekly-report.js?v=20260506a");
+const loadSuggestions     = () => import("./components/suggestions.js?v=20260506a");
+const loadCoachingChat    = () => import("./components/coaching-chat.js?v=20260506a");
+const loadKnowledgeGraph  = () => import("./components/knowledge-graph.js?v=20260506a");
+const loadMonthlyReport   = () => import("./components/monthly-report.js?v=20260506a");
+const loadJournal         = () => import("./components/journal.js?v=20260506a");
+const loadBraindump       = () => import("./components/braindump.js?v=20260506a");
+const loadTaskStats       = () => import("./components/task-stats.js?v=20260506a");
+const loadFlashcardList   = () => import("./components/flashcard-list.js?v=20260506a");
+const loadFlashcardStudy  = () => import("./components/flashcard-study.js?v=20260506a");
+const loadWishlist        = () => import("./components/wishlist.js?v=20260506a");
 
 // ===== ユーティリティ =====
 
@@ -336,7 +336,8 @@ function prewarmInputCache(dateStr, record, reminders) {
 let _homeRemindersCache = [];
 
 function getHomeReminders() {
-  return _homeRemindersCache;
+  // ホームにはアクティブのみ表示（アーカイブされたものは除外）
+  return _homeRemindersCache.filter((r) => !r.archived);
 }
 
 async function syncRemindersFromServer() {
