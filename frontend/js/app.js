@@ -7,27 +7,27 @@
  *   - 各画面のコンポーネントはルート遷移時に動的 import（初期ロードを軽量化）
  */
 
-import { addRoute, navigate, updateNavActive } from "./router.js?v=20260506a";
-import { recordsApi, analysisApi, remindersApi } from "./api.js?v=20260506a";
-import { initSwipeNav } from "./swipe-nav.js?v=20260506a";
-import { initBedtimeTimer } from "./bedtime-timer.js?v=20260506a";
+import { addRoute, navigate, updateNavActive } from "./router.js?v=20260507a";
+import { recordsApi, analysisApi, remindersApi } from "./api.js?v=20260507a";
+import { initSwipeNav } from "./swipe-nav.js?v=20260507a";
+import { initBedtimeTimer } from "./bedtime-timer.js?v=20260507a";
 
 // ===== 動的 import ヘルパー =====
 // 各コンポーネントは初回訪問時に初めてネットワーク取得（以降は SW キャッシュから即応答）
-const loadInputForm       = () => import("./components/input-form.js?v=20260506a");
-const loadAnalysisView    = () => import("./components/analysis-view.js?v=20260506a");
-const loadHistoryList     = () => import("./components/history-list.js?v=20260506a");
-const loadWeeklyReport    = () => import("./components/weekly-report.js?v=20260506a");
-const loadSuggestions     = () => import("./components/suggestions.js?v=20260506a");
-const loadCoachingChat    = () => import("./components/coaching-chat.js?v=20260506a");
-const loadKnowledgeGraph  = () => import("./components/knowledge-graph.js?v=20260506a");
-const loadMonthlyReport   = () => import("./components/monthly-report.js?v=20260506a");
-const loadJournal         = () => import("./components/journal.js?v=20260506a");
-const loadBraindump       = () => import("./components/braindump.js?v=20260506a");
-const loadTaskStats       = () => import("./components/task-stats.js?v=20260506a");
-const loadFlashcardList   = () => import("./components/flashcard-list.js?v=20260506a");
-const loadFlashcardStudy  = () => import("./components/flashcard-study.js?v=20260506a");
-const loadWishlist        = () => import("./components/wishlist.js?v=20260506a");
+const loadInputForm       = () => import("./components/input-form.js?v=20260507a");
+const loadAnalysisView    = () => import("./components/analysis-view.js?v=20260507a");
+const loadHistoryList     = () => import("./components/history-list.js?v=20260507a");
+const loadWeeklyReport    = () => import("./components/weekly-report.js?v=20260507a");
+const loadSuggestions     = () => import("./components/suggestions.js?v=20260507a");
+const loadCoachingChat    = () => import("./components/coaching-chat.js?v=20260507a");
+const loadKnowledgeGraph  = () => import("./components/knowledge-graph.js?v=20260507a");
+const loadMonthlyReport   = () => import("./components/monthly-report.js?v=20260507a");
+const loadJournal         = () => import("./components/journal.js?v=20260507a");
+const loadBraindump       = () => import("./components/braindump.js?v=20260507a");
+const loadTaskStats       = () => import("./components/task-stats.js?v=20260507a");
+const loadFlashcardList   = () => import("./components/flashcard-list.js?v=20260507a");
+const loadFlashcardStudy  = () => import("./components/flashcard-study.js?v=20260507a");
+const loadWishlist        = () => import("./components/wishlist.js?v=20260507a");
 
 // ===== ユーティリティ =====
 
@@ -580,6 +580,86 @@ function buildHomeActions(hasRecord, hasAnalysis, date, isRestDay = false) {
       </div>
     </div>`;
 }
+
+// ===== ペースト時の段落空行保持（全 textarea 対象） =====
+// claude.ai 等のレンダリング HTML から textarea にペーストすると、
+// ブラウザが text/plain に変換する際に <p> 境界の空行を落とすことがある。
+// ここでは clipboardData の text/html を解析し、ブロック境界を空行として
+// 保持したテキストを生成して挿入する。改善が無い場合はデフォルト動作に任せる。
+
+const _PASTE_PARAGRAPH_TAGS = new Set([
+  "P", "BLOCKQUOTE", "PRE", "H1", "H2", "H3", "H4", "H5", "H6",
+]);
+const _PASTE_BLOCK_TAGS = new Set([
+  "P", "DIV", "BLOCKQUOTE", "PRE", "LI", "TR", "DL", "DT", "DD",
+  "FIGURE", "ARTICLE", "SECTION", "HEADER", "FOOTER",
+  "H1", "H2", "H3", "H4", "H5", "H6",
+]);
+
+function _htmlToTextPreserveParagraphs(html) {
+  let doc;
+  try {
+    doc = new DOMParser().parseFromString(html, "text/html");
+  } catch {
+    return null;
+  }
+  const root = doc && doc.body;
+  if (!root) return null;
+
+  doc.querySelectorAll("script, style, noscript").forEach((el) => el.remove());
+
+  function walk(node) {
+    if (node.nodeType === Node.TEXT_NODE) return node.textContent;
+    if (node.nodeType !== Node.ELEMENT_NODE) return "";
+    const tag = node.tagName;
+    if (tag === "BR") return "\n";
+    let inner = "";
+    for (const child of node.childNodes) inner += walk(child);
+    if (_PASTE_PARAGRAPH_TAGS.has(tag)) return "\n\n" + inner + "\n\n";
+    if (_PASTE_BLOCK_TAGS.has(tag)) return "\n" + inner + "\n";
+    return inner;
+  }
+
+  let result = walk(root);
+
+  // インデントによる「空白だけの行」を空行に正規化し、過剰な改行を 2 にまとめる
+  result = result.split("\n").map((line) => (/^\s*$/.test(line) ? "" : line)).join("\n");
+  result = result.replace(/\n{3,}/g, "\n\n").replace(/^\n+|\n+$/g, "");
+  return result;
+}
+
+function _insertTextAtCursor(textarea, text) {
+  const start = textarea.selectionStart ?? textarea.value.length;
+  const end = textarea.selectionEnd ?? textarea.value.length;
+  textarea.value = textarea.value.slice(0, start) + text + textarea.value.slice(end);
+  const cursor = start + text.length;
+  textarea.selectionStart = textarea.selectionEnd = cursor;
+  textarea.dispatchEvent(new Event("input", { bubbles: true }));
+}
+
+document.addEventListener("paste", (e) => {
+  if (e.defaultPrevented) return; // 既に画像ペースト等で処理済み
+  const target = e.target;
+  if (!(target instanceof HTMLTextAreaElement)) return;
+
+  const cd = e.clipboardData;
+  if (!cd) return;
+
+  const html = cd.getData("text/html");
+  if (!html) return;
+
+  const plain = cd.getData("text/plain") || "";
+  const transformed = _htmlToTextPreserveParagraphs(html);
+  if (transformed == null || !transformed) return;
+
+  // text/plain と比べて空行（\n\n）が増えていなければ改変しない
+  const plainBlanks = (plain.match(/\n\n/g) || []).length;
+  const transformedBlanks = (transformed.match(/\n\n/g) || []).length;
+  if (transformedBlanks <= plainBlanks) return;
+
+  e.preventDefault();
+  _insertTextAtCursor(target, transformed);
+});
 
 // ===== イベント委任（動的ボタン用）=====
 
