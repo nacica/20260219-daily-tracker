@@ -4,8 +4,8 @@
  * 自動保存、AIタイトル自動生成、画像貼り付け対応。
  */
 
-import { braindumpApi } from "../api.js?v=20260505a";
-import { showToast } from "../app.js?v=20260505a";
+import { braindumpApi } from "../api.js?v=20260507b";
+import { showToast } from "../app.js?v=20260507b";
 
 // ===== ユーティリティ =====
 
@@ -90,7 +90,10 @@ export async function renderBraindump() {
           <button class="btn btn-primary btn-sm" id="bd-new-btn">＋ 新しいメモ</button>
         </div>
         <div class="braindump-new-form" id="bd-new-form">
-          <textarea class="braindump-textarea" id="bd-new-textarea" placeholder="思いついたことを自由に書き出してください..." rows="36"></textarea>
+          <div class="braindump-textarea-wrap">
+            <textarea class="braindump-textarea" id="bd-new-textarea" placeholder="思いついたことを自由に書き出してください..." rows="36"></textarea>
+            <div class="braindump-resize-bar" id="bd-resize-bar" aria-hidden="true" title="ドラッグして縦幅を調整"></div>
+          </div>
           <div class="braindump-form-actions">
             <button class="btn btn-danger btn-sm" id="bd-delete-btn" style="display: none;">🗑 削除</button>
             <button class="btn btn-outline btn-sm" id="bd-summarize-btn">📝 MD要約</button>
@@ -196,6 +199,9 @@ function attachEvents() {
 
   // Tab キーでフォーカス移動を抑止し、タブ文字を挿入
   document.getElementById("bd-new-textarea")?.addEventListener("keydown", handleTabInsert);
+
+  // 縦幅調整バーのドラッグ処理（デスクトップ専用）
+  initResizeBar();
 
   // マークダウン要約ボタン
   document.getElementById("bd-summarize-btn")?.addEventListener("click", summarizeContent);
@@ -493,6 +499,47 @@ async function refreshEntries() {
   if (container) {
     container.innerHTML = renderRecentEntries();
   }
+}
+
+// ===== 縦幅調整バー（デスクトップ専用、セッション中のみ保持） =====
+
+function initResizeBar() {
+  const bar = document.getElementById("bd-resize-bar");
+  const ta = document.getElementById("bd-new-textarea");
+  if (!bar || !ta) return;
+
+  let startY = 0;
+  let startHeight = 0;
+  let dragging = false;
+
+  const onMove = (e) => {
+    if (!dragging) return;
+    const delta = e.clientY - startY;
+    const next = Math.max(160, startHeight + delta);
+    ta.style.height = next + "px";
+  };
+
+  const onUp = () => {
+    if (!dragging) return;
+    dragging = false;
+    bar.classList.remove("dragging");
+    document.body.style.cursor = "";
+    document.body.style.userSelect = "";
+    window.removeEventListener("mousemove", onMove);
+    window.removeEventListener("mouseup", onUp);
+  };
+
+  bar.addEventListener("mousedown", (e) => {
+    e.preventDefault();
+    dragging = true;
+    startY = e.clientY;
+    startHeight = ta.getBoundingClientRect().height;
+    bar.classList.add("dragging");
+    document.body.style.cursor = "ns-resize";
+    document.body.style.userSelect = "none";
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  });
 }
 
 // ===== Tab キー処理 =====
