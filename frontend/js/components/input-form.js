@@ -5,9 +5,9 @@
  * 朝のタスク整理（ソクラテス式問答）統合
  */
 
-import { recordsApi, analysisApi, morningDialogueApi, remindersApi, categoriesApi } from "../api.js?v=20260507b";
-import { showToast } from "../app.js?v=20260507b";
-import { showTaskCompleteAnimation } from "./task-stats.js?v=20260507b";
+import { recordsApi, analysisApi, morningDialogueApi, remindersApi, categoriesApi } from "../api.js?v=20260509a";
+import { showToast } from "../app.js?v=20260509a";
+import { showTaskCompleteAnimation } from "./task-stats.js?v=20260509a";
 
 /* ── カテゴリ管理 ── */
 
@@ -716,9 +716,7 @@ function attachReminderEvents() {
   }
 
   addBtn.addEventListener("click", addSticky);
-  input.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); addSticky(); }
-  });
+  // Enter は改行のみ。登録は「追加」ボタンクリックで行う（スマホで改行できるよう）
   input.addEventListener("input", () => {
     input.style.height = "auto";
     input.style.height = input.scrollHeight + "px";
@@ -817,9 +815,7 @@ function attachReminderEvents() {
 
         editBtn.removeEventListener("click", save);
         editBtn.addEventListener("click", (ev) => { ev.stopPropagation(); save(); }, { once: true });
-        textarea.addEventListener("keydown", (ev) => {
-          if (ev.key === "Enter" && !ev.shiftKey) { ev.preventDefault(); save(); }
-        });
+        // Enter は改行のみ。保存は ✓ ボタンで行う（新規入力欄と同じルール）
         return;
       }
 
@@ -2443,9 +2439,7 @@ function attachFormEvents(date, isEdit) {
   }
 
   document.getElementById("btn-add-task").addEventListener("click", addTask);
-  plannedInput.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") { e.preventDefault(); addTask(); }
-  });
+  // Enter での自動登録は廃止（追加ボタンクリックでのみ登録）
 
   // 近日中タスク追加
   function addBacklogTask() {
@@ -2461,9 +2455,7 @@ function attachFormEvents(date, isEdit) {
   }
 
   document.getElementById("btn-add-backlog").addEventListener("click", addBacklogTask);
-  backlogInput.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") { e.preventDefault(); addBacklogTask(); }
-  });
+  // Enter での自動登録は廃止（追加ボタンクリックでのみ登録）
 
   // タスク削除 & チェックボックス切り替え & レーン移動（イベント委任）
   function handleTaskClick(e) {
@@ -2560,9 +2552,7 @@ function attachFormEvents(date, isEdit) {
       showToast(`カテゴリ「${name}」を追加しました`, "success");
     }
     btnAddCategory.addEventListener("click", addCategory);
-    newCategoryInput.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") { e.preventDefault(); addCategory(); }
-    });
+    // Enter での自動登録は廃止（追加ボタンクリックでのみ登録）
   }
 
   // フォーム送信
