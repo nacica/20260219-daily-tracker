@@ -431,6 +431,30 @@ export const wishlistApi = {
     }),
 };
 
+// ---- ありがたいノート ----
+
+export const gratitudeApi = {
+  /** エントリ作成 */
+  create: (content) =>
+    apiFetch("/gratitude", { method: "POST", body: { content } }),
+
+  /** 全件取得（新しい順） */
+  list: () => apiFetch("/gratitude"),
+
+  /** 最新 N 件取得（ホーム表示用） */
+  recent: (limit = 3) => apiFetch(`/gratitude/recent?limit=${limit}`),
+
+  /** 単一取得 */
+  get: (entryId) => apiFetch(`/gratitude/${entryId}`),
+
+  /** 更新 */
+  update: (entryId, content) =>
+    apiFetch(`/gratitude/${entryId}`, { method: "PUT", body: { content } }),
+
+  /** 削除 */
+  delete: (entryId) => apiFetch(`/gratitude/${entryId}`, { method: "DELETE" }),
+};
+
 // ---- 月次サマリー ----
 
 export const summariesApi = {

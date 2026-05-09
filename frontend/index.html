@@ -24,14 +24,14 @@
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Klee+One&display=swap" /></noscript>
 
   <link rel="manifest" href="/manifest.json" />
-  <link rel="stylesheet" href="/css/style.css?v=20260509a" />
+  <link rel="stylesheet" href="/css/style.css?v=20260509b" />
 
   <!-- ホーム表示に必要なコアモジュールを先読み（並列 fetch で TTI を短縮） -->
-  <link rel="modulepreload" href="/js/app.js?v=20260509a" />
-  <link rel="modulepreload" href="/js/router.js?v=20260509a" />
-  <link rel="modulepreload" href="/js/api.js?v=20260509a" />
-  <link rel="modulepreload" href="/js/swipe-nav.js?v=20260509a" />
-  <link rel="modulepreload" href="/js/bedtime-timer.js?v=20260509a" />
+  <link rel="modulepreload" href="/js/app.js?v=20260509b" />
+  <link rel="modulepreload" href="/js/router.js?v=20260509b" />
+  <link rel="modulepreload" href="/js/api.js?v=20260509b" />
+  <link rel="modulepreload" href="/js/swipe-nav.js?v=20260509b" />
+  <link rel="modulepreload" href="/js/bedtime-timer.js?v=20260509b" />
 
   <!-- FOUC防止: JSモジュール読み込み前にテーマを適用 -->
   <script>
@@ -76,6 +76,13 @@
             <circle cx="12" cy="12" r="2"/>
           </svg>
           <span>やりたい事</span>
+        </a>
+        <a class="nav-link" href="#/gratitude" data-route="/gratitude">
+          <!-- Heart icon -->
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+          </svg>
+          <span>ありがたいノート</span>
         </a>
         <a class="nav-link" href="#/task-stats" data-route="/task-stats">
           <!-- Check-circle / task stats icon -->
@@ -290,6 +297,6 @@
   -->
 
   <!-- アプリのメインスクリプト（ES Modules） -->
-  <script type="module" src="/js/app.js?v=20260509a"></script>
+  <script type="module" src="/js/app.js?v=20260509b"></script>
 </body>
 </html>

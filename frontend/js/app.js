@@ -7,27 +7,28 @@
  *   - 各画面のコンポーネントはルート遷移時に動的 import（初期ロードを軽量化）
  */
 
-import { addRoute, navigate, updateNavActive } from "./router.js?v=20260509a";
-import { recordsApi, analysisApi, remindersApi } from "./api.js?v=20260509a";
-import { initSwipeNav } from "./swipe-nav.js?v=20260509a";
-import { initBedtimeTimer } from "./bedtime-timer.js?v=20260509a";
+import { addRoute, navigate, updateNavActive } from "./router.js?v=20260509b";
+import { recordsApi, analysisApi, remindersApi, gratitudeApi } from "./api.js?v=20260509b";
+import { initSwipeNav } from "./swipe-nav.js?v=20260509b";
+import { initBedtimeTimer } from "./bedtime-timer.js?v=20260509b";
 
 // ===== 動的 import ヘルパー =====
 // 各コンポーネントは初回訪問時に初めてネットワーク取得（以降は SW キャッシュから即応答）
-const loadInputForm       = () => import("./components/input-form.js?v=20260509a");
-const loadAnalysisView    = () => import("./components/analysis-view.js?v=20260509a");
-const loadHistoryList     = () => import("./components/history-list.js?v=20260509a");
-const loadWeeklyReport    = () => import("./components/weekly-report.js?v=20260509a");
-const loadSuggestions     = () => import("./components/suggestions.js?v=20260509a");
-const loadCoachingChat    = () => import("./components/coaching-chat.js?v=20260509a");
-const loadKnowledgeGraph  = () => import("./components/knowledge-graph.js?v=20260509a");
-const loadMonthlyReport   = () => import("./components/monthly-report.js?v=20260509a");
-const loadJournal         = () => import("./components/journal.js?v=20260509a");
-const loadBraindump       = () => import("./components/braindump.js?v=20260509a");
-const loadTaskStats       = () => import("./components/task-stats.js?v=20260509a");
-const loadFlashcardList   = () => import("./components/flashcard-list.js?v=20260509a");
-const loadFlashcardStudy  = () => import("./components/flashcard-study.js?v=20260509a");
-const loadWishlist        = () => import("./components/wishlist.js?v=20260509a");
+const loadInputForm       = () => import("./components/input-form.js?v=20260509b");
+const loadAnalysisView    = () => import("./components/analysis-view.js?v=20260509b");
+const loadHistoryList     = () => import("./components/history-list.js?v=20260509b");
+const loadWeeklyReport    = () => import("./components/weekly-report.js?v=20260509b");
+const loadSuggestions     = () => import("./components/suggestions.js?v=20260509b");
+const loadCoachingChat    = () => import("./components/coaching-chat.js?v=20260509b");
+const loadKnowledgeGraph  = () => import("./components/knowledge-graph.js?v=20260509b");
+const loadMonthlyReport   = () => import("./components/monthly-report.js?v=20260509b");
+const loadJournal         = () => import("./components/journal.js?v=20260509b");
+const loadBraindump       = () => import("./components/braindump.js?v=20260509b");
+const loadTaskStats       = () => import("./components/task-stats.js?v=20260509b");
+const loadFlashcardList   = () => import("./components/flashcard-list.js?v=20260509b");
+const loadFlashcardStudy  = () => import("./components/flashcard-study.js?v=20260509b");
+const loadWishlist        = () => import("./components/wishlist.js?v=20260509b");
+const loadGratitude       = () => import("./components/gratitude.js?v=20260509b");
 
 // ===== ユーティリティ =====
 
@@ -65,6 +66,7 @@ const ROUTE_TITLES = {
   "/task-stats": { title: "タスク実績", breadcrumb: "タスク実績" },
   "/flashcards": { title: "単語帳", breadcrumb: "単語帳カード" },
   "/wishlist": { title: "やりたいことリスト", breadcrumb: "Wishlist" },
+  "/gratitude": { title: "ありがたいノート", breadcrumb: "Gratitude" },
 };
 
 /** デスクトップヘッダーのタイトルと日付を更新 */
@@ -296,13 +298,14 @@ function loadHomeCache(dateStr) {
   }
 }
 
-function saveHomeCache(dateStr, record, analysis, reminders) {
+function saveHomeCache(dateStr, record, analysis, reminders, gratitude) {
   try {
     localStorage.setItem(HOME_CACHE_KEY, JSON.stringify({
       date: dateStr,
       record: record || null,
       analysis: analysis || null,
       reminders: reminders || [],
+      gratitude: gratitude || [],
     }));
   } catch {}
 }
@@ -426,8 +429,51 @@ function attachHomeReminderEvents() {
 
 // ===== ホーム画面 =====
 
-/** ホーム HTML を組み立てる（record/analysis/reminders から） */
-function buildHomeHTML(dateStr, record, analysis, reminders) {
+function _escapeHtml(str) {
+  if (!str) return "";
+  return String(str).replace(/[&<>"']/g, (c) =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]
+  );
+}
+
+/** 最近のありがたいノートカードを組み立てる（最大 3 件） */
+function buildHomeGratitudeCard(gratitudeItems) {
+  if (!gratitudeItems || gratitudeItems.length === 0) {
+    return `
+      <div class="card home-gratitude-card">
+        <div class="card-title">💗 最近のありがたい</div>
+        <div class="empty-state" style="padding: 16px 0;">
+          <p style="margin: 0; font-size: 0.88rem; color: var(--text-secondary);">
+            まだ何も書かれていません。<br>
+            <a href="#/gratitude" style="color: rgb(219, 39, 119);">ありがたいノートを書いてみる →</a>
+          </p>
+        </div>
+      </div>`;
+  }
+
+  const items = gratitudeItems.slice(0, 3).map((g) => {
+    const d = g.created_at ? new Date(g.created_at) : null;
+    const meta = d
+      ? `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`
+      : "";
+    const text = _escapeHtml(g.content || "").replace(/\n/g, "<br>");
+    return `
+      <div class="home-gr-item">
+        ${meta ? `<span class="home-gr-item-meta">${meta}</span>` : ""}
+        ${text}
+      </div>`;
+  }).join("");
+
+  return `
+    <div class="card home-gratitude-card">
+      <div class="card-title">💗 最近のありがたい</div>
+      <div class="home-gratitude-list">${items}</div>
+      <a class="home-gratitude-more" href="#/gratitude">すべて見る・追加する →</a>
+    </div>`;
+}
+
+/** ホーム HTML を組み立てる（record/analysis/reminders/gratitude から） */
+function buildHomeHTML(dateStr, record, analysis, reminders, gratitudeItems) {
   _homeRemindersCache = reminders || [];
   const isRestDay = !!(record && record.rest_day);
   const restReason = record ? record.rest_reason || "" : "";
@@ -452,6 +498,7 @@ function buildHomeHTML(dateStr, record, analysis, reminders) {
     </div>` : ""}
     ${hasAnalysis && !isRestDay ? buildHomeSummary(analysis) : ""}
     ${buildHomeActions(hasRecord, hasAnalysis, dateStr, isRestDay)}
+    ${buildHomeGratitudeCard(gratitudeItems)}
   `;
 }
 
@@ -462,7 +509,7 @@ async function renderHome() {
   const cached = loadHomeCache(todayStr);
   let rendered = false;
   if (cached) {
-    getMain().innerHTML = buildHomeHTML(todayStr, cached.record, cached.analysis, cached.reminders);
+    getMain().innerHTML = buildHomeHTML(todayStr, cached.record, cached.analysis, cached.reminders, cached.gratitude || []);
     attachHomeReminderEvents();
     rendered = true;
   } else {
@@ -471,24 +518,26 @@ async function renderHome() {
 
   // 2. 最新データを取得して上書き
   try {
-    const [recordRes, analysisRes, remindersRes] = await Promise.allSettled([
+    const [recordRes, analysisRes, remindersRes, gratitudeRes] = await Promise.allSettled([
       recordsApi.get(todayStr),
       analysisApi.get(todayStr),
       syncRemindersFromServer(),
+      gratitudeApi.recent(3),
     ]);
 
     const record = recordRes.status === "fulfilled" ? recordRes.value : null;
     const analysis = analysisRes.status === "fulfilled" ? analysisRes.value : null;
     const reminders = remindersRes.status === "fulfilled" ? (remindersRes.value || []) : _homeRemindersCache;
+    const gratitude = gratitudeRes.status === "fulfilled" ? (gratitudeRes.value || []) : (cached ? cached.gratitude || [] : []);
 
     // キャッシュを更新（次回起動時の楽観描画のため）
-    saveHomeCache(todayStr, record, analysis, reminders);
+    saveHomeCache(todayStr, record, analysis, reminders, gratitude);
 
     // ホームで取得済みの record / reminders を /input の楽観描画キャッシュに事前ウォームアップ
     prewarmInputCache(todayStr, record, reminders);
 
     // 最新データで再描画（差分チェックは省略 — 全体再描画でも十分軽い）
-    getMain().innerHTML = buildHomeHTML(todayStr, record, analysis, reminders);
+    getMain().innerHTML = buildHomeHTML(todayStr, record, analysis, reminders, gratitude);
     attachHomeReminderEvents();
   } catch (e) {
     if (!rendered) {
@@ -702,6 +751,7 @@ addRoute("/task-stats", async () => (await loadTaskStats()).renderTaskStats());
 addRoute("/flashcards", async () => (await loadFlashcardList()).renderFlashcardList());
 addRoute("/flashcards/study", async () => (await loadFlashcardStudy()).renderFlashcardStudy());
 addRoute("/wishlist", async () => (await loadWishlist()).renderWishlist());
+addRoute("/gratitude", async () => (await loadGratitude()).renderGratitude());
 
 // ===== 初期化 =====
 

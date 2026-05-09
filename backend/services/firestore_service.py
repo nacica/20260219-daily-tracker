@@ -680,3 +680,52 @@ def delete_wishlist_item(item_id: str) -> bool:
         return False
     ref.delete()
     return True
+
+
+# ---- gratitude (ありがたいノート) ----
+
+def list_gratitude(limit: Optional[int] = None) -> list[dict]:
+    """ありがたいノート一覧を作成日時降順で返す"""
+    db = get_db()
+    query = db.collection("gratitude_entries").order_by(
+        "created_at", direction=firestore.Query.DESCENDING
+    )
+    if limit is not None:
+        query = query.limit(limit)
+    return [doc.to_dict() for doc in query.stream()]
+
+
+def get_gratitude(entry_id: str) -> Optional[dict]:
+    """指定IDのありがたいノートを取得"""
+    db = get_db()
+    doc = db.collection("gratitude_entries").document(entry_id).get()
+    if doc.exists:
+        return doc.to_dict()
+    return None
+
+
+def create_gratitude(entry_id: str, data: dict) -> dict:
+    """ありがたいノートを作成"""
+    db = get_db()
+    db.collection("gratitude_entries").document(entry_id).set(data)
+    return data
+
+
+def update_gratitude(entry_id: str, data: dict) -> Optional[dict]:
+    """ありがたいノートを更新"""
+    db = get_db()
+    ref = db.collection("gratitude_entries").document(entry_id)
+    if not ref.get().exists:
+        return None
+    ref.update(data)
+    return ref.get().to_dict()
+
+
+def delete_gratitude(entry_id: str) -> bool:
+    """ありがたいノートを削除"""
+    db = get_db()
+    ref = db.collection("gratitude_entries").document(entry_id)
+    if not ref.get().exists:
+        return False
+    ref.delete()
+    return True
