@@ -8545,6 +8545,7 @@ main.swipe-enter-right {
 .gr-entry-meta {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
   margin-bottom: 8px;
   font-size: 0.78rem;
@@ -8557,24 +8558,19 @@ main.swipe-enter-right {
 
 .gr-badge {
   display: inline-block;
-  padding: 2px 8px;
+  padding: 2px 10px;
   border-radius: 999px;
   background: rgba(236, 72, 153, 0.12);
   color: rgb(219, 39, 119);
   font-weight: 600;
-  font-size: 0.72rem;
+  font-size: 0.74rem;
   letter-spacing: 0.02em;
+  white-space: nowrap;
 }
 
 [data-theme="light"] .gr-badge {
   background: rgba(236, 72, 153, 0.14);
   color: rgb(190, 24, 93);
-}
-
-.gr-badge-dim {
-  background: var(--bg-tertiary, rgba(127, 127, 127, 0.08));
-  color: var(--text-muted);
-  font-weight: 500;
 }
 
 .gr-time {

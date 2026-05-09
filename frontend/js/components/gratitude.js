@@ -6,8 +6,8 @@
  * 各エントリは編集・削除可能。
  */
 
-import { gratitudeApi } from "../api.js?v=20260509b";
-import { showToast } from "../app.js?v=20260509b";
+import { gratitudeApi } from "../api.js?v=20260509c";
+import { showToast } from "../app.js?v=20260509c";
 
 const state = {
   items: [],
@@ -30,7 +30,7 @@ function escapeAttr(str) {
 
 const WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
 
-function formatDateTime(iso) {
+function formatDateJa(iso) {
   if (!iso) return "";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "";
@@ -38,23 +38,20 @@ function formatDateTime(iso) {
   const m = d.getMonth() + 1;
   const day = d.getDate();
   const w = WEEKDAYS[d.getDay()];
-  const hh = String(d.getHours()).padStart(2, "0");
-  const mm = String(d.getMinutes()).padStart(2, "0");
-  return `${y}/${m}/${day}（${w}） ${hh}:${mm}`;
+  return `${y}年${m}月${day}日（${w}）`;
 }
 
-function formatDateOnly(iso) {
+function formatTime(iso) {
   if (!iso) return "";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "";
-  return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
 
-function dateKey(iso) {
-  if (!iso) return "";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+function formatDateTime(iso) {
+  const date = formatDateJa(iso);
+  const time = formatTime(iso);
+  return date && time ? `${date} ${time}` : (date || time);
 }
 
 // 内容を表示用に改行を <br> に変換（HTMLエスケープ後）
@@ -119,30 +116,16 @@ function renderList() {
     return;
   }
 
-  // 「今日 / 昨日 / 1週間以内 / それ以前」の簡易セパレータを挟みたいが、
-  // 仕様は「新しい順のフラットなリスト（日付バッジ付き）」なのでフラットに描画。
-  // 連続して同じ日付の場合はバッジを少し控えめにする（視覚ノイズ削減）。
-  let prevKey = null;
-  const rows = state.items.map((item) => {
-    const k = dateKey(item.created_at);
-    const sameAsPrev = k && k === prevKey;
-    prevKey = k;
-    return buildEntryHTML(item, sameAsPrev);
-  }).join("");
+  // 新しい順のフラットなリスト。各エントリに日付バッジ（曜日付き）と時刻を表示。
+  const rows = state.items.map((item) => buildEntryHTML(item)).join("");
 
   container.innerHTML = `<div class="gr-list">${rows}</div>`;
 }
 
-function buildEntryHTML(item, sameDateAsPrev) {
+function buildEntryHTML(item) {
   const isEditing = state.editingId === item.id;
-  const dateBadge = sameDateAsPrev
-    ? `<span class="gr-badge gr-badge-dim" title="${escapeAttr(formatDateTime(item.created_at))}">同じ日</span>`
-    : `<span class="gr-badge" title="${escapeAttr(formatDateTime(item.created_at))}">${escapeHtml(formatDateOnly(item.created_at))}</span>`;
-  const timeOnly = (() => {
-    const d = new Date(item.created_at);
-    if (Number.isNaN(d.getTime())) return "";
-    return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-  })();
+  const dateBadge = `<span class="gr-badge" title="${escapeAttr(formatDateTime(item.created_at))}">${escapeHtml(formatDateJa(item.created_at))}</span>`;
+  const timeOnly = formatTime(item.created_at);
 
   if (isEditing) {
     return `

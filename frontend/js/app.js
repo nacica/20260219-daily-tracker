@@ -7,28 +7,28 @@
  *   - 各画面のコンポーネントはルート遷移時に動的 import（初期ロードを軽量化）
  */
 
-import { addRoute, navigate, updateNavActive } from "./router.js?v=20260509b";
-import { recordsApi, analysisApi, remindersApi, gratitudeApi } from "./api.js?v=20260509b";
-import { initSwipeNav } from "./swipe-nav.js?v=20260509b";
-import { initBedtimeTimer } from "./bedtime-timer.js?v=20260509b";
+import { addRoute, navigate, updateNavActive } from "./router.js?v=20260509c";
+import { recordsApi, analysisApi, remindersApi, gratitudeApi } from "./api.js?v=20260509c";
+import { initSwipeNav } from "./swipe-nav.js?v=20260509c";
+import { initBedtimeTimer } from "./bedtime-timer.js?v=20260509c";
 
 // ===== 動的 import ヘルパー =====
 // 各コンポーネントは初回訪問時に初めてネットワーク取得（以降は SW キャッシュから即応答）
-const loadInputForm       = () => import("./components/input-form.js?v=20260509b");
-const loadAnalysisView    = () => import("./components/analysis-view.js?v=20260509b");
-const loadHistoryList     = () => import("./components/history-list.js?v=20260509b");
-const loadWeeklyReport    = () => import("./components/weekly-report.js?v=20260509b");
-const loadSuggestions     = () => import("./components/suggestions.js?v=20260509b");
-const loadCoachingChat    = () => import("./components/coaching-chat.js?v=20260509b");
-const loadKnowledgeGraph  = () => import("./components/knowledge-graph.js?v=20260509b");
-const loadMonthlyReport   = () => import("./components/monthly-report.js?v=20260509b");
-const loadJournal         = () => import("./components/journal.js?v=20260509b");
-const loadBraindump       = () => import("./components/braindump.js?v=20260509b");
-const loadTaskStats       = () => import("./components/task-stats.js?v=20260509b");
-const loadFlashcardList   = () => import("./components/flashcard-list.js?v=20260509b");
-const loadFlashcardStudy  = () => import("./components/flashcard-study.js?v=20260509b");
-const loadWishlist        = () => import("./components/wishlist.js?v=20260509b");
-const loadGratitude       = () => import("./components/gratitude.js?v=20260509b");
+const loadInputForm       = () => import("./components/input-form.js?v=20260509c");
+const loadAnalysisView    = () => import("./components/analysis-view.js?v=20260509c");
+const loadHistoryList     = () => import("./components/history-list.js?v=20260509c");
+const loadWeeklyReport    = () => import("./components/weekly-report.js?v=20260509c");
+const loadSuggestions     = () => import("./components/suggestions.js?v=20260509c");
+const loadCoachingChat    = () => import("./components/coaching-chat.js?v=20260509c");
+const loadKnowledgeGraph  = () => import("./components/knowledge-graph.js?v=20260509c");
+const loadMonthlyReport   = () => import("./components/monthly-report.js?v=20260509c");
+const loadJournal         = () => import("./components/journal.js?v=20260509c");
+const loadBraindump       = () => import("./components/braindump.js?v=20260509c");
+const loadTaskStats       = () => import("./components/task-stats.js?v=20260509c");
+const loadFlashcardList   = () => import("./components/flashcard-list.js?v=20260509c");
+const loadFlashcardStudy  = () => import("./components/flashcard-study.js?v=20260509c");
+const loadWishlist        = () => import("./components/wishlist.js?v=20260509c");
+const loadGratitude       = () => import("./components/gratitude.js?v=20260509c");
 
 // ===== ユーティリティ =====
 
@@ -451,10 +451,11 @@ function buildHomeGratitudeCard(gratitudeItems) {
       </div>`;
   }
 
+  const weekdays = ["日", "月", "火", "水", "木", "金", "土"];
   const items = gratitudeItems.slice(0, 3).map((g) => {
     const d = g.created_at ? new Date(g.created_at) : null;
     const meta = d
-      ? `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`
+      ? `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日（${weekdays[d.getDay()]}） ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`
       : "";
     const text = _escapeHtml(g.content || "").replace(/\n/g, "<br>");
     return `
