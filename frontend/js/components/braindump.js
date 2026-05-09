@@ -4,8 +4,8 @@
  * 自動保存、AIタイトル自動生成、画像貼り付け対応。
  */
 
-import { braindumpApi } from "../api.js?v=20260509c";
-import { showToast } from "../app.js?v=20260509c";
+import { braindumpApi } from "../api.js?v=20260509d";
+import { showToast } from "../app.js?v=20260509d";
 
 // ===== ユーティリティ =====
 
@@ -34,6 +34,13 @@ let editingEntryId = null;
 let newAutoSaveTimer = null;
 let newEntryId = null; // 新規メモが自動保存された後のエントリID
 let currentImages = []; // テキストとは別に管理する添付画像URLリスト
+let isDirty = false; // テキストエリアに未保存の変更があるか（ヘッダー保存ボタンの表示制御に使用）
+
+function setDirty(dirty) {
+  isDirty = dirty;
+  const btn = document.getElementById("bd-save-header-btn");
+  if (btn) btn.style.display = dirty ? "" : "none";
+}
 
 // ===== 画像とテキストの分離・結合ユーティリティ =====
 
@@ -87,7 +94,10 @@ export async function renderBraindump() {
       <div class="braindump-left">
         <div class="braindump-header">
           <h2 class="braindump-title">ブレインダンプ</h2>
-          <button class="btn btn-primary btn-sm" id="bd-new-btn">＋ 新しいメモ</button>
+          <div class="braindump-header-actions">
+            <button class="btn btn-primary btn-sm" id="bd-save-header-btn" style="display: none;">💾 保存</button>
+            <button class="btn btn-primary btn-sm" id="bd-new-btn">＋ 新しいメモ</button>
+          </div>
         </div>
         <div class="braindump-new-form" id="bd-new-form">
           <div class="braindump-textarea-wrap">
@@ -188,8 +198,9 @@ function attachEvents() {
     document.getElementById("bd-new-textarea")?.focus();
   }, 100);
 
-  // 新規保存
+  // 新規保存（フォーム下部・ヘッダー両方）
   document.getElementById("bd-save-new-btn")?.addEventListener("click", saveNewEntry);
+  document.getElementById("bd-save-header-btn")?.addEventListener("click", saveNewEntry);
 
   // テキストエリアの自動保存（2秒間入力停止で発火 — 新規/既存メモ共通）
   document.getElementById("bd-new-textarea")?.addEventListener("input", handleNewTextareaInput);
@@ -225,6 +236,7 @@ function attachEvents() {
       currentImages = [];
       renderImagePreview();
       document.getElementById("bd-new-textarea").value = "";
+      setDirty(false);
       document.getElementById("bd-new-textarea")?.focus();
     }
   });
@@ -267,6 +279,7 @@ function attachEvents() {
     currentImages = images;
     editingEntryId = entryId;
     newEntryId = null; // 新規メモのIDをリセット
+    setDirty(false); // 読み込み直後は DB と同期されているので未保存状態ではない
     renderImagePreview();
 
     // 右カラムの該当エントリにアクティブ表示
@@ -294,9 +307,13 @@ function updateHeaderForEditing(entry) {
   if (!header) return;
   header.innerHTML = `
     <h2 class="braindump-title" style="font-size: 1rem;">編集中: ${escapeHTML(title)}</h2>
-    <button class="btn btn-outline btn-sm" id="bd-back-to-new-btn">＋ 新しいメモ</button>
+    <div class="braindump-header-actions">
+      <button class="btn btn-primary btn-sm" id="bd-save-header-btn" style="display: ${isDirty ? "" : "none"};">💾 保存</button>
+      <button class="btn btn-outline btn-sm" id="bd-back-to-new-btn">＋ 新しいメモ</button>
+    </div>
   `;
   document.getElementById("bd-back-to-new-btn")?.addEventListener("click", resetToNewMode);
+  document.getElementById("bd-save-header-btn")?.addEventListener("click", saveNewEntry);
 
   // フォーム内の削除ボタンを表示
   const deleteBtn = document.getElementById("bd-delete-btn");
@@ -335,9 +352,13 @@ function resetToNewMode() {
   if (header) {
     header.innerHTML = `
       <h2 class="braindump-title">ブレインダンプ</h2>
-      <button class="btn btn-primary btn-sm" id="bd-new-btn">＋ 新しいメモ</button>
+      <div class="braindump-header-actions">
+        <button class="btn btn-primary btn-sm" id="bd-save-header-btn" style="display: none;">💾 保存</button>
+        <button class="btn btn-primary btn-sm" id="bd-new-btn">＋ 新しいメモ</button>
+      </div>
     `;
     document.getElementById("bd-new-btn")?.addEventListener("click", startNewMemo);
+    document.getElementById("bd-save-header-btn")?.addEventListener("click", saveNewEntry);
   }
 
   // フォーム内の削除ボタンを非表示
@@ -347,10 +368,12 @@ function resetToNewMode() {
   // 右カラムのアクティブ表示を解除
   document.querySelectorAll(".braindump-entry").forEach(el => el.classList.remove("active"));
 
+  setDirty(false);
   textarea?.focus();
 }
 
 function handleNewTextareaInput() {
+  setDirty(true);
   if (newAutoSaveTimer) clearTimeout(newAutoSaveTimer);
   newAutoSaveTimer = setTimeout(() => {
     if (editingEntryId) {
@@ -382,6 +405,7 @@ async function autoSaveExistingEntry(entryId) {
       const activeEl = container.querySelector(`.braindump-entry[data-id="${entryId}"]`);
       if (activeEl) activeEl.classList.add("active");
     }
+    setDirty(false);
   } catch {
     // 自動保存失敗は静かに無視
   }
@@ -426,7 +450,10 @@ async function summarizeContent() {
 async function saveNewEntry() {
   const textarea = document.getElementById("bd-new-textarea");
   const content = buildContent(textarea.value, currentImages);
-  if (!content) return;
+  if (!content) {
+    setDirty(false);
+    return;
+  }
 
   try {
     if (editingEntryId) {
@@ -446,6 +473,7 @@ async function saveNewEntry() {
       const activeEl = document.querySelector(`.braindump-entry[data-id="${editingEntryId}"]`);
       if (activeEl) activeEl.classList.add("active");
     }
+    setDirty(false);
   } catch (e) {
     showToast(`保存に失敗しました: ${e.message}`, "error");
   }
@@ -456,7 +484,10 @@ async function autoSaveNewEntry() {
   if (!textarea) return;
 
   const content = buildContent(textarea.value, currentImages);
-  if (!content) return;
+  if (!content) {
+    setDirty(false);
+    return;
+  }
 
   try {
     if (newEntryId) {
@@ -472,6 +503,7 @@ async function autoSaveNewEntry() {
     // 右カラムの一覧も更新
     entries = await braindumpApi.listByDate(currentDate) || [];
     refreshEntries();
+    setDirty(false);
   } catch {
     // 自動保存失敗は静かに無視
   }
