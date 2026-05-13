@@ -268,10 +268,10 @@ export const journalApi = {
 
 export const braindumpApi = {
   /** メモ作成（1日に複数作成可能） */
-  create: (date, content) =>
+  create: (date, content, labels = null) =>
     apiFetch("/braindump", {
       method: "POST",
-      body: { date, content },
+      body: labels ? { date, content, labels } : { date, content },
     }),
 
   /** メモ一覧（日付範囲） */
@@ -296,9 +296,13 @@ export const braindumpApi = {
   /** 単一メモ取得 */
   getEntry: (entryId) => apiFetch(`/braindump/entry/${encodeURIComponent(entryId)}`),
 
-  /** メモ更新 */
-  update: (entryId, content) =>
-    apiFetch(`/braindump/entry/${encodeURIComponent(entryId)}`, { method: "PUT", body: { content } }),
+  /** メモ更新（content / labels いずれかまたは両方を指定可、null は省略扱い） */
+  update: (entryId, content, labels = null) => {
+    const body = {};
+    if (content !== null && content !== undefined) body.content = content;
+    if (labels !== null && labels !== undefined) body.labels = labels;
+    return apiFetch(`/braindump/entry/${encodeURIComponent(entryId)}`, { method: "PUT", body });
+  },
 
   /** メモ削除 */
   delete: (entryId) =>
@@ -325,6 +329,20 @@ export const braindumpApi = {
     }
     return res.json();
   },
+
+  /** ラベル一覧（全メモから集計、使用件数付き） */
+  listLabels: () => apiFetch("/braindump/labels"),
+
+  /** ラベルをリネーム（影響件数を返す） */
+  renameLabel: (oldName, newName) =>
+    apiFetch("/braindump/labels/rename", {
+      method: "POST",
+      body: { old_name: oldName, new_name: newName },
+    }),
+
+  /** ラベルを削除（カスケード除去、影響件数を返す） */
+  deleteLabel: (name) =>
+    apiFetch(`/braindump/labels/${encodeURIComponent(name)}`, { method: "DELETE" }),
 };
 
 // ---- 単語帳カード ----

@@ -5863,6 +5863,438 @@ main.swipe-enter-right {
 }
 
 /* ===================================================
+   ブレインダンプ — ラベル機能
+   =================================================== */
+
+/* タグ管理ボタン（ヘッダー） */
+#bd-manage-labels-btn {
+  white-space: nowrap;
+}
+
+/* ラベル編集エリア（テキストエリアの上） */
+.braindump-labels-editor {
+  margin-bottom: 8px;
+}
+.bd-labels-editor-inner {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px 10px;
+  border: 1px dashed rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  position: relative;
+}
+.bd-labels-editor-icon {
+  opacity: 0.6;
+  font-size: 14px;
+  margin-right: 2px;
+}
+.bd-labels-editor-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.bd-labels-editor-chips:empty::before {
+  content: "ラベルなし";
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.4);
+}
+[data-theme="light"] .bd-labels-editor-inner {
+  border-color: rgba(0, 0, 0, 0.15);
+  background: rgba(0, 0, 0, 0.015);
+}
+[data-theme="light"] .bd-labels-editor-chips:empty::before {
+  color: rgba(0, 0, 0, 0.35);
+}
+
+/* ラベルチップ共通 */
+.bd-label-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 12px;
+  line-height: 1.4;
+  font-weight: 600;
+  background: var(--bd-chip-bg-dark);
+  color: var(--bd-chip-fg-dark);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  white-space: nowrap;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+[data-theme="light"] .bd-label-chip {
+  background: var(--bd-chip-bg);
+  color: var(--bd-chip-fg);
+  border-color: rgba(0, 0, 0, 0.08);
+}
+
+.bd-label-chip-sm {
+  font-size: 11px;
+  padding: 2px 7px;
+}
+
+.bd-label-chip-remove {
+  background: transparent;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  padding: 0;
+  margin-left: 2px;
+  opacity: 0.6;
+}
+.bd-label-chip-remove:hover {
+  opacity: 1;
+}
+
+.bd-label-count {
+  font-weight: 400;
+  opacity: 0.65;
+  font-size: 10px;
+  margin-left: 2px;
+}
+
+/* ＋ラベルボタン */
+.bd-label-add-btn {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px dashed rgba(255, 255, 255, 0.25);
+  color: rgba(255, 255, 255, 0.75);
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.bd-label-add-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+[data-theme="light"] .bd-label-add-btn {
+  background: rgba(0, 0, 0, 0.03);
+  border-color: rgba(0, 0, 0, 0.2);
+  color: rgba(0, 0, 0, 0.65);
+}
+[data-theme="light"] .bd-label-add-btn:hover {
+  background: rgba(0, 0, 0, 0.07);
+  color: rgba(0, 0, 0, 0.85);
+}
+
+/* ラベルピッカー（ドロップダウン） */
+.bd-label-picker {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: rgba(20, 22, 30, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  padding: 10px;
+  z-index: 50;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+[data-theme="light"] .bd-label-picker {
+  background: #fff;
+  border-color: rgba(0, 0, 0, 0.15);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+.bd-label-picker-input {
+  width: 100%;
+  padding: 6px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  color: inherit;
+  font-size: 13px;
+  margin-bottom: 8px;
+  box-sizing: border-box;
+}
+[data-theme="light"] .bd-label-picker-input {
+  background: #fff;
+  border-color: rgba(0, 0, 0, 0.2);
+}
+.bd-label-picker-input:focus {
+  outline: none;
+  border-color: rgba(100, 150, 255, 0.6);
+}
+.bd-label-picker-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-height: 180px;
+  overflow-y: auto;
+}
+.bd-label-picker-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 12px;
+  cursor: pointer;
+  background: var(--bd-chip-bg-dark);
+  color: var(--bd-chip-fg-dark);
+}
+[data-theme="light"] .bd-label-picker-option {
+  background: var(--bd-chip-bg);
+  color: var(--bd-chip-fg);
+  border-color: rgba(0, 0, 0, 0.08);
+}
+.bd-label-picker-option:hover {
+  filter: brightness(1.1);
+}
+.bd-label-picker-empty {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.4);
+  padding: 6px 4px;
+}
+.bd-label-picker-hint {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.4);
+  margin-top: 6px;
+  text-align: right;
+}
+[data-theme="light"] .bd-label-picker-empty,
+[data-theme="light"] .bd-label-picker-hint {
+  color: rgba(0, 0, 0, 0.45);
+}
+
+/* フィルタバー（右カラム上部） */
+.braindump-filter-bar {
+  margin-bottom: 12px;
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.02);
+}
+[data-theme="light"] .braindump-filter-bar {
+  border-color: rgba(0, 0, 0, 0.08);
+  background: rgba(0, 0, 0, 0.015);
+}
+.bd-filter-bar-inner {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.bd-filter-label {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.55);
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  margin-right: 2px;
+}
+[data-theme="light"] .bd-filter-label {
+  color: rgba(0, 0, 0, 0.5);
+}
+.bd-filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.bd-filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--bd-chip-bg-dark);
+  color: var(--bd-chip-fg-dark);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  cursor: pointer;
+  opacity: 0.6;
+  transition: opacity 0.15s, transform 0.1s;
+}
+.bd-filter-chip:hover {
+  opacity: 0.85;
+}
+.bd-filter-chip.active {
+  opacity: 1;
+  border-color: rgba(255, 255, 255, 0.6);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.15);
+  transform: translateY(-1px);
+}
+[data-theme="light"] .bd-filter-chip {
+  background: var(--bd-chip-bg);
+  color: var(--bd-chip-fg);
+  border-color: rgba(0, 0, 0, 0.08);
+}
+[data-theme="light"] .bd-filter-chip.active {
+  border-color: rgba(0, 0, 0, 0.5);
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.08);
+}
+.bd-filter-clear {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: rgba(255, 255, 255, 0.6);
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  cursor: pointer;
+  margin-left: auto;
+}
+.bd-filter-clear:hover {
+  border-color: rgba(255, 100, 100, 0.5);
+  color: rgba(255, 130, 130, 0.95);
+}
+[data-theme="light"] .bd-filter-clear {
+  border-color: rgba(0, 0, 0, 0.2);
+  color: rgba(0, 0, 0, 0.55);
+}
+.bd-filter-empty {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.4);
+  padding: 2px 4px;
+}
+[data-theme="light"] .bd-filter-empty {
+  color: rgba(0, 0, 0, 0.4);
+}
+
+/* エントリカード内のラベル表示 */
+.bd-entry-labels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 4px 0 6px;
+}
+
+/* ラベル管理モーダル */
+.bd-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 16px;
+  box-sizing: border-box;
+  backdrop-filter: blur(2px);
+}
+.bd-modal {
+  background: rgba(22, 24, 32, 0.98);
+  color: #fff;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  max-width: 560px;
+  width: 100%;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+[data-theme="light"] .bd-modal {
+  background: #fff;
+  color: #111;
+  border-color: rgba(0, 0, 0, 0.12);
+}
+.bd-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+[data-theme="light"] .bd-modal-header {
+  border-bottom-color: rgba(0, 0, 0, 0.08);
+}
+.bd-modal-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+.bd-modal-close {
+  background: transparent;
+  border: none;
+  font-size: 22px;
+  line-height: 1;
+  color: inherit;
+  opacity: 0.6;
+  cursor: pointer;
+  padding: 0 4px;
+}
+.bd-modal-close:hover {
+  opacity: 1;
+}
+.bd-modal-body {
+  padding: 12px 18px;
+  overflow-y: auto;
+  flex: 1 1 auto;
+}
+.bd-modal-footer {
+  padding: 10px 18px 14px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+[data-theme="light"] .bd-modal-footer {
+  border-top-color: rgba(0, 0, 0, 0.08);
+}
+.bd-labels-modal-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 4px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+.bd-labels-modal-row:last-child {
+  border-bottom: none;
+}
+[data-theme="light"] .bd-labels-modal-row {
+  border-bottom-color: rgba(0, 0, 0, 0.05);
+}
+.bd-labels-modal-count {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.5);
+  white-space: nowrap;
+}
+[data-theme="light"] .bd-labels-modal-count {
+  color: rgba(0, 0, 0, 0.5);
+}
+.bd-labels-modal-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 6px;
+}
+.bd-labels-modal-empty {
+  padding: 24px 4px;
+  text-align: center;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.5);
+}
+[data-theme="light"] .bd-labels-modal-empty {
+  color: rgba(0, 0, 0, 0.5);
+}
+
+/* モバイル: モーダル */
+@media (max-width: 600px) {
+  .bd-modal {
+    max-height: 90vh;
+  }
+  .bd-labels-modal-row {
+    flex-wrap: wrap;
+  }
+  .bd-labels-modal-actions {
+    margin-left: 0;
+    width: 100%;
+  }
+}
+
+/* ===================================================
    単語帳カード — 一覧画面
    =================================================== */
 

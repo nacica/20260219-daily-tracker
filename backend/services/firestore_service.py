@@ -9,6 +9,8 @@ from firebase_admin import credentials, firestore
 from google.cloud.firestore_v1.base_query import FieldFilter
 from typing import Optional
 
+from utils.helpers import now_jst
+
 # Firebase Admin SDK の初期化（初回のみ）
 _initialized = False
 
@@ -543,6 +545,69 @@ def delete_braindump(entry_id: str) -> bool:
         return False
     ref.delete()
     return True
+
+
+def aggregate_braindump_labels() -> list[dict]:
+    """全ブレインダンプを走査してラベル使用件数を集計する"""
+    db = get_db()
+    counts: dict[str, int] = {}
+    for doc in db.collection("braindump_entries").stream():
+        data = doc.to_dict() or {}
+        for label in data.get("labels") or []:
+            if not isinstance(label, str):
+                continue
+            name = label.strip()
+            if not name:
+                continue
+            counts[name] = counts.get(name, 0) + 1
+    return [{"name": k, "count": v} for k, v in sorted(counts.items(), key=lambda x: (-x[1], x[0]))]
+
+
+def rename_braindump_label(old_name: str, new_name: str) -> int:
+    """全ブレインダンプの labels 配列の old_name を new_name に置換する。影響件数を返す"""
+    db = get_db()
+    old = (old_name or "").strip()
+    new = (new_name or "").strip()
+    if not old or not new or old == new:
+        return 0
+
+    affected = 0
+    for doc in db.collection("braindump_entries").stream():
+        data = doc.to_dict() or {}
+        labels = data.get("labels") or []
+        if not isinstance(labels, list) or old not in labels:
+            continue
+        # 置換 + 重複排除（順序維持）
+        seen = set()
+        new_labels: list[str] = []
+        for lbl in labels:
+            replaced = new if lbl == old else lbl
+            if replaced in seen:
+                continue
+            seen.add(replaced)
+            new_labels.append(replaced)
+        doc.reference.update({"labels": new_labels, "updated_at": now_jst()})
+        affected += 1
+    return affected
+
+
+def delete_braindump_label(name: str) -> int:
+    """全ブレインダンプの labels 配列から name を除去する。影響件数を返す"""
+    db = get_db()
+    target = (name or "").strip()
+    if not target:
+        return 0
+
+    affected = 0
+    for doc in db.collection("braindump_entries").stream():
+        data = doc.to_dict() or {}
+        labels = data.get("labels") or []
+        if not isinstance(labels, list) or target not in labels:
+            continue
+        new_labels = [lbl for lbl in labels if lbl != target]
+        doc.reference.update({"labels": new_labels, "updated_at": now_jst()})
+        affected += 1
+    return affected
 
 
 # ---- reminders (今日意識すること) ----

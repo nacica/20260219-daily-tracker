@@ -19,9 +19,27 @@ from typing import Optional
 
 from models.braindump_schemas import (
     BraindumpCreate, BraindumpUpdate, BraindumpEntry,
+    LabelRenameRequest, LabelListResponse, LabelCount,
 )
 from services import firestore_service, claude_service, storage_service
 from utils.helpers import now_jst
+
+
+def _normalize_labels(labels: Optional[list[str]]) -> list[str]:
+    """ラベル配列を正規化（trim・空除去・重複排除・順序維持）"""
+    if not labels:
+        return []
+    seen: set[str] = set()
+    out: list[str] = []
+    for lbl in labels:
+        if not isinstance(lbl, str):
+            continue
+        name = lbl.strip()
+        if not name or name in seen:
+            continue
+        seen.add(name)
+        out.append(name)
+    return out
 
 router = APIRouter()
 
@@ -49,6 +67,7 @@ async def create_braindump(body: BraindumpCreate, background_tasks: BackgroundTa
         "entry_number": entry_number,
         "content": body.content,
         "title": temp_title,
+        "labels": _normalize_labels(body.labels),
         "created_at": now,
         "updated_at": now,
     }
@@ -118,6 +137,9 @@ async def update_braindump_entry(entry_id: str, body: BraindumpUpdate, backgroun
                 temp_title += "..."
             update_data["title"] = temp_title
             background_tasks.add_task(_generate_title_background, entry_id, body.content)
+
+    if body.labels is not None:
+        update_data["labels"] = _normalize_labels(body.labels)
 
     updated = firestore_service.update_braindump(entry_id, update_data)
     return BraindumpEntry(**updated)
@@ -196,6 +218,38 @@ async def generate_braindump_title(entry_id: str):
     update_data = {"title": title, "updated_at": now_jst()}
     updated = firestore_service.update_braindump(entry_id, update_data)
     return BraindumpEntry(**updated)
+
+
+# ---- ラベル管理 ----
+
+@router.get("/braindump/labels", response_model=LabelListResponse)
+async def list_braindump_labels():
+    """全ブレインダンプから集計したラベル一覧（使用件数付き、件数降順→名前昇順）"""
+    items = firestore_service.aggregate_braindump_labels()
+    return LabelListResponse(labels=[LabelCount(**i) for i in items])
+
+
+@router.post("/braindump/labels/rename")
+async def rename_braindump_label_endpoint(body: LabelRenameRequest):
+    """ラベルをリネーム（使用中の全メモを一括更新）"""
+    old = body.old_name.strip()
+    new = body.new_name.strip()
+    if not old or not new:
+        raise HTTPException(status_code=400, detail="ラベル名が空です")
+    if old == new:
+        return {"affected": 0}
+    affected = firestore_service.rename_braindump_label(old, new)
+    return {"affected": affected}
+
+
+@router.delete("/braindump/labels/{name}")
+async def delete_braindump_label_endpoint(name: str):
+    """ラベルを削除（使用中の全メモからカスケード除去）"""
+    target = (name or "").strip()
+    if not target:
+        raise HTTPException(status_code=400, detail="ラベル名が空です")
+    affected = firestore_service.delete_braindump_label(target)
+    return {"affected": affected}
 
 
 # ---- バックグラウンドタスク ----

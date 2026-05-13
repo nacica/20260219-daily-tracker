@@ -13,11 +13,19 @@ class BraindumpCreate(BaseModel):
     """ブレインダンプ作成リクエスト"""
     date: str = Field(..., description="日付 (YYYY-MM-DD)")
     content: str = Field(..., min_length=1, max_length=50000, description="メモ本文")
+    labels: Optional[list[str]] = Field(default=None, description="ラベル名リスト")
 
 
 class BraindumpUpdate(BaseModel):
     """ブレインダンプ更新リクエスト"""
     content: Optional[str] = Field(None, min_length=1, max_length=50000)
+    labels: Optional[list[str]] = Field(default=None, description="ラベル名リスト（指定で全置換）")
+
+
+class LabelRenameRequest(BaseModel):
+    """ラベルリネームリクエスト"""
+    old_name: str = Field(..., min_length=1, max_length=50)
+    new_name: str = Field(..., min_length=1, max_length=50)
 
 
 # ---- API レスポンス ----
@@ -29,5 +37,17 @@ class BraindumpEntry(BaseModel):
     entry_number: int = 1
     content: str
     title: Optional[str] = None
+    labels: list[str] = Field(default_factory=list)
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
+
+
+class LabelCount(BaseModel):
+    """ラベルと使用件数"""
+    name: str
+    count: int
+
+
+class LabelListResponse(BaseModel):
+    """全ラベル一覧（管理UI / 入力候補用）"""
+    labels: list[LabelCount]

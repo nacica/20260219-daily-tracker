@@ -1,11 +1,12 @@
-/**
+﻿/**
  * ブレインダンプ コンポーネント
  * プレーンテキストのメモ帳。1日に複数メモ作成可能。
  * 自動保存、AIタイトル自動生成、画像貼り付け対応。
+ * ラベル機能: メモごとに複数ラベル付与可、ラベルOR検索、専用管理モーダル。
  */
 
-import { braindumpApi } from "../api.js?v=20260509d";
-import { showToast } from "../app.js?v=20260509d";
+import { braindumpApi } from "../api.js?v=20260513a";
+import { showToast } from "../app.js?v=20260513a";
 
 // ===== ユーティリティ =====
 
@@ -25,6 +26,27 @@ function daysAgo(n) {
   return d.toLocaleDateString("sv-SE");
 }
 
+/** タグ名から決定的に HSL 色を生成（薄め背景・濃いめ文字） */
+function labelColor(name) {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) {
+    h = (h * 31 + name.charCodeAt(i)) >>> 0;
+  }
+  const hue = h % 360;
+  return {
+    bg: `hsl(${hue}, 70%, 88%)`,
+    fg: `hsl(${hue}, 60%, 28%)`,
+    bgDark: `hsl(${hue}, 35%, 22%)`,
+    fgDark: `hsl(${hue}, 70%, 78%)`,
+  };
+}
+
+function labelChipStyle(name) {
+  const c = labelColor(name);
+  // ライト/ダーク両対応は CSS 変数経由ではなく inline で。--label-bg/--label-fg を data-theme で切替
+  return `--bd-chip-bg:${c.bg}; --bd-chip-fg:${c.fg}; --bd-chip-bg-dark:${c.bgDark}; --bd-chip-fg-dark:${c.fgDark};`;
+}
+
 // ===== 状態管理 =====
 
 let currentDate = today();
@@ -34,7 +56,10 @@ let editingEntryId = null;
 let newAutoSaveTimer = null;
 let newEntryId = null; // 新規メモが自動保存された後のエントリID
 let currentImages = []; // テキストとは別に管理する添付画像URLリスト
+let currentLabels = []; // 編集中メモ / 新規メモのラベル配列
 let isDirty = false; // テキストエリアに未保存の変更があるか（ヘッダー保存ボタンの表示制御に使用）
+let allLabels = []; // 全メモから集計したラベル一覧 [{name, count}]
+let filterLabels = []; // 一覧フィルタで選択中のラベル名（OR検索）
 
 function setDirty(dirty) {
   isDirty = dirty;
@@ -72,6 +97,8 @@ function buildContent(text, images) {
 export async function renderBraindump() {
   currentDate = today();
   newEntryId = null; // ページ遷移時にリセット
+  currentLabels = [];
+  filterLabels = [];
   const main = document.querySelector("main");
   main.innerHTML = `<div class="loading"><div class="spinner"></div><p>読み込み中...</p></div>`;
 
@@ -88,6 +115,14 @@ export async function renderBraindump() {
     recentEntries = [];
   }
 
+  // ラベル一覧（全メモから集計）
+  try {
+    const res = await braindumpApi.listLabels();
+    allLabels = (res && res.labels) || [];
+  } catch {
+    allLabels = [];
+  }
+
   main.innerHTML = `
     <div class="braindump-container">
       <!-- 左カラム: 入力エリア (7) -->
@@ -97,9 +132,13 @@ export async function renderBraindump() {
           <div class="braindump-header-actions">
             <button class="btn btn-primary btn-sm" id="bd-save-header-btn" style="display: none;">💾 保存</button>
             <button class="btn btn-primary btn-sm" id="bd-new-btn">＋ 新しいメモ</button>
+            <button class="btn btn-outline btn-sm" id="bd-manage-labels-btn" title="ラベルを管理">⚙ タグ管理</button>
           </div>
         </div>
         <div class="braindump-new-form" id="bd-new-form">
+          <div class="braindump-labels-editor" id="bd-labels-editor">
+            ${renderLabelsEditor()}
+          </div>
           <div class="braindump-textarea-wrap">
             <textarea class="braindump-textarea" id="bd-new-textarea" placeholder="思いついたことを自由に書き出してください..." rows="36"></textarea>
             <div class="braindump-resize-bar" id="bd-resize-bar" aria-hidden="true" title="ドラッグして縦幅を調整"></div>
@@ -115,6 +154,9 @@ export async function renderBraindump() {
 
       <!-- 右カラム: メモ一覧 (3) -->
       <div class="braindump-right">
+        <div class="braindump-filter-bar" id="bd-filter-bar">
+          ${renderFilterBar()}
+        </div>
         <div class="braindump-entries" id="bd-entries">
           ${renderRecentEntries()}
         </div>
@@ -125,20 +167,238 @@ export async function renderBraindump() {
   attachEvents();
 }
 
+// ===== ラベル入力エリア（テキストエリア上部） =====
+
+function renderLabelsEditor() {
+  const chips = currentLabels.map(name => `
+    <span class="bd-label-chip" style="${labelChipStyle(name)}" data-label="${escapeHTML(name)}">
+      ${escapeHTML(name)}
+      <button class="bd-label-chip-remove" type="button" data-label="${escapeHTML(name)}" title="このラベルを外す">×</button>
+    </span>
+  `).join("");
+
+  return `
+    <div class="bd-labels-editor-inner">
+      <span class="bd-labels-editor-icon" aria-hidden="true">🏷</span>
+      <div class="bd-labels-editor-chips" id="bd-labels-editor-chips">${chips}</div>
+      <button class="bd-label-add-btn" id="bd-label-add-btn" type="button" title="ラベルを追加">＋ ラベル</button>
+      <div class="bd-label-picker" id="bd-label-picker" style="display:none;"></div>
+    </div>
+  `;
+}
+
+function refreshLabelsEditor() {
+  const el = document.getElementById("bd-labels-editor");
+  if (!el) return;
+  el.innerHTML = renderLabelsEditor();
+  attachLabelsEditorEvents();
+}
+
+function attachLabelsEditorEvents() {
+  // チップ削除
+  document.querySelectorAll(".bd-label-chip-remove").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const name = btn.dataset.label;
+      currentLabels = currentLabels.filter(l => l !== name);
+      refreshLabelsEditor();
+      onLabelsChanged();
+    });
+  });
+
+  // ラベル追加ボタン → ピッカー表示
+  const addBtn = document.getElementById("bd-label-add-btn");
+  const picker = document.getElementById("bd-label-picker");
+  if (addBtn && picker) {
+    addBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (picker.style.display === "none") {
+        renderLabelPicker();
+        picker.style.display = "";
+        const input = picker.querySelector(".bd-label-picker-input");
+        if (input) {
+          input.value = "";
+          input.focus();
+        }
+      } else {
+        picker.style.display = "none";
+      }
+    });
+  }
+}
+
+function renderLabelPicker() {
+  const picker = document.getElementById("bd-label-picker");
+  if (!picker) return;
+
+  // 既存ラベル: currentLabels に既にあるものは除外
+  const available = allLabels.filter(l => !currentLabels.includes(l.name));
+
+  const options = available.map(l => `
+    <button class="bd-label-picker-option" type="button" data-name="${escapeHTML(l.name)}" style="${labelChipStyle(l.name)}">
+      ${escapeHTML(l.name)} <span class="bd-label-count">${l.count}</span>
+    </button>
+  `).join("");
+
+  picker.innerHTML = `
+    <input type="text" class="bd-label-picker-input" placeholder="新規ラベル名を入力 / 既存から選択" maxlength="50" />
+    <div class="bd-label-picker-options">${options || '<div class="bd-label-picker-empty">既存ラベルなし</div>'}</div>
+    <div class="bd-label-picker-hint">Enter で確定 / Esc で閉じる</div>
+  `;
+
+  const input = picker.querySelector(".bd-label-picker-input");
+  if (input) {
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        const val = input.value.trim();
+        if (val) addLabelToCurrent(val);
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        picker.style.display = "none";
+      }
+    });
+    // 入力に応じて候補をフィルタ
+    input.addEventListener("input", () => {
+      const q = input.value.trim().toLowerCase();
+      picker.querySelectorAll(".bd-label-picker-option").forEach(btn => {
+        const name = btn.dataset.name.toLowerCase();
+        btn.style.display = !q || name.includes(q) ? "" : "none";
+      });
+    });
+  }
+
+  picker.querySelectorAll(".bd-label-picker-option").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const name = btn.dataset.name;
+      addLabelToCurrent(name);
+    });
+  });
+}
+
+function addLabelToCurrent(rawName) {
+  const name = rawName.trim();
+  if (!name) return;
+  if (currentLabels.includes(name)) return;
+  currentLabels.push(name);
+  // allLabels にもまだなければ追加（count=1 で先頭表示）
+  if (!allLabels.find(l => l.name === name)) {
+    allLabels.unshift({ name, count: 1 });
+  }
+  refreshLabelsEditor();
+  onLabelsChanged();
+  // ピッカーを閉じる
+  const picker = document.getElementById("bd-label-picker");
+  if (picker) picker.style.display = "none";
+}
+
+/** ラベル変更直後にサーバへ反映（既存メモ編集中なら即保存、新規なら autoSave 経由で保存） */
+async function onLabelsChanged() {
+  if (editingEntryId) {
+    try {
+      await braindumpApi.update(editingEntryId, null, currentLabels);
+      const idx = recentEntries.findIndex(e => e.id === editingEntryId);
+      if (idx >= 0) recentEntries[idx].labels = [...currentLabels];
+      refreshFilterBar();
+      refreshEntriesList(editingEntryId);
+    } catch {
+      // 失敗時は静かに無視
+    }
+  } else if (newEntryId) {
+    try {
+      await braindumpApi.update(newEntryId, null, currentLabels);
+      const idx = recentEntries.findIndex(e => e.id === newEntryId);
+      if (idx >= 0) recentEntries[idx].labels = [...currentLabels];
+      refreshFilterBar();
+      refreshEntriesList(newEntryId);
+    } catch {}
+  }
+  // 新規メモ（未保存）の場合は currentLabels だけ保持し、保存時に一緒に送る
+}
+
+// ===== フィルタバー（右カラム上部） =====
+
+function renderFilterBar() {
+  if (allLabels.length === 0) {
+    return `<div class="bd-filter-empty">ラベルなし</div>`;
+  }
+  const chips = allLabels.map(l => {
+    const active = filterLabels.includes(l.name);
+    return `
+      <button class="bd-filter-chip${active ? ' active' : ''}" type="button"
+              data-name="${escapeHTML(l.name)}"
+              style="${labelChipStyle(l.name)}">
+        ${escapeHTML(l.name)} <span class="bd-label-count">${l.count}</span>
+      </button>
+    `;
+  }).join("");
+  const clearBtn = filterLabels.length > 0
+    ? `<button class="bd-filter-clear" type="button" id="bd-filter-clear-btn">× クリア</button>`
+    : "";
+  return `
+    <div class="bd-filter-bar-inner">
+      <span class="bd-filter-label">フィルタ:</span>
+      <div class="bd-filter-chips">${chips}</div>
+      ${clearBtn}
+    </div>
+  `;
+}
+
+function refreshFilterBar() {
+  const el = document.getElementById("bd-filter-bar");
+  if (!el) return;
+  el.innerHTML = renderFilterBar();
+  attachFilterBarEvents();
+}
+
+function attachFilterBarEvents() {
+  document.querySelectorAll(".bd-filter-chip").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const name = btn.dataset.name;
+      if (filterLabels.includes(name)) {
+        filterLabels = filterLabels.filter(n => n !== name);
+      } else {
+        filterLabels.push(name);
+      }
+      refreshFilterBar();
+      refreshEntriesList();
+    });
+  });
+  document.getElementById("bd-filter-clear-btn")?.addEventListener("click", () => {
+    filterLabels = [];
+    refreshFilterBar();
+    refreshEntriesList();
+  });
+}
+
 // ===== エントリ一覧レンダリング =====
 
+function getFilteredEntries() {
+  if (filterLabels.length === 0) return recentEntries;
+  // OR: いずれかを含む
+  return recentEntries.filter(e => {
+    const labels = e.labels || [];
+    return labels.some(l => filterLabels.includes(l));
+  });
+}
+
 function renderRecentEntries() {
-  if (recentEntries.length === 0) {
+  const list = getFilteredEntries();
+  if (list.length === 0) {
+    const msg = filterLabels.length > 0
+      ? `選択中のラベルに該当するメモはありません`
+      : `過去15日間のメモはありません`;
     return `
       <div class="empty-state" style="padding: 32px 0;">
         <div class="icon">📝</div>
-        <p>過去15日間のメモはありません</p>
+        <p>${msg}</p>
       </div>`;
   }
 
   // 日付ごとにグループ化（新しい日付順）
   const grouped = {};
-  for (const entry of recentEntries) {
+  for (const entry of list) {
     const date = entry.date;
     if (!grouped[date]) grouped[date] = [];
     grouped[date].push(entry);
@@ -165,6 +425,12 @@ function renderRecentEntries() {
       const cleanContent = entry.content.replace(IMG_REGEX, " ").trim();
       const title = entry.title || cleanContent.slice(0, 30).replace(/\n/g, " ");
       const preview = cleanContent.slice(0, 80).replace(/\n/g, " ");
+      const labels = entry.labels || [];
+      const labelsHTML = labels.length > 0
+        ? `<div class="bd-entry-labels">${labels.map(l => `
+            <span class="bd-label-chip bd-label-chip-sm" style="${labelChipStyle(l)}">${escapeHTML(l)}</span>
+          `).join("")}</div>`
+        : "";
 
       return `
         <div class="braindump-entry" data-id="${entry.id}" style="cursor: pointer;">
@@ -175,6 +441,7 @@ function renderRecentEntries() {
               <button class="braindump-entry-delete" data-id="${entry.id}" title="削除">×</button>
             </div>
           </div>
+          ${labelsHTML}
           <div class="braindump-entry-preview">${escapeHTML(preview)}${entry.content.length > 80 ? '...' : ''}</div>
         </div>`;
     }).join("");
@@ -187,11 +454,26 @@ function renderRecentEntries() {
   }).join("");
 }
 
+function refreshEntriesList(activeId) {
+  const container = document.getElementById("bd-entries");
+  if (container) {
+    container.innerHTML = renderRecentEntries();
+    const targetId = activeId || editingEntryId;
+    if (targetId) {
+      const activeEl = container.querySelector(`.braindump-entry[data-id="${targetId}"]`);
+      if (activeEl) activeEl.classList.add("active");
+    }
+  }
+}
+
 // ===== イベントハンドリング =====
 
 function attachEvents() {
   // 新しいメモボタン（書きかけ内容を保存してから新規モードへリセット）
   document.getElementById("bd-new-btn")?.addEventListener("click", startNewMemo);
+
+  // ラベル管理ボタン
+  document.getElementById("bd-manage-labels-btn")?.addEventListener("click", openLabelsManager);
 
   // ページ表示時に自動フォーカス
   setTimeout(() => {
@@ -214,6 +496,22 @@ function attachEvents() {
   // 縦幅調整バーのドラッグ処理（デスクトップ専用）
   initResizeBar();
 
+  // ラベル編集UIのイベント
+  attachLabelsEditorEvents();
+
+  // フィルタバーのイベント
+  attachFilterBarEvents();
+
+  // ピッカー外クリックで閉じる
+  document.addEventListener("click", (e) => {
+    const picker = document.getElementById("bd-label-picker");
+    const addBtn = document.getElementById("bd-label-add-btn");
+    if (!picker || picker.style.display === "none") return;
+    if (picker.contains(e.target)) return;
+    if (addBtn && addBtn.contains(e.target)) return;
+    picker.style.display = "none";
+  });
+
   // マークダウン要約ボタン
   document.getElementById("bd-summarize-btn")?.addEventListener("click", summarizeContent);
 
@@ -234,7 +532,9 @@ function attachEvents() {
     } else {
       newEntryId = null;
       currentImages = [];
+      currentLabels = [];
       renderImagePreview();
+      refreshLabelsEditor();
       document.getElementById("bd-new-textarea").value = "";
       setDirty(false);
       document.getElementById("bd-new-textarea")?.focus();
@@ -277,10 +577,12 @@ function attachEvents() {
     const { text, images } = splitContentAndImages(entry.content);
     textarea.value = text;
     currentImages = images;
+    currentLabels = [...(entry.labels || [])];
     editingEntryId = entryId;
     newEntryId = null; // 新規メモのIDをリセット
     setDirty(false); // 読み込み直後は DB と同期されているので未保存状態ではない
     renderImagePreview();
+    refreshLabelsEditor();
 
     // 右カラムの該当エントリにアクティブ表示
     document.querySelectorAll(".braindump-entry").forEach(el => el.classList.remove("active"));
@@ -310,10 +612,12 @@ function updateHeaderForEditing(entry) {
     <div class="braindump-header-actions">
       <button class="btn btn-primary btn-sm" id="bd-save-header-btn" style="display: ${isDirty ? "" : "none"};">💾 保存</button>
       <button class="btn btn-outline btn-sm" id="bd-back-to-new-btn">＋ 新しいメモ</button>
+      <button class="btn btn-outline btn-sm" id="bd-manage-labels-btn" title="ラベルを管理">⚙ タグ管理</button>
     </div>
   `;
   document.getElementById("bd-back-to-new-btn")?.addEventListener("click", resetToNewMode);
   document.getElementById("bd-save-header-btn")?.addEventListener("click", saveNewEntry);
+  document.getElementById("bd-manage-labels-btn")?.addEventListener("click", openLabelsManager);
 
   // フォーム内の削除ボタンを表示
   const deleteBtn = document.getElementById("bd-delete-btn");
@@ -345,7 +649,9 @@ function resetToNewMode() {
   const textarea = document.getElementById("bd-new-textarea");
   if (textarea) textarea.value = "";
   currentImages = [];
+  currentLabels = [];
   renderImagePreview();
+  refreshLabelsEditor();
 
   // ヘッダーを元に戻す
   const header = document.querySelector(".braindump-header");
@@ -355,10 +661,12 @@ function resetToNewMode() {
       <div class="braindump-header-actions">
         <button class="btn btn-primary btn-sm" id="bd-save-header-btn" style="display: none;">💾 保存</button>
         <button class="btn btn-primary btn-sm" id="bd-new-btn">＋ 新しいメモ</button>
+        <button class="btn btn-outline btn-sm" id="bd-manage-labels-btn" title="ラベルを管理">⚙ タグ管理</button>
       </div>
     `;
     document.getElementById("bd-new-btn")?.addEventListener("click", startNewMemo);
     document.getElementById("bd-save-header-btn")?.addEventListener("click", saveNewEntry);
+    document.getElementById("bd-manage-labels-btn")?.addEventListener("click", openLabelsManager);
   }
 
   // フォーム内の削除ボタンを非表示
@@ -391,20 +699,13 @@ async function autoSaveExistingEntry(entryId) {
   if (!content) return;
 
   try {
-    const updated = await braindumpApi.update(entryId, content);
+    const updated = await braindumpApi.update(entryId, content, currentLabels);
     // recentEntries を更新
     const idx = recentEntries.findIndex(e => e.id === entryId);
     if (idx >= 0 && updated) {
       recentEntries[idx] = updated;
     }
-    // 右カラムの一覧を再描画（アクティブ状態を維持）
-    const container = document.getElementById("bd-entries");
-    if (container) {
-      container.innerHTML = renderRecentEntries();
-      // アクティブ状態を再適用
-      const activeEl = container.querySelector(`.braindump-entry[data-id="${entryId}"]`);
-      if (activeEl) activeEl.classList.add("active");
-    }
+    refreshEntriesList(entryId);
     setDirty(false);
   } catch {
     // 自動保存失敗は静かに無視
@@ -457,18 +758,18 @@ async function saveNewEntry() {
 
   try {
     if (editingEntryId) {
-      await braindumpApi.update(editingEntryId, content);
+      await braindumpApi.update(editingEntryId, content, currentLabels);
     } else if (newEntryId) {
-      await braindumpApi.update(newEntryId, content);
+      await braindumpApi.update(newEntryId, content, currentLabels);
     } else {
-      const created = await braindumpApi.create(currentDate, content);
+      const created = await braindumpApi.create(currentDate, content, currentLabels);
       if (created && created.id) {
         newEntryId = created.id;
       }
     }
     showToast("保存しました");
     entries = await braindumpApi.listByDate(currentDate) || [];
-    refreshEntries();
+    await refreshEntries();
     if (editingEntryId) {
       const activeEl = document.querySelector(`.braindump-entry[data-id="${editingEntryId}"]`);
       if (activeEl) activeEl.classList.add("active");
@@ -492,17 +793,17 @@ async function autoSaveNewEntry() {
   try {
     if (newEntryId) {
       // 既に作成済み → 更新
-      await braindumpApi.update(newEntryId, content);
+      await braindumpApi.update(newEntryId, content, currentLabels);
     } else {
       // 初回 → 新規作成してIDを保持
-      const created = await braindumpApi.create(currentDate, content);
+      const created = await braindumpApi.create(currentDate, content, currentLabels);
       if (created && created.id) {
         newEntryId = created.id;
       }
     }
     // 右カラムの一覧も更新
     entries = await braindumpApi.listByDate(currentDate) || [];
-    refreshEntries();
+    await refreshEntries();
     setDirty(false);
   } catch {
     // 自動保存失敗は静かに無視
@@ -514,7 +815,7 @@ async function deleteEntry(entryId) {
     await braindumpApi.delete(entryId);
     editingEntryId = null;
     entries = entries.filter(e => e.id !== entryId);
-    refreshEntries();
+    await refreshEntries();
   } catch (e) {
     showToast(`削除に失敗しました: ${e.message}`, "error");
   }
@@ -527,10 +828,116 @@ async function refreshEntries() {
   } catch {
     // 失敗時は既存データを維持
   }
-  const container = document.getElementById("bd-entries");
-  if (container) {
-    container.innerHTML = renderRecentEntries();
-  }
+  // ラベル一覧も再集計
+  try {
+    const res = await braindumpApi.listLabels();
+    allLabels = (res && res.labels) || [];
+  } catch {}
+  refreshFilterBar();
+  refreshEntriesList();
+}
+
+// ===== ラベル管理モーダル =====
+
+async function openLabelsManager() {
+  // 最新のラベル一覧を取得
+  try {
+    const res = await braindumpApi.listLabels();
+    allLabels = (res && res.labels) || [];
+  } catch {}
+
+  // 既存のモーダルがあれば閉じる
+  document.getElementById("bd-labels-modal")?.remove();
+
+  const rows = allLabels.length === 0
+    ? `<div class="bd-labels-modal-empty">まだラベルがありません。メモの「＋ ラベル」から追加してください。</div>`
+    : allLabels.map(l => `
+        <div class="bd-labels-modal-row" data-name="${escapeHTML(l.name)}">
+          <span class="bd-label-chip" style="${labelChipStyle(l.name)}">${escapeHTML(l.name)}</span>
+          <span class="bd-labels-modal-count">${l.count}件</span>
+          <div class="bd-labels-modal-actions">
+            <button class="btn btn-outline btn-sm bd-label-rename-btn" data-name="${escapeHTML(l.name)}">リネーム</button>
+            <button class="btn btn-danger btn-sm bd-label-delete-btn" data-name="${escapeHTML(l.name)}">削除</button>
+          </div>
+        </div>
+      `).join("");
+
+  const modal = document.createElement("div");
+  modal.id = "bd-labels-modal";
+  modal.className = "bd-modal-overlay";
+  modal.innerHTML = `
+    <div class="bd-modal">
+      <div class="bd-modal-header">
+        <h3>ラベル管理</h3>
+        <button class="bd-modal-close" type="button" title="閉じる">×</button>
+      </div>
+      <div class="bd-modal-body">
+        ${rows}
+      </div>
+      <div class="bd-modal-footer">
+        <button class="btn btn-outline btn-sm" id="bd-labels-modal-close-btn">閉じる</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+
+  const close = () => modal.remove();
+  modal.querySelector(".bd-modal-close")?.addEventListener("click", close);
+  modal.querySelector("#bd-labels-modal-close-btn")?.addEventListener("click", close);
+  modal.addEventListener("click", (e) => {
+    if (e.target === modal) close();
+  });
+
+  modal.querySelectorAll(".bd-label-rename-btn").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const oldName = btn.dataset.name;
+      const newName = prompt(`「${oldName}」を何にリネームしますか？`, oldName);
+      if (newName === null) return;
+      const trimmed = newName.trim();
+      if (!trimmed || trimmed === oldName) return;
+      try {
+        const result = await braindumpApi.renameLabel(oldName, trimmed);
+        showToast(`「${oldName}」→「${trimmed}」に変更（${result.affected}件）`);
+        // 編集中メモにも反映
+        if (currentLabels.includes(oldName)) {
+          currentLabels = currentLabels.map(l => l === oldName ? trimmed : l);
+          refreshLabelsEditor();
+        }
+        // フィルタにも反映
+        if (filterLabels.includes(oldName)) {
+          filterLabels = filterLabels.map(l => l === oldName ? trimmed : l);
+        }
+        await refreshEntries();
+        // モーダルを再描画
+        close();
+        openLabelsManager();
+      } catch (err) {
+        showToast(`リネーム失敗: ${err.message}`, "error");
+      }
+    });
+  });
+
+  modal.querySelectorAll(".bd-label-delete-btn").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const name = btn.dataset.name;
+      const target = allLabels.find(l => l.name === name);
+      const count = target ? target.count : 0;
+      if (!confirm(`「${name}」を削除しますか？\n使用中のメモ ${count} 件からもこのラベルが外れます。`)) return;
+      try {
+        const result = await braindumpApi.deleteLabel(name);
+        showToast(`「${name}」を削除（${result.affected}件から除去）`);
+        // 編集中メモにも反映
+        currentLabels = currentLabels.filter(l => l !== name);
+        refreshLabelsEditor();
+        filterLabels = filterLabels.filter(l => l !== name);
+        await refreshEntries();
+        close();
+        openLabelsManager();
+      } catch (err) {
+        showToast(`削除失敗: ${err.message}`, "error");
+      }
+    });
+  });
 }
 
 // ===== 縦幅調整バー（デスクトップ専用、セッション中のみ保持） =====
