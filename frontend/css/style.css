@@ -5613,6 +5613,43 @@ main.swipe-enter-right {
   background: rgba(255, 51, 102, 0.35);
 }
 
+.braindump-entry-reorder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.72);
+  border-radius: 4px;
+  font-size: 0.7rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, opacity 0.15s;
+}
+
+.braindump-entry-reorder:hover:not([disabled]) {
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+}
+
+.braindump-entry-reorder[disabled] {
+  opacity: 0.25;
+  cursor: not-allowed;
+}
+
+[data-theme="light"] .braindump-entry-reorder {
+  background: rgba(0, 0, 0, 0.06);
+  color: rgba(0, 0, 0, 0.55);
+}
+
+[data-theme="light"] .braindump-entry-reorder:hover:not([disabled]) {
+  background: rgba(0, 0, 0, 0.12);
+  color: rgba(0, 0, 0, 0.85);
+}
+
 .btn-danger {
   background: rgba(255, 51, 102, 0.2);
   color: var(--neon-red, #ff3366);

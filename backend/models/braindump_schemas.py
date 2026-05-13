@@ -28,6 +28,11 @@ class LabelRenameRequest(BaseModel):
     new_name: str = Field(..., min_length=1, max_length=50)
 
 
+class BraindumpReorderRequest(BaseModel):
+    """同一日付内の並び替えリクエスト（ordered_ids の順に sort_order を 1,2,3,... で再採番）"""
+    ordered_ids: list[str] = Field(..., min_length=1)
+
+
 # ---- API レスポンス ----
 
 class BraindumpEntry(BaseModel):
@@ -38,6 +43,7 @@ class BraindumpEntry(BaseModel):
     content: str
     title: Optional[str] = None
     labels: list[str] = Field(default_factory=list)
+    sort_order: Optional[float] = None
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
 

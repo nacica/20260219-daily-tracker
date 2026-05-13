@@ -1,12 +1,12 @@
-﻿/**
+/**
  * ブレインダンプ コンポーネント
  * プレーンテキストのメモ帳。1日に複数メモ作成可能。
  * 自動保存、AIタイトル自動生成、画像貼り付け対応。
  * ラベル機能: メモごとに複数ラベル付与可、ラベルOR検索、専用管理モーダル。
  */
 
-import { braindumpApi } from "../api.js?v=20260513a";
-import { showToast } from "../app.js?v=20260513a";
+import { braindumpApi } from "../api.js?v=20260513b";
+import { showToast } from "../app.js?v=20260513b";
 
 // ===== ユーティリティ =====
 
@@ -405,6 +405,15 @@ function renderRecentEntries() {
   }
   const sortedDates = Object.keys(grouped).sort().reverse();
 
+  // 各日付グループ内を sort_order 昇順でソート（未設定は entry_number にフォールバック）
+  const sortKey = (e) => {
+    const so = e.sort_order;
+    return so == null ? (e.entry_number || 1) : so;
+  };
+  for (const date of sortedDates) {
+    grouped[date].sort((a, b) => sortKey(a) - sortKey(b) || (a.entry_number || 0) - (b.entry_number || 0));
+  }
+
   return sortedDates.map(date => {
     const dateEntries = grouped[date];
     const d = new Date(date + "T00:00:00");
@@ -420,7 +429,8 @@ function renderRecentEntries() {
       ${isToday ? '<span class="braindump-today-badge"><span class="braindump-today-dot"></span>today</span>' : ''}
     `;
 
-    const entriesHTML = dateEntries.map(entry => {
+    const lastIndex = dateEntries.length - 1;
+    const entriesHTML = dateEntries.map((entry, idx) => {
       const time = entry.created_at ? entry.created_at.slice(11, 16) : "";
       const cleanContent = entry.content.replace(IMG_REGEX, " ").trim();
       const title = entry.title || cleanContent.slice(0, 30).replace(/\n/g, " ");
@@ -432,12 +442,17 @@ function renderRecentEntries() {
           `).join("")}</div>`
         : "";
 
+      const upDisabled = idx === 0 ? "disabled" : "";
+      const downDisabled = idx === lastIndex ? "disabled" : "";
+
       return `
-        <div class="braindump-entry" data-id="${entry.id}" style="cursor: pointer;">
+        <div class="braindump-entry" data-id="${entry.id}" data-date="${entry.date}" style="cursor: pointer;">
           <div class="braindump-entry-header">
             <span class="braindump-entry-title">${escapeHTML(title)}</span>
             <div class="braindump-entry-actions">
               <span class="braindump-entry-time">${time}</span>
+              <button class="braindump-entry-reorder" data-id="${entry.id}" data-dir="up" title="上へ移動" ${upDisabled}>▲</button>
+              <button class="braindump-entry-reorder" data-id="${entry.id}" data-dir="down" title="下へ移動" ${downDisabled}>▼</button>
               <button class="braindump-entry-delete" data-id="${entry.id}" title="削除">×</button>
             </div>
           </div>
@@ -541,8 +556,16 @@ function attachEvents() {
     }
   });
 
-  // エントリ削除ボタン
+  // エントリ削除ボタン / 並び替えボタン
   document.getElementById("bd-entries")?.addEventListener("click", async (e) => {
+    const reorderBtn = e.target.closest(".braindump-entry-reorder");
+    if (reorderBtn) {
+      e.stopPropagation();
+      if (reorderBtn.disabled) return;
+      await handleReorderClick(reorderBtn.dataset.id, reorderBtn.dataset.dir);
+      return;
+    }
+
     const deleteBtn = e.target.closest(".braindump-entry-delete");
     if (deleteBtn) {
       e.stopPropagation();
@@ -818,6 +841,48 @@ async function deleteEntry(entryId) {
     await refreshEntries();
   } catch (e) {
     showToast(`削除に失敗しました: ${e.message}`, "error");
+  }
+}
+
+/**
+ * 一覧上で ▲▼ ボタンが押されたときの並び替え処理。
+ * 同一日付内でのみ隣接エントリと入れ替え、結果を sort_order に永続化する。
+ */
+async function handleReorderClick(entryId, direction) {
+  if (!entryId || (direction !== "up" && direction !== "down")) return;
+  const target = recentEntries.find(e => e.id === entryId);
+  if (!target) return;
+
+  // 表示と同じ条件で同日エントリを sort_order 昇順に並べる
+  const sortKey = (e) => {
+    const so = e.sort_order;
+    return so == null ? (e.entry_number || 1) : so;
+  };
+  const sameDate = recentEntries
+    .filter(e => e.date === target.date)
+    .sort((a, b) => sortKey(a) - sortKey(b) || (a.entry_number || 0) - (b.entry_number || 0));
+
+  const idx = sameDate.findIndex(e => e.id === entryId);
+  if (idx === -1) return;
+  const swapIdx = direction === "up" ? idx - 1 : idx + 1;
+  if (swapIdx < 0 || swapIdx >= sameDate.length) return;
+
+  // 入れ替え
+  [sameDate[idx], sameDate[swapIdx]] = [sameDate[swapIdx], sameDate[idx]];
+
+  // 楽観更新: 新しい sort_order を局所的に書き換えてから再描画
+  sameDate.forEach((e, i) => {
+    e.sort_order = i + 1;
+  });
+  refreshEntriesList();
+
+  // サーバーに並び順を確定
+  try {
+    await braindumpApi.reorder(target.date, sameDate.map(e => e.id));
+  } catch (err) {
+    showToast(`並び替えに失敗しました: ${err.message}`, "error");
+    // 失敗時はサーバー状態で同期し直す
+    await refreshEntries();
   }
 }
 

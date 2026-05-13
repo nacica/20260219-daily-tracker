@@ -20,6 +20,7 @@ from typing import Optional
 from models.braindump_schemas import (
     BraindumpCreate, BraindumpUpdate, BraindumpEntry,
     LabelRenameRequest, LabelListResponse, LabelCount,
+    BraindumpReorderRequest,
 )
 from services import firestore_service, claude_service, storage_service
 from utils.helpers import now_jst
@@ -60,6 +61,16 @@ async def create_braindump(body: BraindumpCreate, background_tasks: BackgroundTa
     if len(body.content) > 30:
         temp_title += "..."
 
+    # 同日内の既存 sort_order の最大値+1（手動並び替え済みでも末尾に追加されるように）
+    existing_today = firestore_service.list_braindumps_for_date(date)
+    existing_max_order = 0.0
+    for e in existing_today:
+        order = e.get("sort_order")
+        if order is None:
+            order = float(e.get("entry_number", 1))
+        existing_max_order = max(existing_max_order, float(order))
+    sort_order = existing_max_order + 1.0
+
     now = now_jst()
     data = {
         "id": entry_id,
@@ -68,6 +79,7 @@ async def create_braindump(body: BraindumpCreate, background_tasks: BackgroundTa
         "content": body.content,
         "title": temp_title,
         "labels": _normalize_labels(body.labels),
+        "sort_order": sort_order,
         "created_at": now,
         "updated_at": now,
     }
@@ -106,6 +118,13 @@ async def get_braindumps_by_date(date: str):
     """指定日の全ブレインダンプを取得する"""
     entries = firestore_service.list_braindumps_for_date(date)
     return [BraindumpEntry(**e) for e in entries]
+
+
+@router.post("/braindump/by-date/{date}/reorder")
+async def reorder_braindumps(date: str, body: BraindumpReorderRequest):
+    """同一日付内のブレインダンプを並び替える（ordered_ids の順に sort_order を 1,2,3... で再採番）"""
+    affected = firestore_service.reorder_braindumps_for_date(date, body.ordered_ids)
+    return {"affected": affected}
 
 
 # ---- 単一エントリ操作 ----

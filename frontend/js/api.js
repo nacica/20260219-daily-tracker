@@ -285,6 +285,13 @@ export const braindumpApi = {
   /** 指定日の全メモ取得 */
   listByDate: (date) => apiFetch(`/braindump/by-date/${date}`),
 
+  /** 指定日のメモを並び替え（ordered_ids の順に sort_order を再採番） */
+  reorder: (date, orderedIds) =>
+    apiFetch(`/braindump/by-date/${date}/reorder`, {
+      method: "POST",
+      body: { ordered_ids: orderedIds },
+    }),
+
   /** メモが存在する日付一覧 */
   datesWithEntries: (startDate, endDate) => {
     const params = new URLSearchParams();

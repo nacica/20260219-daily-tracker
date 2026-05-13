@@ -1,13 +1,13 @@
-﻿/**
+/**
  * 行動記録入力フォームコンポーネント
  * 新規作成・既存レコードの編集に対応
  * デスクトップ: 2列ドラッグ&ドロップレイアウト
  * 朝のタスク整理（ソクラテス式問答）統合
  */
 
-import { recordsApi, analysisApi, morningDialogueApi, remindersApi, categoriesApi } from "../api.js?v=20260513a";
-import { showToast } from "../app.js?v=20260513a";
-import { showTaskCompleteAnimation } from "./task-stats.js?v=20260513a";
+import { recordsApi, analysisApi, morningDialogueApi, remindersApi, categoriesApi } from "../api.js?v=20260513b";
+import { showToast } from "../app.js?v=20260513b";
+import { showTaskCompleteAnimation } from "./task-stats.js?v=20260513b";
 
 /* ── カテゴリ管理 ── */
 

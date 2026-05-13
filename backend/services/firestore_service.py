@@ -489,26 +489,77 @@ def get_braindump(entry_id: str) -> Optional[dict]:
     return None
 
 
+def _braindump_sort_key(entry: dict) -> tuple:
+    """同一日付内のソートキー: sort_order 昇順、未設定なら entry_number にフォールバック"""
+    order = entry.get("sort_order")
+    if order is None:
+        order = float(entry.get("entry_number", 1))
+    return (float(order), int(entry.get("entry_number", 1)))
+
+
 def list_braindumps(start_date: Optional[str] = None, end_date: Optional[str] = None) -> list[dict]:
-    """ブレインダンプ一覧を取得（日付範囲指定可能）"""
+    """ブレインダンプ一覧を取得（日付 DESC、同一日付内は sort_order ASC）"""
     db = get_db()
-    query = db.collection("braindump_entries").order_by("date", direction=firestore.Query.DESCENDING)
+    query = db.collection("braindump_entries")
 
     if start_date:
         query = query.where(filter=FieldFilter("date", ">=", start_date))
     if end_date:
         query = query.where(filter=FieldFilter("date", "<=", end_date))
 
-    return [doc.to_dict() for doc in query.stream()]
+    results = [doc.to_dict() for doc in query.stream()]
+    # 日付 DESC, 同一日付内は sort_order ASC（未設定は entry_number にフォールバック）
+    # Python の sort は安定ソートなので、二次キーを先にソートしてから一次キーをソートする
+    results.sort(key=_braindump_sort_key)
+    results.sort(key=lambda e: e.get("date", ""), reverse=True)
+    return results
 
 
 def list_braindumps_for_date(date: str) -> list[dict]:
-    """指定日の全ブレインダンプを取得（entry_number 昇順）"""
+    """指定日の全ブレインダンプを取得（sort_order 昇順、未設定は entry_number にフォールバック）"""
     db = get_db()
     query = db.collection("braindump_entries").where(filter=FieldFilter("date", "==", date))
     results = [doc.to_dict() for doc in query.stream()]
-    results.sort(key=lambda e: e.get("entry_number", 1))
+    results.sort(key=_braindump_sort_key)
     return results
+
+
+def reorder_braindumps_for_date(date: str, ordered_ids: list[str]) -> int:
+    """指定日のブレインダンプを ordered_ids の順に sort_order = 1,2,3... で再採番する。
+
+    ordered_ids に含まれないエントリは末尾に並び順を維持して追記する。
+    異なる日付のIDが混入していた場合はそのエントリだけ無視する。
+    更新件数を返す。
+    """
+    db = get_db()
+    # 現存する当日エントリを取得
+    existing = list_braindumps_for_date(date)
+    existing_ids = {e["id"] for e in existing}
+
+    # ordered_ids を当日のものだけにフィルタしつつ重複排除
+    seen: set[str] = set()
+    final_order: list[str] = []
+    for entry_id in ordered_ids:
+        if entry_id in existing_ids and entry_id not in seen:
+            seen.add(entry_id)
+            final_order.append(entry_id)
+
+    # ordered_ids に含まれなかった既存エントリを既存のソート順を維持して末尾に追加
+    for e in existing:
+        if e["id"] not in seen:
+            seen.add(e["id"])
+            final_order.append(e["id"])
+
+    if not final_order:
+        return 0
+
+    batch = db.batch()
+    now = now_jst()
+    for index, entry_id in enumerate(final_order, start=1):
+        ref = db.collection("braindump_entries").document(entry_id)
+        batch.update(ref, {"sort_order": float(index), "updated_at": now})
+    batch.commit()
+    return len(final_order)
 
 
 def get_next_braindump_entry_number(date: str) -> int:
