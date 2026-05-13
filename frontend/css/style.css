@@ -7948,8 +7948,7 @@ main.swipe-enter-right {
   display: flex;
   flex-direction: column;
   gap: 14px;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
+  overflow: hidden;
   min-height: 0;
 }
 
@@ -8002,17 +8001,16 @@ main.swipe-enter-right {
 
 .reminder-modal-body {
   width: 100%;
-  flex: 0 1 auto;
-  min-height: 180px;
-  display: block;
-  overflow: visible;
+  flex: 1 1 auto;
+  min-height: 120px;
+  display: flex;
+  overflow: hidden;
 }
 
 .reminder-modal-text {
   width: 100%;
-  flex: 0 1 auto;
-  min-height: 180px;
-  max-height: 70vh;
+  flex: 1 1 auto;
+  min-height: 0;
   padding: 14px 16px;
   border-radius: 10px;
   background: var(--bg-input);
@@ -8037,9 +8035,8 @@ main.swipe-enter-right {
 
 .reminder-modal-textarea {
   width: 100%;
-  flex: 0 0 auto;
-  min-height: 180px;
-  max-height: 70vh;
+  flex: 1 1 auto;
+  min-height: 0;
   padding: 14px 16px;
   border: 1px solid var(--cyan-dim);
   border-radius: 10px;
@@ -8062,24 +8059,35 @@ main.swipe-enter-right {
 
 .reminder-modal-actions {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
   flex-shrink: 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  background: var(--bg-card);
 }
 
 .reminder-modal-nav {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 10px;
+  order: 2;
 }
 
 .reminder-modal-buttons {
   display: flex;
-  align-items: center;
+  align-items: stretch;
   gap: 8px;
-  margin-left: auto;
+  order: 1;
+  width: 100%;
+}
+
+.reminder-modal-buttons > .btn {
+  flex: 1 1 0;
+  min-width: 0;
+  white-space: nowrap;
 }
 
 @media (max-width: 480px) {
@@ -8087,21 +8095,11 @@ main.swipe-enter-right {
     padding: 20px 16px 14px;
   }
   .reminder-modal-body {
-    min-height: 120px;
+    min-height: 100px;
   }
   .reminder-modal-text,
   .reminder-modal-textarea {
     /* font-size はユーザー設定（--reminder-modal-text-size）を優先 */
-  }
-  .reminder-modal-actions {
-    flex-direction: column-reverse;
-    align-items: stretch;
-  }
-  .reminder-modal-nav {
-    justify-content: center;
-  }
-  .reminder-modal-buttons {
-    justify-content: flex-end;
   }
 }
 
