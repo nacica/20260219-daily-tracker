@@ -29,6 +29,32 @@ jobs:
         with:
           project_id: ${{ env.PROJECT_ID }}
 
+      # ── Artifact Registry クリーンアップポリシー適用（古いイメージの自動削除） ──
+      # 最新5バージョンは常に保持、それ以外で7日以上経過したものは GCP が自動削除する。
+      # 冪等な操作なので毎回適用しても問題ない（権限不足等で失敗してもデプロイは継続）。
+      - name: Apply Artifact Registry cleanup policy
+        continue-on-error: true
+        run: |
+          cat > /tmp/cleanup-policy.json <<'JSON'
+          [
+            {
+              "name": "keep-5-recent",
+              "action": {"type": "Keep"},
+              "mostRecentVersions": {"keepCount": 5}
+            },
+            {
+              "name": "delete-older-than-7d",
+              "action": {"type": "Delete"},
+              "condition": {"olderThan": "604800s"}
+            }
+          ]
+          JSON
+          gcloud artifacts repositories set-cleanup-policies daily-tracker \
+            --location="${{ env.REGION }}" \
+            --project="${{ env.PROJECT_ID }}" \
+            --policy=/tmp/cleanup-policy.json \
+            --no-dry-run
+
       # ── バックエンド: Docker ビルド & Cloud Run デプロイ ──
       - name: Build & Push Backend image
         run: |
