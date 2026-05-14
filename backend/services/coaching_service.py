@@ -1,9 +1,8 @@
 """
 コーチングサービス
-ナレッジグラフとユーザーデータを活用したパーソナルコーチング
+直近の分析データと月次サマリーを活用したパーソナルコーチング
 """
 
-import os
 import logging
 
 from services import firestore_service
@@ -14,52 +13,6 @@ logger = logging.getLogger(__name__)
 
 # コーチングは Sonnet を使用（仕様指定）
 COACHING_MODEL = "claude-sonnet-4-6"
-
-# テーマ別キーワード
-THEME_KEYWORDS = {
-    "food": ["食事", "食べ", "ダイエット", "体重", "カロリー", "間食", "ストレス食い"],
-    "work": ["仕事", "タスク", "生産性", "集中", "副業", "作業", "締切", "プロジェクト"],
-    "mental": ["メンタル", "気分", "不安", "ストレス", "疲れ", "憂鬱", "モチベーション"],
-    "sleep": ["睡眠", "夜更かし", "起床", "朝型", "夜型", "眠れない"],
-    "exercise": ["運動", "ジム", "散歩", "ウォーキング", "筋トレ"],
-}
-
-
-def _contains_keywords(text: str, keywords: list[str]) -> bool:
-    """テキストにキーワードが含まれるか"""
-    return any(kw in text for kw in keywords)
-
-
-def _format_entities(entities: list[dict]) -> str:
-    """エンティティ一覧をテキストに変換"""
-    if not entities:
-        return "（まだデータがありません）"
-    lines = []
-    for e in entities:
-        obs = e.get("observations", [])
-        latest_obs = obs[-1].get("content", "") if obs else ""
-        count = e.get("observation_count", 0)
-        lines.append(
-            f"- **{e.get('name')}** [{e.get('entityType')}] "
-            f"(観測{count}回, 最終: {e.get('last_observed', '不明')}) "
-            f"— {latest_obs}"
-        )
-    return "\n".join(lines)
-
-
-def _format_relations(relations: list[dict]) -> str:
-    """リレーション一覧をテキストに変換"""
-    if not relations:
-        return "（まだデータがありません）"
-    lines = []
-    for r in relations:
-        lines.append(
-            f"- {r.get('from_entity')} → {r.get('to_entity')} "
-            f"[{r.get('relation_type')}] "
-            f"(強度: {r.get('strength', 0):.1f}, 証拠: {r.get('evidence_count', 0)}回) "
-            f"— {r.get('description', '')}"
-        )
-    return "\n".join(lines)
 
 
 def _format_recent_week(analyses: list[dict]) -> str:
@@ -99,47 +52,17 @@ def _format_monthly_summary(summary: dict) -> str:
 
 async def build_coaching_context(user_message: str) -> dict:
     """
-    ユーザーの質問/相談内容に応じて、最適なコンテキストを構築する。
+    ユーザーの質問/相談内容に応じて、コンテキストを構築する。
     """
     context = {}
 
-    # 1. 直近7日の日次分析サマリー
+    # 直近7日の日次分析サマリー
     from utils.helpers import today_jst
     today = today_jst()
     context["recent_week"] = firestore_service.get_past_analyses(today, days=7)
 
-    # 2. アクティブなエンティティ上位20件
-    context["active_entities"] = firestore_service.list_entities(status="active", limit=20)
-
-    # 3. 強い関係性（strength >= 0.6）上位10件
-    context["strong_relations"] = firestore_service.list_relations(min_strength=0.6, limit=10)
-
-    # 4. 最新の月次サマリー
+    # 最新の月次サマリー
     context["latest_monthly"] = firestore_service.get_latest_coaching_summary()
-
-    # 5. テーマ別の追加データ
-    theme_entities = []
-    if _contains_keywords(user_message, THEME_KEYWORDS["food"]):
-        theme_entities += firestore_service.list_entities(entity_type="behavior_pattern", limit=10)
-        theme_entities += firestore_service.list_entities(entity_type="habit", limit=10)
-    if _contains_keywords(user_message, THEME_KEYWORDS["work"]):
-        theme_entities += firestore_service.list_entities(entity_type="goal", limit=10)
-        theme_entities += firestore_service.list_entities(entity_type="strength", limit=10)
-        theme_entities += firestore_service.list_entities(entity_type="weakness", limit=10)
-    if _contains_keywords(user_message, THEME_KEYWORDS["mental"]):
-        theme_entities += firestore_service.list_entities(entity_type="emotion_pattern", limit=10)
-        theme_entities += firestore_service.list_entities(entity_type="trigger", limit=10)
-
-    if theme_entities:
-        # 重複排除
-        seen = set()
-        unique = []
-        for e in theme_entities:
-            eid = e.get("id", "")
-            if eid not in seen:
-                seen.add(eid)
-                unique.append(e)
-        context["theme_entities"] = unique
 
     return context
 
@@ -154,23 +77,9 @@ async def generate_coaching_reply(
     Returns:
         {"reply": str, "referenced_patterns": list, "suggested_action": str}
     """
-    # コンテキスト構築
     context = await build_coaching_context(user_message)
 
-    # システムプロンプトにデータ注入
-    all_entities = context.get("active_entities", [])
-    theme_entities = context.get("theme_entities", [])
-    if theme_entities:
-        # テーマ別エンティティを優先表示
-        seen_ids = {e.get("id") for e in theme_entities}
-        for e in all_entities:
-            if e.get("id") not in seen_ids:
-                theme_entities.append(e)
-        all_entities = theme_entities
-
     system_prompt = COACHING_SYSTEM_PROMPT.format(
-        active_entities_formatted=_format_entities(all_entities[:20]),
-        strong_relations_formatted=_format_relations(context.get("strong_relations", [])),
         recent_week_formatted=_format_recent_week(context.get("recent_week", [])),
         latest_monthly_formatted=_format_monthly_summary(context.get("latest_monthly")),
     )

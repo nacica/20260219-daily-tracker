@@ -11,7 +11,6 @@ const TAB_ORDER = [
   "/suggestions",
   "/coach",
   "/journal",
-  "/knowledge",
   "/monthly",
 ];
 

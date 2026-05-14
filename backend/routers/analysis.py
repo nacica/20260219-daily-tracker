@@ -6,19 +6,18 @@ GET  /api/v1/analysis                  - 分析一覧を取得
 """
 
 import anthropic
-from fastapi import APIRouter, HTTPException, Query, BackgroundTasks, Response
+from fastapi import APIRouter, HTTPException, Query, Response
 from typing import Optional
 
 from models.schemas import DailyAnalysis, AnalysisSummary, AnalysisDetail
 from services import firestore_service, claude_service
-from services.knowledge_graph_service import update_knowledge_graph
 from utils.helpers import now_jst
 
 router = APIRouter()
 
 
 @router.post("/analysis/{date}/generate", response_model=DailyAnalysis)
-async def generate_analysis(date: str, background_tasks: BackgroundTasks):
+async def generate_analysis(date: str):
     """
     指定日の行動記録をもとに Claude API で日次分析を生成し保存する。
     過去7日間のデータも参照して比較分析を行う。
@@ -74,9 +73,6 @@ async def generate_analysis(date: str, background_tasks: BackgroundTasks):
             "created_at": now,
         }
         saved = firestore_service.save_analysis(date, doc)
-
-        # バックグラウンドでナレッジグラフ更新（分析レスポンスを遅延させない）
-        background_tasks.add_task(update_knowledge_graph, record, doc)
 
         return _build_response(saved)
 

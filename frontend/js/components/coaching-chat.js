@@ -23,12 +23,9 @@ export async function renderCoachingChat() {
     <div class="coach-container">
       <div class="coach-header">
         <h2 class="coach-title">パーソナルコーチ</h2>
-        <p class="coach-subtitle">ナレッジグラフを活用したAIコーチング</p>
+        <p class="coach-subtitle">直近の分析データを活用したAIコーチング</p>
         <div class="coach-actions">
           <button class="btn btn-outline btn-sm" id="btn-clear-chat">会話をリセット</button>
-          <button class="btn btn-outline btn-sm" onclick="window.location.hash='/knowledge'">
-            ナレッジグラフを見る
-          </button>
         </div>
       </div>
 

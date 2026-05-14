@@ -173,45 +173,6 @@ class MorningPlan(BaseModel):
     focus_message: str = ""
 
 
-# ---- ナレッジグラフ（コーチング機能） ----
-
-class EntityObservation(BaseModel):
-    """エンティティの観測記録"""
-    content: str
-    source_date: str
-    confidence: float = 0.8
-
-
-class UserEntity(BaseModel):
-    """ナレッジグラフのエンティティ"""
-    id: str = ""
-    name: str
-    entityType: str  # goal|behavior_pattern|trigger|strength|weakness|habit|value|emotion_pattern|life_context
-    observations: list[EntityObservation] = []
-    first_observed: str = ""
-    last_observed: str = ""
-    observation_count: int = 0
-    status: str = "active"  # active|resolved|monitoring
-    created_at: Optional[str] = None
-    updated_at: Optional[str] = None
-
-
-class EntityRelation(BaseModel):
-    """エンティティ間の関係性"""
-    id: str = ""
-    from_entity: str
-    from_entity_id: str = ""
-    to_entity: str
-    to_entity_id: str = ""
-    relation_type: str  # triggers|prevents|supports|conflicts_with|correlates_with|part_of|leads_to
-    strength: float = 0.5
-    evidence_count: int = 1
-    evidence_dates: list[str] = []
-    description: str = ""
-    created_at: Optional[str] = None
-    updated_at: Optional[str] = None
-
-
 class PatternSummary(BaseModel):
     """月次パターンサマリー"""
     pattern: str

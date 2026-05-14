@@ -7,28 +7,27 @@
  *   - 各画面のコンポーネントはルート遷移時に動的 import（初期ロードを軽量化）
  */
 
-import { addRoute, navigate, updateNavActive } from "./router.js?v=20260513c";
-import { recordsApi, analysisApi, remindersApi, gratitudeApi } from "./api.js?v=20260513c";
-import { initSwipeNav } from "./swipe-nav.js?v=20260513c";
-import { initBedtimeTimer } from "./bedtime-timer.js?v=20260513c";
+import { addRoute, navigate, updateNavActive } from "./router.js?v=20260514a";
+import { recordsApi, analysisApi, remindersApi, gratitudeApi } from "./api.js?v=20260514a";
+import { initSwipeNav } from "./swipe-nav.js?v=20260514a";
+import { initBedtimeTimer } from "./bedtime-timer.js?v=20260514a";
 
 // ===== 動的 import ヘルパー =====
 // 各コンポーネントは初回訪問時に初めてネットワーク取得（以降は SW キャッシュから即応答）
-const loadInputForm       = () => import("./components/input-form.js?v=20260513c");
-const loadAnalysisView    = () => import("./components/analysis-view.js?v=20260513c");
-const loadHistoryList     = () => import("./components/history-list.js?v=20260513c");
-const loadWeeklyReport    = () => import("./components/weekly-report.js?v=20260513c");
-const loadSuggestions     = () => import("./components/suggestions.js?v=20260513c");
-const loadCoachingChat    = () => import("./components/coaching-chat.js?v=20260513c");
-const loadKnowledgeGraph  = () => import("./components/knowledge-graph.js?v=20260513c");
-const loadMonthlyReport   = () => import("./components/monthly-report.js?v=20260513c");
-const loadJournal         = () => import("./components/journal.js?v=20260513c");
-const loadBraindump       = () => import("./components/braindump.js?v=20260513c");
-const loadTaskStats       = () => import("./components/task-stats.js?v=20260513c");
-const loadFlashcardList   = () => import("./components/flashcard-list.js?v=20260513c");
-const loadFlashcardStudy  = () => import("./components/flashcard-study.js?v=20260513c");
-const loadWishlist        = () => import("./components/wishlist.js?v=20260513c");
-const loadGratitude       = () => import("./components/gratitude.js?v=20260513c");
+const loadInputForm       = () => import("./components/input-form.js?v=20260514a");
+const loadAnalysisView    = () => import("./components/analysis-view.js?v=20260514a");
+const loadHistoryList     = () => import("./components/history-list.js?v=20260514a");
+const loadWeeklyReport    = () => import("./components/weekly-report.js?v=20260514a");
+const loadSuggestions     = () => import("./components/suggestions.js?v=20260514a");
+const loadCoachingChat    = () => import("./components/coaching-chat.js?v=20260514a");
+const loadMonthlyReport   = () => import("./components/monthly-report.js?v=20260514a");
+const loadJournal         = () => import("./components/journal.js?v=20260514a");
+const loadBraindump       = () => import("./components/braindump.js?v=20260514a");
+const loadTaskStats       = () => import("./components/task-stats.js?v=20260514a");
+const loadFlashcardList   = () => import("./components/flashcard-list.js?v=20260514a");
+const loadFlashcardStudy  = () => import("./components/flashcard-study.js?v=20260514a");
+const loadWishlist        = () => import("./components/wishlist.js?v=20260514a");
+const loadGratitude       = () => import("./components/gratitude.js?v=20260514a");
 
 // ===== ユーティリティ =====
 
@@ -59,7 +58,6 @@ const ROUTE_TITLES = {
   "/weekly": { title: "週次レポート", breadcrumb: "週次分析" },
   "/suggestions": { title: "改善提案", breadcrumb: "提案アーカイブ" },
   "/coach": { title: "コーチング", breadcrumb: "パーソナルコーチ" },
-  "/knowledge": { title: "ナレッジグラフ", breadcrumb: "行動パターン" },
   "/monthly": { title: "月次レポート", breadcrumb: "月次サマリー" },
   "/journal": { title: "フリージャーナル", breadcrumb: "ジャーナル" },
   "/braindump": { title: "ブレインダンプ", breadcrumb: "頭の整理メモ" },
@@ -742,7 +740,6 @@ addRoute("/weekly", async () => (await loadWeeklyReport()).renderWeeklyReport(nu
 addRoute("/weekly/:weekId", async ({ weekId }) => (await loadWeeklyReport()).renderWeeklyReport(weekId));
 addRoute("/suggestions", async () => (await loadSuggestions()).renderSuggestions());
 addRoute("/coach", async () => (await loadCoachingChat()).renderCoachingChat());
-addRoute("/knowledge", async () => (await loadKnowledgeGraph()).renderKnowledgeGraph());
 addRoute("/monthly", async () => (await loadMonthlyReport()).renderMonthlyReport(null));
 addRoute("/monthly/:yearMonth", async ({ yearMonth }) => (await loadMonthlyReport()).renderMonthlyReport(yearMonth));
 addRoute("/journal", async () => (await loadJournal()).renderJournal(today()));

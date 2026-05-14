@@ -8,11 +8,10 @@ DELETE /api/v1/dialogue/{date}           - 対話を削除
 """
 
 import anthropic
-from fastapi import APIRouter, HTTPException, BackgroundTasks, Response
+from fastapi import APIRouter, HTTPException, Response
 
 from models.schemas import AnalysisDialogue, DialogueReplyRequest, DialogueMessage
 from services import firestore_service, claude_service
-from services.knowledge_graph_service import update_knowledge_graph
 from utils.helpers import now_jst
 
 router = APIRouter()
@@ -163,7 +162,7 @@ async def reply_dialogue(date: str, body: DialogueReplyRequest):
 
 
 @router.post("/dialogue/{date}/synthesize")
-async def synthesize_dialogue(date: str, background_tasks: BackgroundTasks):
+async def synthesize_dialogue(date: str):
     """
     対話からの共創分析を生成する。
     DailyAnalysis を daily_analyses に保存し、対話を completed にする。
@@ -216,9 +215,6 @@ async def synthesize_dialogue(date: str, background_tasks: BackgroundTasks):
         dialogue["status"] = "completed"
         dialogue["updated_at"] = now
         firestore_service.save_dialogue(date, dialogue)
-
-        # バックグラウンドでナレッジグラフ更新
-        background_tasks.add_task(update_knowledge_graph, record, analysis_doc)
 
         # 分析 + 対話をまとめて返却
         from routers.analysis import _build_response
