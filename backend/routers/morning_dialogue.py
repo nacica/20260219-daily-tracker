@@ -95,10 +95,8 @@ async def start_morning_dialogue(date: str):
         incomplete_tasks = _collect_incomplete_tasks(date)
         backlog_tasks = _collect_backlog_tasks(date)
 
-        # アクティブな目標を取得
-        active_goals = firestore_service.list_entities(
-            entity_type="goal", status="active", limit=5,
-        )
+        # アクティブな目標は KG 廃止により空にする（過去互換用に引数は残す）
+        active_goals: list = []
 
         # 朝の問いかけを生成
         try:

@@ -44,19 +44,11 @@ MONTHLY_SUMMARY_SYSTEM_PROMPT = """あなたはユーザーの月間行動デー
 def build_monthly_summary_prompt(
     period: str,
     analyses_text: str,
-    entities_text: str,
-    relations_text: str,
 ) -> str:
     """月次サマリー生成用ユーザープロンプトを構築"""
     return f"""## 対象期間: {period}
 
 ## 日次分析データ
 {analyses_text}
-
-## 蓄積されたエンティティ（行動パターン・習慣・目標など）
-{entities_text}
-
-## エンティティ間の関係性
-{relations_text}
 
 上記のデータから、{period}の月次コーチングサマリーをJSON形式で生成してください。"""
