@@ -1333,24 +1333,6 @@ textarea {
   color: var(--text-primary);
 }
 
-/* ===== ホーム ===== */
-
-.home-date {
-  font-size: 0.68rem;
-  font-weight: 700;
-  color: var(--cyan-dim);
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  margin-bottom: 5px;
-}
-
-.home-title {
-  font-size: 1.25rem;
-  font-weight: 700;
-  margin-bottom: var(--gap);
-  color: var(--text-primary);
-}
-
 /* ===== タスク完了サマリーカード（Gaming UI） ===== */
 
 @keyframes scanline {
@@ -4209,16 +4191,6 @@ textarea {
 
   ::-webkit-scrollbar-thumb:hover {
     background: rgba(0, 212, 255, 0.3);
-  }
-
-  /* ── Home page title adjustments ── */
-  .home-date {
-    font-size: 0.72rem;
-  }
-
-  .home-title {
-    font-size: 1.4rem;
-    margin-bottom: 20px;
   }
 
   /* ── Dialogue — desktop enhancements ── */
@@ -8797,56 +8769,6 @@ main.swipe-enter-right {
   font-size: 2.6rem;
   margin-bottom: 10px;
   filter: drop-shadow(0 2px 6px rgba(236, 72, 153, 0.3));
-}
-
-/* ホーム: 最近のありがたい */
-.home-gratitude-card {
-  border: 1px solid rgba(236, 72, 153, 0.2);
-  background: linear-gradient(180deg, rgba(236, 72, 153, 0.05), rgba(236, 72, 153, 0.01));
-}
-
-.home-gratitude-card .card-title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.home-gratitude-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-top: 4px;
-}
-
-.home-gr-item {
-  padding: 8px 10px;
-  border-left: 3px solid rgba(236, 72, 153, 0.5);
-  background: var(--bg-secondary);
-  border-radius: 6px;
-  font-size: 0.88rem;
-  line-height: 1.55;
-  color: var(--text-primary);
-}
-
-.home-gr-item-meta {
-  display: block;
-  font-size: 0.7rem;
-  color: var(--text-muted);
-  margin-bottom: 4px;
-  font-variant-numeric: tabular-nums;
-}
-
-.home-gratitude-more {
-  display: inline-block;
-  margin-top: 10px;
-  font-size: 0.82rem;
-  color: var(--text-secondary);
-  text-decoration: none;
-}
-
-.home-gratitude-more:hover {
-  color: rgb(219, 39, 119);
-  text-decoration: underline;
 }
 
 @media (max-width: 600px) {

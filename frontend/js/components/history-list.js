@@ -29,7 +29,6 @@ export async function renderHistoryList() {
       <div class="empty-state">
         <div class="icon">📅</div>
         <p>データの取得に失敗しました: ${err.message}</p>
-        <button class="btn btn-outline" onclick="window.location.hash='/'">ホームへ戻る</button>
       </div>`;
   }
 }
@@ -44,7 +43,7 @@ function buildHistoryHTML(records, analyses) {
       <div class="empty-state">
         <div class="icon">📅</div>
         <p>まだ記録がありません。<br>行動記録を入力して始めましょう。</p>
-        <button class="btn btn-primary" onclick="window.location.hash='/input'">記録を入力する</button>
+        <button class="btn btn-primary" onclick="window.location.hash='/'">記録を入力する</button>
       </div>`;
   }
 

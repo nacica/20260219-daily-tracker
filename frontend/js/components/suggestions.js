@@ -32,7 +32,6 @@ export async function renderSuggestions() {
       <div class="empty-state">
         <div class="icon">💡</div>
         <p>データの取得に失敗しました: ${esc(err.message)}</p>
-        <button class="btn btn-outline" onclick="window.location.hash='/'">ホームへ戻る</button>
       </div>`;
   }
 }
@@ -162,7 +161,7 @@ function buildEmptyHTML() {
     <div class="empty-state">
       <div class="icon">💡</div>
       <p>まだ分析データがありません。<br>行動を記録してAI分析を実行しましょう。</p>
-      <button class="btn btn-primary" style="max-width:280px;" onclick="window.location.hash='/input'">
+      <button class="btn btn-primary" style="max-width:280px;" onclick="window.location.hash='/'">
         記録を入力する
       </button>
     </div>`;

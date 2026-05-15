@@ -1,46 +1,42 @@
 /**
  * アプリのメインロジック
- * ルーティングの設定とホーム画面の表示を担当する。
+ * ルーティングの設定とトップ画面（記録入力）の表示を担当する。
  *
  * コード分割方針:
- *   - ホーム表示に必要なコア（router / api / swipe-nav）のみ静的 import
+ *   - 起動に必要なコア（router / api / swipe-nav）のみ静的 import
  *   - 各画面のコンポーネントはルート遷移時に動的 import（初期ロードを軽量化）
+ *
+ * 注: トップ URL は `/`（旧 `/input`）。`/input`・`/input/:date` は後方互換のため
+ *     リダイレクトのみ提供する。
  */
 
-import { addRoute, navigate, updateNavActive } from "./router.js?v=20260514b";
-import { recordsApi, analysisApi, remindersApi, gratitudeApi } from "./api.js?v=20260514b";
-import { initSwipeNav } from "./swipe-nav.js?v=20260514b";
-import { initBedtimeTimer } from "./bedtime-timer.js?v=20260514b";
+import { addRoute, navigate, updateNavActive } from "./router.js?v=20260515a";
+import { recordsApi } from "./api.js?v=20260515a";
+import { initSwipeNav } from "./swipe-nav.js?v=20260515a";
+import { initBedtimeTimer } from "./bedtime-timer.js?v=20260515a";
 
 // ===== 動的 import ヘルパー =====
 // 各コンポーネントは初回訪問時に初めてネットワーク取得（以降は SW キャッシュから即応答）
-const loadInputForm       = () => import("./components/input-form.js?v=20260514b");
-const loadAnalysisView    = () => import("./components/analysis-view.js?v=20260514b");
-const loadHistoryList     = () => import("./components/history-list.js?v=20260514b");
-const loadWeeklyReport    = () => import("./components/weekly-report.js?v=20260514b");
-const loadSuggestions     = () => import("./components/suggestions.js?v=20260514b");
-const loadCoachingChat    = () => import("./components/coaching-chat.js?v=20260514b");
-const loadMonthlyReport   = () => import("./components/monthly-report.js?v=20260514b");
-const loadJournal         = () => import("./components/journal.js?v=20260514b");
-const loadBraindump       = () => import("./components/braindump.js?v=20260514b");
-const loadTaskStats       = () => import("./components/task-stats.js?v=20260514b");
-const loadFlashcardList   = () => import("./components/flashcard-list.js?v=20260514b");
-const loadFlashcardStudy  = () => import("./components/flashcard-study.js?v=20260514b");
-const loadWishlist        = () => import("./components/wishlist.js?v=20260514b");
-const loadGratitude       = () => import("./components/gratitude.js?v=20260514b");
+const loadInputForm       = () => import("./components/input-form.js?v=20260515a");
+const loadAnalysisView    = () => import("./components/analysis-view.js?v=20260515a");
+const loadHistoryList     = () => import("./components/history-list.js?v=20260515a");
+const loadWeeklyReport    = () => import("./components/weekly-report.js?v=20260515a");
+const loadSuggestions     = () => import("./components/suggestions.js?v=20260515a");
+const loadCoachingChat    = () => import("./components/coaching-chat.js?v=20260515a");
+const loadMonthlyReport   = () => import("./components/monthly-report.js?v=20260515a");
+const loadJournal         = () => import("./components/journal.js?v=20260515a");
+const loadBraindump       = () => import("./components/braindump.js?v=20260515a");
+const loadTaskStats       = () => import("./components/task-stats.js?v=20260515a");
+const loadFlashcardList   = () => import("./components/flashcard-list.js?v=20260515a");
+const loadFlashcardStudy  = () => import("./components/flashcard-study.js?v=20260515a");
+const loadWishlist        = () => import("./components/wishlist.js?v=20260515a");
+const loadGratitude       = () => import("./components/gratitude.js?v=20260515a");
 
 // ===== ユーティリティ =====
 
 /** 今日の日付を YYYY-MM-DD 形式で返す */
 function today() {
   return new Date().toLocaleDateString("sv-SE"); // "2026-02-19"
-}
-
-/** 日付を日本語表記にフォーマット */
-function formatDateJP(dateStr) {
-  const d = new Date(dateStr + "T00:00:00");
-  const weekdays = ["日", "月", "火", "水", "木", "金", "土"];
-  return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日（${weekdays[d.getDay()]}）`;
 }
 
 /** メインコンテンツエリアを返す */
@@ -52,8 +48,8 @@ function getMain() {
 
 /** ルート名マッピング */
 const ROUTE_TITLES = {
-  "/": { title: "ダッシュボード", breadcrumb: "ホーム" },
-  "/input": { title: "行動記録", breadcrumb: "記録入力" },
+  "/": { title: "行動記録", breadcrumb: "記録入力" },
+  "/edit": { title: "行動記録", breadcrumb: "記録入力" },
   "/history": { title: "履歴一覧", breadcrumb: "履歴" },
   "/weekly": { title: "週次レポート", breadcrumb: "週次分析" },
   "/suggestions": { title: "改善提案", breadcrumb: "提案アーカイブ" },
@@ -170,7 +166,9 @@ async function openDatePicker(anchorEl) {
       const date = dayEl.dataset.date;
       if (date) {
         closeDatePicker();
-        window.location.hash = `/input/${date}`;
+        // 今日なら "/"、それ以外は "/edit/:date" に遷移
+        const todayStr = today();
+        window.location.hash = date === todayStr ? "/" : `/edit/${date}`;
       }
     }
   });
@@ -279,356 +277,6 @@ export function showToast(message, type = "info") {
   }
 }
 
-// ===== ホーム楽観描画用キャッシュ =====
-// localStorage に「今日の record / analysis / reminders」のスナップショットを保存し、
-// 次回起動時に API 応答を待たずに即描画する。日付が変わったら破棄する。
-const HOME_CACHE_KEY = "home_cache_v1";
-
-function loadHomeCache(dateStr) {
-  try {
-    const raw = localStorage.getItem(HOME_CACHE_KEY);
-    if (!raw) return null;
-    const data = JSON.parse(raw);
-    if (!data || data.date !== dateStr) return null;
-    return data;
-  } catch {
-    return null;
-  }
-}
-
-function saveHomeCache(dateStr, record, analysis, reminders, gratitude) {
-  try {
-    localStorage.setItem(HOME_CACHE_KEY, JSON.stringify({
-      date: dateStr,
-      record: record || null,
-      analysis: analysis || null,
-      reminders: reminders || [],
-      gratitude: gratitude || [],
-    }));
-  } catch {}
-}
-
-/**
- * ホームで取得済みの record / reminders を /input 画面のキャッシュに事前ウォームアップ。
- * ユーザーがホーム → 記録タブに遷移したとき、/input の楽観描画が即座に使える。
- * input-form.js の `INPUT_CACHE_KEY_PREFIX` 形式と合わせること。
- */
-function prewarmInputCache(dateStr, record, reminders) {
-  try {
-    const key = "input_cache_v1_" + dateStr;
-    const existing = (() => {
-      try { return JSON.parse(localStorage.getItem(key)) || {}; } catch { return {}; }
-    })();
-    const merged = {
-      ...existing,
-      date: dateStr,
-      existingRecord: record || null,
-      isRestDay: !!(record && record.rest_day),
-      restReason: (record && record.rest_reason) || "",
-      reminders: reminders || existing.reminders || [],
-      ts: Date.now(),
-    };
-    localStorage.setItem(key, JSON.stringify(merged));
-  } catch {}
-}
-
-// ===== 今日意識すること（ホーム用） =====
-
-let _homeRemindersCache = [];
-
-function getHomeReminders() {
-  // ホームにはアクティブのみ表示（アーカイブされたものは除外）
-  return _homeRemindersCache.filter((r) => !r.archived);
-}
-
-async function syncRemindersFromServer() {
-  try {
-    const res = await remindersApi.get();
-    _homeRemindersCache = res.items || [];
-    return _homeRemindersCache;
-  } catch {
-    return null;
-  }
-}
-
-let homeReminderIndex = 0;
-
-function buildHomeReminderCard() {
-  const reminders = getHomeReminders();
-  if (reminders.length === 0) return "";
-
-  if (homeReminderIndex >= reminders.length) homeReminderIndex = 0;
-
-  const navHTML = reminders.length > 1
-    ? `<div class="sticky-nav">
-        <button class="sticky-nav-btn" id="home-sticky-prev">&#9664;</button>
-        <span class="sticky-counter" id="home-sticky-counter">${homeReminderIndex + 1} / ${reminders.length}</span>
-        <button class="sticky-nav-btn" id="home-sticky-next">&#9654;</button>
-      </div>`
-    : "";
-
-  const notesHTML = reminders.map((r, i) => {
-    const activeClass = i === homeReminderIndex ? " active" : "";
-    const d = r.createdAt ? new Date(r.createdAt) : null;
-    const dateStr = d
-      ? `${d.getMonth() + 1}/${d.getDate()}(${["日","月","火","水","木","金","土"][d.getDay()]}) ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`
-      : "";
-    const escaped = r.text.replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]);
-    return `<div class="sticky-note${activeClass}" data-id="${r.id}">
-      <div class="sticky-note-body">
-        ${dateStr ? `<div class="sticky-note-date">${dateStr}</div>` : ""}
-        <span class="sticky-text">${escaped}</span>
-      </div>
-    </div>`;
-  }).join("");
-
-  return `
-    <div class="card reminder-board-card" id="home-reminder-board">
-      <div class="card-title">今日意識すること</div>
-      ${navHTML}
-      <div class="sticky-notes" id="home-sticky-notes">
-        ${notesHTML}
-      </div>
-    </div>`;
-}
-
-function attachHomeReminderEvents() {
-  const reminders = getHomeReminders();
-  if (reminders.length <= 1) return;
-
-  const container = document.getElementById("home-sticky-notes");
-  if (!container) return;
-
-  function showAtIndex() {
-    const notes = container.querySelectorAll(".sticky-note");
-    notes.forEach((note, i) => note.classList.toggle("active", i === homeReminderIndex));
-    const counter = document.getElementById("home-sticky-counter");
-    if (counter) counter.textContent = `${homeReminderIndex + 1} / ${notes.length}`;
-  }
-
-  function navigate(delta) {
-    const len = reminders.length;
-    homeReminderIndex = (homeReminderIndex + delta + len) % len;
-    showAtIndex();
-  }
-
-  const prev = document.getElementById("home-sticky-prev");
-  const next = document.getElementById("home-sticky-next");
-  if (prev) prev.addEventListener("click", () => navigate(-1));
-  if (next) next.addEventListener("click", () => navigate(1));
-
-  // カード本体クリックで次へ
-  container.addEventListener("click", (e) => {
-    if (e.target.closest(".sticky-note") && reminders.length > 1) {
-      navigate(1);
-    }
-  });
-}
-
-// ===== ホーム画面 =====
-
-function _escapeHtml(str) {
-  if (!str) return "";
-  return String(str).replace(/[&<>"']/g, (c) =>
-    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]
-  );
-}
-
-/** 最近のありがたいノートカードを組み立てる（最大 3 件） */
-function buildHomeGratitudeCard(gratitudeItems) {
-  if (!gratitudeItems || gratitudeItems.length === 0) {
-    return `
-      <div class="card home-gratitude-card">
-        <div class="card-title">💗 最近のありがたい</div>
-        <div class="empty-state" style="padding: 16px 0;">
-          <p style="margin: 0; font-size: 0.88rem; color: var(--text-secondary);">
-            まだ何も書かれていません。<br>
-            <a href="#/gratitude" style="color: rgb(219, 39, 119);">ありがたいノートを書いてみる →</a>
-          </p>
-        </div>
-      </div>`;
-  }
-
-  const weekdays = ["日", "月", "火", "水", "木", "金", "土"];
-  const items = gratitudeItems.slice(0, 3).map((g) => {
-    const d = g.created_at ? new Date(g.created_at) : null;
-    const meta = d
-      ? `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日（${weekdays[d.getDay()]}） ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`
-      : "";
-    const text = _escapeHtml(g.content || "").replace(/\n/g, "<br>");
-    return `
-      <div class="home-gr-item">
-        ${meta ? `<span class="home-gr-item-meta">${meta}</span>` : ""}
-        ${text}
-      </div>`;
-  }).join("");
-
-  return `
-    <div class="card home-gratitude-card">
-      <div class="card-title">💗 最近のありがたい</div>
-      <div class="home-gratitude-list">${items}</div>
-      <a class="home-gratitude-more" href="#/gratitude">すべて見る・追加する →</a>
-    </div>`;
-}
-
-/** ホーム HTML を組み立てる（record/analysis/reminders/gratitude から） */
-function buildHomeHTML(dateStr, record, analysis, reminders, gratitudeItems) {
-  _homeRemindersCache = reminders || [];
-  const isRestDay = !!(record && record.rest_day);
-  const restReason = record ? record.rest_reason || "" : "";
-  const hasRecord = !!record;
-  const hasAnalysis = !!analysis;
-
-  return `
-    <div class="home-date">${formatDateJP(dateStr)}</div>
-    <h1 class="home-title">今日の行動分析</h1>
-    ${buildHomeReminderCard()}
-    ${isRestDay ? `
-    <div class="card" style="border: 1px solid rgba(168, 85, 247, 0.3); background: rgba(168, 85, 247, 0.08); margin-bottom: var(--gap);">
-      <div style="display: flex; align-items: center; gap: 10px;">
-        <span style="font-size: 1.5rem;">🌙</span>
-        <div>
-          <div style="font-weight: 600;">おやすみモード</div>
-          <div style="font-size: 0.82rem; color: var(--text-secondary);">
-            今日は分析対象外です${restReason ? `（${restReason}）` : ""}
-          </div>
-        </div>
-      </div>
-    </div>` : ""}
-    ${hasAnalysis && !isRestDay ? buildHomeSummary(analysis) : ""}
-    ${buildHomeActions(hasRecord, hasAnalysis, dateStr, isRestDay)}
-    ${buildHomeGratitudeCard(gratitudeItems)}
-  `;
-}
-
-async function renderHome() {
-  const todayStr = today();
-
-  // 1. キャッシュがあれば即描画（スピナーなし）
-  const cached = loadHomeCache(todayStr);
-  let rendered = false;
-  if (cached) {
-    getMain().innerHTML = buildHomeHTML(todayStr, cached.record, cached.analysis, cached.reminders, cached.gratitude || []);
-    attachHomeReminderEvents();
-    rendered = true;
-  } else {
-    showLoading("今日のデータを確認中...");
-  }
-
-  // 2. 最新データを取得して上書き
-  try {
-    const [recordRes, analysisRes, remindersRes, gratitudeRes] = await Promise.allSettled([
-      recordsApi.get(todayStr),
-      analysisApi.get(todayStr),
-      syncRemindersFromServer(),
-      gratitudeApi.recent(3),
-    ]);
-
-    const record = recordRes.status === "fulfilled" ? recordRes.value : null;
-    const analysis = analysisRes.status === "fulfilled" ? analysisRes.value : null;
-    const reminders = remindersRes.status === "fulfilled" ? (remindersRes.value || []) : _homeRemindersCache;
-    const gratitude = gratitudeRes.status === "fulfilled" ? (gratitudeRes.value || []) : (cached ? cached.gratitude || [] : []);
-
-    // キャッシュを更新（次回起動時の楽観描画のため）
-    saveHomeCache(todayStr, record, analysis, reminders, gratitude);
-
-    // ホームで取得済みの record / reminders を /input の楽観描画キャッシュに事前ウォームアップ
-    prewarmInputCache(todayStr, record, reminders);
-
-    // 最新データで再描画（差分チェックは省略 — 全体再描画でも十分軽い）
-    getMain().innerHTML = buildHomeHTML(todayStr, record, analysis, reminders, gratitude);
-    attachHomeReminderEvents();
-  } catch (e) {
-    if (!rendered) {
-      getMain().innerHTML = `
-        ${buildHomeReminderCard()}
-        <div class="empty-state">
-          <div class="icon">📝</div>
-          <p>今日の記録はまだありません。<br>行動記録を入力して分析を始めましょう。</p>
-          <button class="btn btn-primary" onclick="window.location.hash='/input'">記録を入力する</button>
-        </div>`;
-      attachHomeReminderEvents();
-    }
-  }
-}
-
-function buildHomeSummary(analysis) {
-  const score = analysis.summary.overall_score;
-  const scoreClass = score >= 70 ? "good" : score >= 40 ? "mid" : "bad";
-  const scoreLabel = score >= 70 ? "良い一日" : score >= 40 ? "まあまあ" : "要改善";
-
-  return `
-    <div class="card">
-      <div class="card-title">今日のスコア</div>
-      <div class="score-circle ${scoreClass}">
-        <span class="score-value">${score}</span>
-        <span class="score-label">${scoreLabel}</span>
-      </div>
-      <div class="stats-grid">
-        <div class="stat-item">
-          <div class="stat-value">${analysis.summary.productive_hours.toFixed(1)}</div>
-          <div class="stat-label">生産的（h）</div>
-        </div>
-        <div class="stat-item">
-          <div class="stat-value">${analysis.summary.wasted_hours.toFixed(1)}</div>
-          <div class="stat-label">無駄（h）</div>
-        </div>
-        <div class="stat-item">
-          <div class="stat-value">${analysis.summary.tasks_completed_count ?? Math.round(analysis.summary.task_completion_rate * 100)}${analysis.summary.tasks_completed_count != null ? '個' : '%'}</div>
-          <div class="stat-label">完了タスク</div>
-        </div>
-      </div>
-      <button class="btn btn-outline btn-sm" onclick="window.location.hash='/analysis/${analysis.date}'">
-        詳細を見る →
-      </button>
-    </div>`;
-}
-
-function buildHomeActions(hasRecord, hasAnalysis, date, isRestDay = false) {
-  if (isRestDay) {
-    return `
-      <div class="card">
-        <div class="card-title">アクション</div>
-        <button class="btn btn-outline btn-sm" onclick="window.location.hash='/input'">記録を編集</button>
-      </div>`;
-  }
-  if (!hasRecord) {
-    return `
-      <div class="card">
-        <div class="card-title">今日の記録</div>
-        <div class="empty-state" style="padding: 24px 0;">
-          <div class="icon">✏️</div>
-          <p>まだ今日の記録がありません</p>
-        </div>
-        <button class="btn btn-primary" onclick="window.location.hash='/input'">
-          行動を記録する
-        </button>
-      </div>`;
-  }
-
-  if (!hasAnalysis) {
-    return `
-      <div class="card">
-        <div class="card-title">AI 分析</div>
-        <p style="color: var(--text-muted); margin-bottom: 16px; font-size: 0.9rem;">
-          記録済みです。AIによる分析を実行しましょう。
-        </p>
-        <button class="btn btn-primary" id="btn-generate-analysis">
-          🤖 AI で分析する
-        </button>
-      </div>`;
-  }
-
-  return `
-    <div class="card">
-      <div class="card-title">アクション</div>
-      <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-        <button class="btn btn-outline btn-sm" onclick="window.location.hash='/input'">記録を編集</button>
-        <button class="btn btn-outline btn-sm" id="btn-regenerate">分析を再実行</button>
-      </div>
-    </div>`;
-}
-
 // ===== ペースト時の段落空行保持（全 textarea 対象） =====
 // claude.ai 等のレンダリング HTML から textarea にペーストすると、
 // ブラウザが text/plain に変換する際に <p> 境界の空行を落とすことがある。
@@ -709,31 +357,17 @@ document.addEventListener("paste", (e) => {
   _insertTextAtCursor(target, transformed);
 });
 
-// ===== イベント委任（動的ボタン用）=====
-
-document.addEventListener("click", async (e) => {
-  if (e.target.id === "btn-generate-analysis" || e.target.id === "btn-regenerate") {
-    const todayStr = today();
-    e.target.disabled = true;
-    e.target.textContent = "分析中...";
-    try {
-      await analysisApi.generate(todayStr);
-      showToast("分析が完了しました！", "success");
-      window.location.hash = `/analysis/${todayStr}`;
-    } catch (err) {
-      showToast(`分析に失敗しました: ${err.message}`, "error");
-      e.target.disabled = false;
-      e.target.textContent = "🤖 AI で分析する";
-    }
-  }
-});
-
 // ===== ルーティング設定 =====
-// 各ルートは初回訪問時に動的 import（ホームのバンドルには含めない）
+// 各ルートは初回訪問時に動的 import（トップのバンドルには含めない）
 
-addRoute("/", () => renderHome());
-addRoute("/input", async () => (await loadInputForm()).renderInputForm(today()));
-addRoute("/input/:date", async ({ date }) => (await loadInputForm()).renderInputForm(date));
+// トップ（旧 /input）
+addRoute("/", async () => (await loadInputForm()).renderInputForm(today()));
+addRoute("/edit/:date", async ({ date }) => (await loadInputForm()).renderInputForm(date));
+
+// 旧 URL の後方互換リダイレクト（ブックマーク・他コンポーネントの古いリンク用）
+addRoute("/input", () => { window.location.hash = "/"; });
+addRoute("/input/:date", ({ date }) => { window.location.hash = `/edit/${date}`; });
+
 addRoute("/analysis/:date", async ({ date }) => (await loadAnalysisView()).renderAnalysisView(date));
 addRoute("/history", async () => (await loadHistoryList()).renderHistoryList());
 addRoute("/weekly", async () => (await loadWeeklyReport()).renderWeeklyReport(null));

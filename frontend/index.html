@@ -24,14 +24,14 @@
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Klee+One&display=swap" /></noscript>
 
   <link rel="manifest" href="/manifest.json" />
-  <link rel="stylesheet" href="/css/style.css?v=20260514b" />
+  <link rel="stylesheet" href="/css/style.css?v=20260515a" />
 
-  <!-- ホーム表示に必要なコアモジュールを先読み（並列 fetch で TTI を短縮） -->
-  <link rel="modulepreload" href="/js/app.js?v=20260514b" />
-  <link rel="modulepreload" href="/js/router.js?v=20260514b" />
-  <link rel="modulepreload" href="/js/api.js?v=20260514b" />
-  <link rel="modulepreload" href="/js/swipe-nav.js?v=20260514b" />
-  <link rel="modulepreload" href="/js/bedtime-timer.js?v=20260514b" />
+  <!-- トップ表示に必要なコアモジュールを先読み（並列 fetch で TTI を短縮） -->
+  <link rel="modulepreload" href="/js/app.js?v=20260515a" />
+  <link rel="modulepreload" href="/js/router.js?v=20260515a" />
+  <link rel="modulepreload" href="/js/api.js?v=20260515a" />
+  <link rel="modulepreload" href="/js/swipe-nav.js?v=20260515a" />
+  <link rel="modulepreload" href="/js/bedtime-timer.js?v=20260515a" />
 
   <!-- FOUC防止: JSモジュール読み込み前にテーマを適用 -->
   <script>
@@ -51,9 +51,9 @@
   <!-- ナビゲーション -->
   <nav class="nav" style="padding-top: env(safe-area-inset-top, 48px)">
     <div class="nav-inner">
-      <a class="nav-logo" href="#/input">行動分析AI</a>
+      <a class="nav-logo" href="#/">行動分析AI</a>
       <div class="nav-links">
-        <a class="nav-link" href="#/input" data-route="/input">
+        <a class="nav-link" href="#/" data-route="/">
           <!-- Edit icon -->
           <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
             <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
@@ -229,8 +229,8 @@
   <!-- デスクトップ用ヘッダー（モバイルでは非表示） -->
   <header class="desktop-header">
     <div class="desktop-header-left">
-      <h1 class="desktop-header-title" id="desktop-page-title">ダッシュボード</h1>
-      <span class="desktop-header-breadcrumb" id="desktop-breadcrumb">ホーム</span>
+      <h1 class="desktop-header-title" id="desktop-page-title">行動記録</h1>
+      <span class="desktop-header-breadcrumb" id="desktop-breadcrumb">記録入力</span>
     </div>
     <div class="desktop-header-right">
       <!-- 就寝までウィジェット（デスクトップヘッダー: HUD コンパクト版） -->
@@ -284,6 +284,6 @@
   -->
 
   <!-- アプリのメインスクリプト（ES Modules） -->
-  <script type="module" src="/js/app.js?v=20260514b"></script>
+  <script type="module" src="/js/app.js?v=20260515a"></script>
 </body>
 </html>

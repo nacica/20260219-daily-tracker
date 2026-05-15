@@ -114,7 +114,7 @@ function buildChoiceHTML(date, record) {
   return `
     <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
       <h2 style="font-size: 1.1rem;">${dateLabel}の記録</h2>
-      <button class="btn btn-outline btn-sm" onclick="window.location.hash='/input/${date}'">記録を編集</button>
+      <button class="btn btn-outline btn-sm" onclick="window.location.hash='/edit/${date}'">記録を編集</button>
     </div>
     <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: var(--gap);">未分析</p>
 
@@ -313,7 +313,7 @@ function buildAnalysisHTML(analysis, dialogueData) {
   return `
     <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
       <h2 style="font-size: 1.1rem;">分析結果</h2>
-      <button class="btn btn-outline btn-sm" onclick="window.location.hash='/input/${date}'">記録を編集</button>
+      <button class="btn btn-outline btn-sm" onclick="window.location.hash='/edit/${date}'">記録を編集</button>
     </div>
     <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: var(--gap);">${dateLabel}</p>
 
@@ -488,10 +488,9 @@ function buildNoAnalysisHTML(date, errorMsg) {
           🤖 今すぐ分析する
         </button>
         <button class="btn btn-outline" style="margin-top: 10px; max-width: 320px;"
-          onclick="window.location.hash='/input/${date}'">
+          onclick="window.location.hash='/edit/${date}'">
           記録を入力する
-        </button>` : `
-        <button class="btn btn-outline" onclick="window.location.hash='/'">ホームへ戻る</button>`}
+        </button>` : ""}
     </div>`;
 }
 

@@ -43,7 +43,7 @@ export function navigate(path) {
     }
   }
 
-  // マッチなし → ホームへ
+  // マッチなし → 404 表示
   handler404();
 }
 
@@ -54,7 +54,6 @@ function handler404() {
       <div class="empty-state">
         <div class="icon">🔍</div>
         <p>ページが見つかりません</p>
-        <button class="btn btn-outline" onclick="window.location.hash='/'">ホームへ</button>
       </div>`;
   }
 }

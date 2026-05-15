@@ -5,7 +5,7 @@
 
 /** ナビタブの順序（data-route と一致） */
 const TAB_ORDER = [
-  "/input",
+  "/",
   "/history",
   "/weekly",
   "/suggestions",
