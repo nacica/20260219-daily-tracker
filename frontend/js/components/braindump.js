@@ -5,8 +5,8 @@
  * ラベル機能: メモごとに複数ラベル付与可、ラベルOR検索、専用管理モーダル。
  */
 
-import { braindumpApi } from "../api.js?v=20260515b";
-import { showToast } from "../app.js?v=20260515b";
+import { braindumpApi } from "../api.js?v=20260515d";
+import { showToast } from "../app.js?v=20260515d";
 
 // ===== ユーティリティ =====
 
@@ -24,6 +24,29 @@ function daysAgo(n) {
   const d = new Date();
   d.setDate(d.getDate() - n);
   return d.toLocaleDateString("sv-SE");
+}
+
+// 「＋ 新しいメモ」押下時に textarea 1行目へ自動挿入する日時ヘッダー
+const DATE_HEADER_REGEX = /^\s*\d{4}年\d{1,2}月\d{1,2}日\([日月火水木金土]\) \d{1,2}時\d{2}分\s*$/;
+
+function formatDateTimeHeader() {
+  const d = new Date();
+  const wd = ["日", "月", "火", "水", "木", "金", "土"][d.getDay()];
+  const mi = String(d.getMinutes()).padStart(2, "0");
+  return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日(${wd}) ${d.getHours()}時${mi}分`;
+}
+
+function insertDateTimeHeader() {
+  const ta = document.getElementById("bd-new-textarea");
+  if (!ta) return;
+  ta.value = `${formatDateTimeHeader()}\n\n`;
+  const pos = ta.value.length;
+  ta.setSelectionRange(pos, pos);
+  ta.focus();
+}
+
+function isHeaderOnly(text) {
+  return DATE_HEADER_REGEX.test(text);
 }
 
 /** タグ名から決定的に HSL 色を生成（薄め背景・濃いめ文字） */
@@ -793,7 +816,10 @@ function updateHeaderForEditing(entry) {
       <button class="btn btn-outline btn-sm" id="bd-manage-labels-btn" title="ラベルを管理">⚙ タグ管理</button>
     </div>
   `;
-  document.getElementById("bd-back-to-new-btn")?.addEventListener("click", resetToNewMode);
+  document.getElementById("bd-back-to-new-btn")?.addEventListener("click", () => {
+    resetToNewMode();
+    insertDateTimeHeader();
+  });
   document.getElementById("bd-save-header-btn")?.addEventListener("click", saveNewEntry);
   document.getElementById("bd-manage-labels-btn")?.addEventListener("click", openLabelsManager);
 
@@ -809,7 +835,9 @@ async function startNewMemo() {
     newAutoSaveTimer = null;
   }
   const textarea = document.getElementById("bd-new-textarea");
-  const hasText = textarea && textarea.value.trim().length > 0;
+  const text = textarea ? textarea.value : "";
+  // 自動挿入された日時ヘッダーだけの状態は「中身なし」として扱う
+  const hasText = text.trim().length > 0 && !isHeaderOnly(text);
   const hasImages = currentImages.length > 0;
   if (hasText || hasImages) {
     if (editingEntryId) {
@@ -819,6 +847,7 @@ async function startNewMemo() {
     }
   }
   resetToNewMode();
+  insertDateTimeHeader();
 }
 
 function resetToNewMode() {
@@ -962,7 +991,15 @@ async function autoSaveNewEntry() {
   const textarea = document.getElementById("bd-new-textarea");
   if (!textarea) return;
 
-  const content = buildContent(textarea.value, currentImages);
+  const text = textarea.value;
+  const hasImages = currentImages.length > 0;
+  // 自動挿入された日時ヘッダーだけの状態では空メモを作らない
+  if (!hasImages && (text.trim() === "" || isHeaderOnly(text))) {
+    setDirty(false);
+    return;
+  }
+
+  const content = buildContent(text, currentImages);
   if (!content) {
     setDirty(false);
     return;
