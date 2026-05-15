@@ -5,8 +5,8 @@
  * ラベル機能: メモごとに複数ラベル付与可、ラベルOR検索、専用管理モーダル。
  */
 
-import { braindumpApi } from "../api.js?v=20260515d";
-import { showToast } from "../app.js?v=20260515d";
+import { braindumpApi } from "../api.js?v=20260516a";
+import { showToast } from "../app.js?v=20260516a";
 
 // ===== ユーティリティ =====
 
@@ -47,6 +47,15 @@ function insertDateTimeHeader() {
 
 function isHeaderOnly(text) {
   return DATE_HEADER_REGEX.test(text);
+}
+
+// 一覧カードのタイトル/プレビュー算出用に、先頭の日時ヘッダー行（と続く空行）を取り除く
+function stripDateHeader(text) {
+  const lines = text.split("\n");
+  if (lines.length === 0 || !DATE_HEADER_REGEX.test(lines[0])) return text;
+  let i = 1;
+  while (i < lines.length && lines[i].trim() === "") i++;
+  return lines.slice(i).join("\n");
 }
 
 /** タグ名から決定的に HSL 色を生成（薄め背景・濃いめ文字） */
@@ -456,8 +465,10 @@ function renderRecentEntries() {
     const entriesHTML = dateEntries.map((entry, idx) => {
       const time = entry.created_at ? entry.created_at.slice(11, 16) : "";
       const cleanContent = entry.content.replace(IMG_REGEX, " ").trim();
-      const title = entry.title || cleanContent.slice(0, 30).replace(/\n/g, " ");
-      const preview = cleanContent.slice(0, 80).replace(/\n/g, " ");
+      const bodyContent = stripDateHeader(cleanContent).trim();
+      const title = entry.title
+        || (bodyContent ? bodyContent.slice(0, 30).replace(/\n/g, " ") : "(無題)");
+      const preview = bodyContent.slice(0, 80).replace(/\n/g, " ");
       const labels = entry.labels || [];
       const labelsHTML = labels.length > 0
         ? `<div class="bd-entry-labels">${labels.map(l => `
@@ -480,7 +491,7 @@ function renderRecentEntries() {
             </div>
           </div>
           ${labelsHTML}
-          <div class="braindump-entry-preview">${escapeHTML(preview)}${entry.content.length > 80 ? '...' : ''}</div>
+          <div class="braindump-entry-preview">${escapeHTML(preview)}${bodyContent.length > 80 ? '...' : ''}</div>
         </div>`;
     }).join("");
 
@@ -513,7 +524,8 @@ function getEntryDisplayInfo(entryId) {
   const entry = recentEntries.find(en => en.id === entryId);
   if (!entry) return { title: "(不明なメモ)", labels: [] };
   const cleanContent = entry.content.replace(IMG_REGEX, " ").trim();
-  const title = entry.title || cleanContent.slice(0, 40).replace(/\n/g, " ") || "(無題)";
+  const bodyContent = stripDateHeader(cleanContent).trim();
+  const title = entry.title || bodyContent.slice(0, 40).replace(/\n/g, " ") || "(無題)";
   return { title, labels: entry.labels || [] };
 }
 
@@ -805,7 +817,9 @@ function attachEvents() {
 // ===== ヘッダーモード切替 =====
 
 function updateHeaderForEditing(entry) {
-  const title = entry.title || entry.content.slice(0, 30).replace(/\n/g, " ");
+  const cleanContent = entry.content.replace(IMG_REGEX, " ").trim();
+  const bodyContent = stripDateHeader(cleanContent).trim();
+  const title = entry.title || bodyContent.slice(0, 30).replace(/\n/g, " ") || "(無題)";
   const header = document.querySelector(".braindump-header");
   if (!header) return;
   header.innerHTML = `
