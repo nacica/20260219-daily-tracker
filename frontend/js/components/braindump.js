@@ -5,8 +5,8 @@
  * ラベル機能: メモごとに複数ラベル付与可、ラベルOR検索、専用管理モーダル。
  */
 
-import { braindumpApi } from "../api.js?v=20260515a";
-import { showToast } from "../app.js?v=20260515a";
+import { braindumpApi } from "../api.js?v=20260515b";
+import { showToast } from "../app.js?v=20260515b";
 
 // ===== ユーティリティ =====
 
@@ -481,6 +481,138 @@ function refreshEntriesList(activeId) {
   }
 }
 
+// ===== 削除確認モーダル + 長押し =====
+
+const LONG_PRESS_MS = 500;
+let suppressNextClick = false; // 長押し発火後の click を抑止
+
+function getEntryDisplayInfo(entryId) {
+  const entry = recentEntries.find(en => en.id === entryId);
+  if (!entry) return { title: "(不明なメモ)", labels: [] };
+  const cleanContent = entry.content.replace(IMG_REGEX, " ").trim();
+  const title = entry.title || cleanContent.slice(0, 40).replace(/\n/g, " ") || "(無題)";
+  return { title, labels: entry.labels || [] };
+}
+
+function showDeleteConfirmModal({ title, labels, onConfirm }) {
+  document.getElementById("bd-delete-confirm-modal")?.remove();
+
+  const labelsHTML = labels && labels.length
+    ? `<div class="bd-delete-confirm-labels">${labels.map(l =>
+        `<span class="bd-label-chip bd-label-chip-sm" style="${labelChipStyle(l)}">${escapeHTML(l)}</span>`
+      ).join("")}</div>`
+    : "";
+
+  const modal = document.createElement("div");
+  modal.id = "bd-delete-confirm-modal";
+  modal.className = "bd-modal-overlay";
+  modal.innerHTML = `
+    <div class="bd-modal bd-delete-confirm" role="alertdialog" aria-labelledby="bd-delete-confirm-heading">
+      <div class="bd-modal-header">
+        <h3 id="bd-delete-confirm-heading">本当に削除しますか？</h3>
+        <button class="bd-modal-close" type="button" aria-label="閉じる">×</button>
+      </div>
+      <div class="bd-modal-body">
+        <div class="bd-delete-confirm-title">${escapeHTML(title || "(無題)")}</div>
+        ${labelsHTML}
+        <div class="bd-delete-confirm-warning">この操作は取り消せません。</div>
+      </div>
+      <div class="bd-modal-footer">
+        <button class="btn btn-outline btn-sm" id="bd-delete-confirm-cancel" type="button">キャンセル</button>
+        <button class="btn btn-danger btn-sm" id="bd-delete-confirm-ok" type="button">削除する</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+
+  const close = () => modal.remove();
+  modal.querySelector(".bd-modal-close")?.addEventListener("click", close);
+  modal.querySelector("#bd-delete-confirm-cancel")?.addEventListener("click", close);
+  modal.addEventListener("click", (e) => {
+    if (e.target === modal) close();
+  });
+  document.addEventListener("keydown", function onEsc(e) {
+    if (e.key === "Escape") {
+      close();
+      document.removeEventListener("keydown", onEsc);
+    }
+  });
+  modal.querySelector("#bd-delete-confirm-ok")?.addEventListener("click", async () => {
+    close();
+    await onConfirm();
+  });
+  setTimeout(() => modal.querySelector("#bd-delete-confirm-cancel")?.focus(), 30);
+}
+
+// 長押しハンドラ: ボタンに直接付与（フォーム内の固定ボタン用）
+function attachLongPressToButton(btn, onTrigger) {
+  if (!btn || btn.dataset.lpInit === "1") return;
+  btn.dataset.lpInit = "1";
+
+  let timer = null;
+  const cancel = () => {
+    if (timer) { clearTimeout(timer); timer = null; }
+    btn.classList.remove("bd-longpress-active");
+  };
+
+  btn.addEventListener("pointerdown", (e) => {
+    if (e.button !== undefined && e.button !== 0) return;
+    cancel();
+    btn.classList.add("bd-longpress-active");
+    timer = setTimeout(() => {
+      cancel();
+      suppressNextClick = true;
+      if (navigator.vibrate) { try { navigator.vibrate(20); } catch {} }
+      onTrigger();
+    }, LONG_PRESS_MS);
+  });
+  btn.addEventListener("pointerup", cancel);
+  btn.addEventListener("pointerleave", cancel);
+  btn.addEventListener("pointercancel", cancel);
+}
+
+// 長押しハンドラ: イベント委譲版（動的に再描画される一覧の × ボタン用）
+function initEntriesLongPress(container) {
+  if (!container || container.dataset.lpInit === "1") return;
+  container.dataset.lpInit = "1";
+
+  let timer = null;
+  let activeBtn = null;
+  const cancel = () => {
+    if (timer) { clearTimeout(timer); timer = null; }
+    if (activeBtn) activeBtn.classList.remove("bd-longpress-active");
+    activeBtn = null;
+  };
+
+  container.addEventListener("pointerdown", (e) => {
+    const btn = e.target.closest(".braindump-entry-delete");
+    if (!btn) return;
+    if (e.button !== undefined && e.button !== 0) return;
+    cancel();
+    activeBtn = btn;
+    btn.classList.add("bd-longpress-active");
+    const entryId = btn.dataset.id;
+    timer = setTimeout(() => {
+      cancel();
+      suppressNextClick = true;
+      if (navigator.vibrate) { try { navigator.vibrate(20); } catch {} }
+      const { title, labels } = getEntryDisplayInfo(entryId);
+      showDeleteConfirmModal({
+        title,
+        labels,
+        onConfirm: async () => {
+          await deleteEntry(entryId);
+          if (editingEntryId === entryId) resetToNewMode();
+          showToast("削除しました");
+        },
+      });
+    }, LONG_PRESS_MS);
+  });
+  container.addEventListener("pointerup", cancel);
+  container.addEventListener("pointerleave", cancel);
+  container.addEventListener("pointercancel", cancel);
+}
+
 // ===== イベントハンドリング =====
 
 function attachEvents() {
@@ -530,15 +662,33 @@ function attachEvents() {
   // マークダウン要約ボタン
   document.getElementById("bd-summarize-btn")?.addEventListener("click", summarizeContent);
 
-  // フォーム内の削除ボタン
-  document.getElementById("bd-delete-btn")?.addEventListener("click", async () => {
-    const targetId = editingEntryId || newEntryId;
-    if (!targetId) return;
-    if (!confirm("このメモを削除しますか？")) return;
-    await deleteEntry(targetId);
-    resetToNewMode();
-    showToast("削除しました");
-  });
+  // フォーム内の削除ボタン（長押し0.5秒で確認モーダル）
+  const formDeleteBtn = document.getElementById("bd-delete-btn");
+  if (formDeleteBtn) {
+    // 通常クリック: 長押し直後のクリックは無視、それ以外はヒントを出す
+    formDeleteBtn.addEventListener("click", (e) => {
+      if (suppressNextClick) {
+        suppressNextClick = false;
+        e.preventDefault();
+        return;
+      }
+      showToast("削除するにはボタンを長押ししてください");
+    });
+    attachLongPressToButton(formDeleteBtn, () => {
+      const targetId = editingEntryId || newEntryId;
+      if (!targetId) return;
+      const { title, labels } = getEntryDisplayInfo(targetId);
+      showDeleteConfirmModal({
+        title,
+        labels,
+        onConfirm: async () => {
+          await deleteEntry(targetId);
+          resetToNewMode();
+          showToast("削除しました");
+        },
+      });
+    });
+  }
 
   // クリアボタン
   document.getElementById("bd-cancel-new-btn")?.addEventListener("click", () => {
@@ -557,7 +707,11 @@ function attachEvents() {
   });
 
   // エントリ削除ボタン / 並び替えボタン
-  document.getElementById("bd-entries")?.addEventListener("click", async (e) => {
+  const entriesEl = document.getElementById("bd-entries");
+  // 一覧の × ボタンに長押し操作を委譲で付与
+  initEntriesLongPress(entriesEl);
+
+  entriesEl?.addEventListener("click", async (e) => {
     const reorderBtn = e.target.closest(".braindump-entry-reorder");
     if (reorderBtn) {
       e.stopPropagation();
@@ -568,15 +722,16 @@ function attachEvents() {
 
     const deleteBtn = e.target.closest(".braindump-entry-delete");
     if (deleteBtn) {
+      // 同一要素上のエントリクリック・ハンドラ(エディタ読み込み)も止める
       e.stopPropagation();
-      const entryId = deleteBtn.dataset.id;
-      if (!entryId) return;
-      if (!confirm("このメモを削除しますか？")) return;
-      await deleteEntry(entryId);
-      if (editingEntryId === entryId) {
-        resetToNewMode();
+      e.stopImmediatePropagation();
+      // 長押しで発火済みの click は無視
+      if (suppressNextClick) {
+        suppressNextClick = false;
+        return;
       }
-      showToast("削除しました");
+      // 通常タップではエントリ読み込みを抑止しつつヒントを表示
+      showToast("削除するにはボタンを長押ししてください");
       return;
     }
   });

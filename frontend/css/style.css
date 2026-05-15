@@ -5977,6 +5977,71 @@ main.swipe-enter-right {
 }
 
 /* ===================================================
+   削除確認モーダル
+   =================================================== */
+
+.bd-delete-confirm {
+  max-width: 420px;
+}
+.bd-delete-confirm .bd-modal-header h3 {
+  color: #ff8585;
+}
+[data-theme="light"] .bd-delete-confirm .bd-modal-header h3 {
+  color: #c0392b;
+}
+.bd-delete-confirm-title {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
+  margin-bottom: 8px;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 6px;
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+[data-theme="light"] .bd-delete-confirm-title {
+  background: rgba(0, 0, 0, 0.04);
+}
+.bd-delete-confirm-labels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+.bd-delete-confirm-warning {
+  font-size: 12px;
+  color: rgba(255, 200, 200, 0.7);
+  margin-top: 6px;
+}
+[data-theme="light"] .bd-delete-confirm-warning {
+  color: rgba(192, 57, 43, 0.8);
+}
+
+/* 長押し中のフィードバック: 進捗オーバーレイ */
+.bd-longpress-active {
+  position: relative;
+  overflow: hidden;
+  transform: scale(0.96);
+  transition: transform 0.1s ease;
+}
+.bd-longpress-active::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to right, rgba(255, 64, 96, 0.55), rgba(255, 64, 96, 0.55));
+  background-size: 0% 100%;
+  background-repeat: no-repeat;
+  pointer-events: none;
+  animation: bd-longpress-fill 0.5s linear forwards;
+  border-radius: inherit;
+}
+@keyframes bd-longpress-fill {
+  from { background-size: 0% 100%; }
+  to   { background-size: 100% 100%; }
+}
+
+/* ===================================================
    単語帳カード — 一覧画面
    =================================================== */
 
