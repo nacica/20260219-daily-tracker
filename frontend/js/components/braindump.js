@@ -5,8 +5,8 @@
  * ラベル機能: メモごとに複数ラベル付与可、ラベルOR検索、専用管理モーダル。
  */
 
-import { braindumpApi } from "../api.js?v=20260516a";
-import { showToast } from "../app.js?v=20260516a";
+import { braindumpApi } from "../api.js?v=20260516b";
+import { showToast } from "../app.js?v=20260516b";
 
 // ===== ユーティリティ =====
 
@@ -466,8 +466,7 @@ function renderRecentEntries() {
       const time = entry.created_at ? entry.created_at.slice(11, 16) : "";
       const cleanContent = entry.content.replace(IMG_REGEX, " ").trim();
       const bodyContent = stripDateHeader(cleanContent).trim();
-      const title = entry.title
-        || (bodyContent ? bodyContent.slice(0, 30).replace(/\n/g, " ") : "(無題)");
+      const title = bodyContent ? bodyContent.slice(0, 40).replace(/\n/g, " ") : "(無題)";
       const preview = bodyContent.slice(0, 80).replace(/\n/g, " ");
       const labels = entry.labels || [];
       const labelsHTML = labels.length > 0
@@ -525,7 +524,7 @@ function getEntryDisplayInfo(entryId) {
   if (!entry) return { title: "(不明なメモ)", labels: [] };
   const cleanContent = entry.content.replace(IMG_REGEX, " ").trim();
   const bodyContent = stripDateHeader(cleanContent).trim();
-  const title = entry.title || bodyContent.slice(0, 40).replace(/\n/g, " ") || "(無題)";
+  const title = bodyContent.slice(0, 40).replace(/\n/g, " ") || "(無題)";
   return { title, labels: entry.labels || [] };
 }
 
@@ -819,7 +818,7 @@ function attachEvents() {
 function updateHeaderForEditing(entry) {
   const cleanContent = entry.content.replace(IMG_REGEX, " ").trim();
   const bodyContent = stripDateHeader(cleanContent).trim();
-  const title = entry.title || bodyContent.slice(0, 30).replace(/\n/g, " ") || "(無題)";
+  const title = bodyContent.slice(0, 40).replace(/\n/g, " ") || "(無題)";
   const header = document.querySelector(".braindump-header");
   if (!header) return;
   header.innerHTML = `
