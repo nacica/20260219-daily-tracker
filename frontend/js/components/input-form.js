@@ -5,9 +5,90 @@
  * 朝のタスク整理（ソクラテス式問答）統合
  */
 
-import { recordsApi, analysisApi, morningDialogueApi, remindersApi, categoriesApi } from "../api.js?v=20260515b";
-import { showToast } from "../app.js?v=20260515b";
-import { showTaskCompleteAnimation } from "./task-stats.js?v=20260515b";
+import { recordsApi, analysisApi, morningDialogueApi, remindersApi, categoriesApi } from "../api.js?v=20260515c";
+import { showToast } from "../app.js?v=20260515c";
+import { showTaskCompleteAnimation } from "./task-stats.js?v=20260515c";
+
+// ===== 付箋(今日意識すること) の Markdown レンダリング =====
+// Claude などからコピペした表/箇条書き/見出し/太字を整形表示する。
+// 保存値はプレーンテキスト(Markdown)のままで、表示時のみ HTML に変換する。
+
+let _markedLoadPromise = null;
+let _purifyLoadPromise = null;
+let _mdLibsRefreshPending = false;
+
+function loadMarked() {
+  if (window.marked) return Promise.resolve(window.marked);
+  if (_markedLoadPromise) return _markedLoadPromise;
+  _markedLoadPromise = new Promise((resolve, reject) => {
+    const s = document.createElement("script");
+    s.src = "https://cdn.jsdelivr.net/npm/marked/marked.min.js";
+    s.async = true;
+    s.onload = () => {
+      try {
+        const m = window.marked;
+        if (m && typeof m.setOptions === "function") {
+          // breaks:true → 単一改行も <br> に。プレーンメモが従来通り改行表示される。
+          m.setOptions({ breaks: true, gfm: true });
+        }
+      } catch {}
+      resolve(window.marked);
+    };
+    s.onerror = () => { _markedLoadPromise = null; reject(new Error("marked.js の読込に失敗")); };
+    document.head.appendChild(s);
+  });
+  return _markedLoadPromise;
+}
+
+function loadDomPurify() {
+  if (window.DOMPurify) return Promise.resolve(window.DOMPurify);
+  if (_purifyLoadPromise) return _purifyLoadPromise;
+  _purifyLoadPromise = new Promise((resolve, reject) => {
+    const s = document.createElement("script");
+    s.src = "https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js";
+    s.async = true;
+    s.onload = () => resolve(window.DOMPurify);
+    s.onerror = () => { _purifyLoadPromise = null; reject(new Error("DOMPurify の読込に失敗")); };
+    document.head.appendChild(s);
+  });
+  return _purifyLoadPromise;
+}
+
+function mdParseToHtml(m, text) {
+  if (typeof m.parse === "function") return m.parse(text);
+  if (m.marked && typeof m.marked.parse === "function") return m.marked.parse(text);
+  if (typeof m === "function") return m(text);
+  return "";
+}
+
+/** Markdown を sanitize 済み HTML へ変換。未ロード時はエスケープ + 改行のみで応急描画。 */
+function renderStickyMd(text) {
+  if (!text) return "";
+  const m = window.marked;
+  const p = window.DOMPurify;
+  if (m && p) {
+    try {
+      const raw = mdParseToHtml(m, text);
+      return p.sanitize(raw, { USE_PROFILES: { html: true } });
+    } catch {
+      return escapeHTML(text).replace(/\n/g, "<br>");
+    }
+  }
+  ensureMdLibsForRefresh();
+  return escapeHTML(text).replace(/\n/g, "<br>");
+}
+
+/** ライブラリ未ロード時にバックグラウンドでロードし、完了後に描画を差し替える。 */
+function ensureMdLibsForRefresh() {
+  if (_mdLibsRefreshPending) return;
+  _mdLibsRefreshPending = true;
+  Promise.all([loadMarked(), loadDomPurify()]).then(() => {
+    if (document.getElementById("sticky-notes")) refreshStickyNotes();
+    if (document.getElementById("reminder-modal-body")) renderReminderModalContent();
+  }).catch(() => {
+    _mdLibsRefreshPending = false; // 失敗時は次回再試行
+  });
+}
 
 /* ── カテゴリ管理 ── */
 
@@ -600,7 +681,7 @@ function buildStickyNoteHTML(r, activeClass = "") {
   return `<div class="sticky-note${activeClass}" data-id="${escapeHTML(r.id)}">
     <div class="sticky-note-body">
       ${dateStr ? `<div class="sticky-note-date">${dateStr}</div>` : ""}
-      <span class="sticky-text">${escapeHTML(r.text)}</span>
+      <div class="sticky-text sticky-text-md">${renderStickyMd(r.text)}</div>
     </div>
     <div class="sticky-actions">
       <button class="sticky-delete" title="削除">&times;</button>
@@ -1164,10 +1245,10 @@ function renderReminderModalContent() {
         }, 30);
       }
     } else {
-      body.innerHTML = `<div class="reminder-modal-text" id="reminder-modal-text" data-id="${escapeHTML(target.id)}"></div>`;
+      body.innerHTML = `<div class="reminder-modal-text sticky-text-md" id="reminder-modal-text" data-id="${escapeHTML(target.id)}"></div>`;
       const textEl = document.getElementById("reminder-modal-text");
       if (textEl) {
-        textEl.textContent = target.text;
+        textEl.innerHTML = renderStickyMd(target.text);
         textEl.title = "クリックで次へ";
         textEl.addEventListener("click", () => {
           if (reminders.length <= 1) return;
