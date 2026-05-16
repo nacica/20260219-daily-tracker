@@ -172,17 +172,6 @@ export const diaryDialogueApi = {
   delete: (date) => apiFetch(`/diary-dialogue/${date}`, { method: "DELETE" }),
 };
 
-// ---- コーチングチャット ----
-
-export const coachApi = {
-  /** コーチとチャット */
-  chat: (message, conversationHistory = []) =>
-    apiFetch("/coach/chat", {
-      method: "POST",
-      body: { message, conversation_history: conversationHistory },
-    }),
-};
-
 // ---- フリージャーナル ----
 
 export const journalApi = {

@@ -9,7 +9,6 @@ const TAB_ORDER = [
   "/history",
   "/weekly",
   "/suggestions",
-  "/coach",
   "/journal",
   "/monthly",
 ];

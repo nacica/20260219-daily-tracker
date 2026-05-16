@@ -93,7 +93,6 @@ function _renderSummary(main, summary, targetMonth) {
         <h2 class="monthly-title">${summary.period || targetMonth} 月次レポート</h2>
         <div class="monthly-nav">
           <button class="btn btn-outline btn-sm" onclick="window.location.hash='/monthly/${prevYearMonth(targetMonth)}'">前月</button>
-          <button class="btn btn-outline btn-sm" onclick="window.location.hash='/coach'">コーチに相談</button>
         </div>
       </div>
 

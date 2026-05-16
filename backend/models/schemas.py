@@ -213,16 +213,3 @@ class CoachingSummary(BaseModel):
     created_at: Optional[str] = None
 
 
-# ---- コーチング API リクエスト ----
-
-class CoachChatRequest(BaseModel):
-    """コーチングチャットリクエスト"""
-    message: str = Field(..., min_length=1, max_length=2000)
-    conversation_history: list[dict] = Field(default=[], description="直近の対話履歴（最大10ターン）")
-
-
-class CoachChatResponse(BaseModel):
-    """コーチングチャットレスポンス"""
-    reply: str
-    referenced_patterns: list[str] = []
-    suggested_action: str = ""
