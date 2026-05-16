@@ -5,8 +5,8 @@
  * ラベル機能: メモごとに複数ラベル付与可、ラベルOR検索、専用管理モーダル。
  */
 
-import { braindumpApi } from "../api.js?v=20260516b";
-import { showToast } from "../app.js?v=20260516b";
+import { braindumpApi } from "../api.js?v=20260516c";
+import { showToast } from "../app.js?v=20260516c";
 
 // ===== ユーティリティ =====
 
@@ -92,6 +92,15 @@ let currentLabels = []; // 編集中メモ / 新規メモのラベル配列
 let isDirty = false; // テキストエリアに未保存の変更があるか（ヘッダー保存ボタンの表示制御に使用）
 let allLabels = []; // 全メモから集計したラベル一覧 [{name, count}]
 let filterLabels = []; // 一覧フィルタで選択中のラベル名（OR検索）
+// ノートID別の textarea スクロール位置を記憶（同ノートに戻ったとき前回位置を復元）
+const scrollPositions = new Map();
+
+function saveCurrentScroll() {
+  const textarea = document.getElementById("bd-new-textarea");
+  if (!textarea) return;
+  const key = editingEntryId || newEntryId;
+  if (key) scrollPositions.set(key, textarea.scrollTop);
+}
 
 function setDirty(dirty) {
   isDirty = dirty;
@@ -729,6 +738,7 @@ function attachEvents() {
     if (editingEntryId) {
       resetToNewMode();
     } else {
+      saveCurrentScroll();
       newEntryId = null;
       currentImages = [];
       currentLabels = [];
@@ -786,6 +796,9 @@ function attachEvents() {
     const textarea = document.getElementById("bd-new-textarea");
     if (!textarea) return;
 
+    // 切り替え前ノートのスクロール位置を保存
+    saveCurrentScroll();
+
     const { text, images } = splitContentAndImages(entry.content);
     textarea.value = text;
     currentImages = images;
@@ -803,8 +816,8 @@ function attachEvents() {
     // ヘッダーを編集モード表示に更新
     updateHeaderForEditing(entry);
 
-    textarea.focus();
-    textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+    // 前回の表示位置を復元（未記録なら先頭）。focus/カーソル移動はしない
+    textarea.scrollTop = scrollPositions.get(entryId) || 0;
 
     // 自動保存を既存メモ更新に切り替え
     if (newAutoSaveTimer) clearTimeout(newAutoSaveTimer);
@@ -864,6 +877,8 @@ async function startNewMemo() {
 }
 
 function resetToNewMode() {
+  // 離脱前ノートのスクロール位置を保存
+  saveCurrentScroll();
   editingEntryId = null;
   newEntryId = null;
   const textarea = document.getElementById("bd-new-textarea");
