@@ -7668,10 +7668,42 @@ main.swipe-enter-right {
 .reminder-modal-nav {
   display: flex;
   align-items: center;
-  justify-content: center;
   gap: 10px;
   order: 2;
+  position: relative;
+  min-height: 28px;
 }
+
+.reminder-modal-nav-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  flex: 1 1 auto;
+}
+
+.reminder-modal-fontsize {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.reminder-fontsize-btn {
+  width: auto;
+  min-width: 32px;
+  padding: 0 8px;
+  border-radius: 14px;
+  font-weight: 700;
+  font-family: inherit;
+  letter-spacing: 0.02em;
+}
+
+.reminder-fontsize-btn#reminder-modal-font-dec { font-size: 0.78rem; }
+.reminder-fontsize-btn#reminder-modal-font-inc { font-size: 1rem; }
 
 .reminder-modal-buttons {
   display: flex;

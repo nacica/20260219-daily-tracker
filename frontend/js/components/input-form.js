@@ -5,9 +5,9 @@
  * 朝のタスク整理（ソクラテス式問答）統合
  */
 
-import { recordsApi, analysisApi, morningDialogueApi, remindersApi, categoriesApi } from "../api.js?v=20260516d";
-import { showToast } from "../app.js?v=20260516d";
-import { showTaskCompleteAnimation } from "./task-stats.js?v=20260516d";
+import { recordsApi, analysisApi, morningDialogueApi, remindersApi, categoriesApi } from "../api.js?v=20260518a";
+import { showToast } from "../app.js?v=20260518a";
+import { showTaskCompleteAnimation } from "./task-stats.js?v=20260518a";
 
 // ===== 付箋(今日意識すること) の Markdown レンダリング =====
 // Claude などからコピペした表/箇条書き/見出し/太字を整形表示する。
@@ -584,6 +584,11 @@ const REMINDER_STYLE_DEFAULT = { size: 18, weight: 700 };
 const REMINDER_STYLE_LIMITS = { sizeMin: 12, sizeMax: 32, weightMin: 300, weightMax: 900 };
 let stickyStylePanelOpen = false;
 
+/* ── モーダル本文サイズ（カード側とは独立、A-/A+ で調整） ── */
+const REMINDER_MODAL_SIZE_KEY = "reminder-modal-text-size";
+const REMINDER_MODAL_SIZE_DEFAULT = 23;
+const REMINDER_MODAL_SIZE_LIMITS = { min: 12, max: 48, step: 2 };
+
 function clampNum(v, min, max) {
   v = Number(v);
   if (!Number.isFinite(v)) return min;
@@ -608,8 +613,29 @@ function applyReminderStyle(style) {
   const s = style || getReminderStyle();
   const root = document.documentElement;
   root.style.setProperty("--reminder-text-size", `${s.size}px`);
-  root.style.setProperty("--reminder-modal-text-size", `${Math.round(s.size * 1.3)}px`);
   root.style.setProperty("--reminder-text-weight", String(s.weight));
+  // --reminder-modal-text-size はモーダル側で独立管理（applyModalTextSize）
+}
+
+function getModalTextSize() {
+  try {
+    const raw = localStorage.getItem(REMINDER_MODAL_SIZE_KEY);
+    if (raw === null || raw === "") return REMINDER_MODAL_SIZE_DEFAULT;
+    return clampNum(parseInt(raw, 10), REMINDER_MODAL_SIZE_LIMITS.min, REMINDER_MODAL_SIZE_LIMITS.max);
+  } catch {
+    return REMINDER_MODAL_SIZE_DEFAULT;
+  }
+}
+
+function applyModalTextSize(size) {
+  document.documentElement.style.setProperty("--reminder-modal-text-size", `${size}px`);
+}
+
+function setModalTextSize(size) {
+  const next = clampNum(size, REMINDER_MODAL_SIZE_LIMITS.min, REMINDER_MODAL_SIZE_LIMITS.max);
+  try { localStorage.setItem(REMINDER_MODAL_SIZE_KEY, String(next)); } catch {}
+  applyModalTextSize(next);
+  return next;
 }
 
 function saveReminderStyle(style) {
@@ -623,6 +649,7 @@ function saveReminderStyle(style) {
 
 // モジュール読み込み時に保存済みスタイルを反映
 applyReminderStyle();
+applyModalTextSize(getModalTextSize());
 
 /** textarea を内容に合わせて自動リサイズする（max-height は CSS 側で制御）。 */
 function autoResizeTextarea(ta) {
@@ -1158,12 +1185,18 @@ function openReminderModal() {
       <div class="reminder-modal-body" id="reminder-modal-body"></div>
       <div class="reminder-modal-actions">
         <div class="reminder-modal-nav">
-          ${reminders.length > 1 ? `
-            <button class="sticky-nav-btn" id="reminder-modal-prev" title="前へ">&#9664;</button>
-            <span class="sticky-counter" id="reminder-modal-counter"></span>
-            <button class="sticky-nav-btn" id="reminder-modal-next" title="次へ">&#9654;</button>
-            <button class="sticky-nav-btn sticky-random-btn${stickyRandomMode ? ' active' : ''}" id="reminder-modal-random" title="ランダム">&#x1f500;</button>
-          ` : ""}
+          <div class="reminder-modal-nav-center">
+            ${reminders.length > 1 ? `
+              <button class="sticky-nav-btn" id="reminder-modal-prev" title="前へ">&#9664;</button>
+              <span class="sticky-counter" id="reminder-modal-counter"></span>
+              <button class="sticky-nav-btn" id="reminder-modal-next" title="次へ">&#9654;</button>
+              <button class="sticky-nav-btn sticky-random-btn${stickyRandomMode ? ' active' : ''}" id="reminder-modal-random" title="ランダム">&#x1f500;</button>
+            ` : ""}
+          </div>
+          <div class="reminder-modal-fontsize" role="group" aria-label="文字サイズ">
+            <button class="sticky-nav-btn reminder-fontsize-btn" id="reminder-modal-font-dec" title="文字を小さく" aria-label="文字を小さく">A-</button>
+            <button class="sticky-nav-btn reminder-fontsize-btn" id="reminder-modal-font-inc" title="文字を大きく" aria-label="文字を大きく">A+</button>
+          </div>
         </div>
         <div class="reminder-modal-buttons" id="reminder-modal-buttons"></div>
       </div>
@@ -1215,6 +1248,28 @@ function openReminderModal() {
     const boardRandomBtn = document.getElementById("sticky-random");
     if (boardRandomBtn) boardRandomBtn.classList.toggle("active", stickyRandomMode);
   });
+
+  // 文字サイズ A-/A+
+  applyModalTextSize(getModalTextSize());
+  updateModalFontButtonsState();
+  document.getElementById("reminder-modal-font-dec")?.addEventListener("click", () => {
+    const cur = getModalTextSize();
+    const next = setModalTextSize(cur - REMINDER_MODAL_SIZE_LIMITS.step);
+    if (next !== cur) updateModalFontButtonsState();
+  });
+  document.getElementById("reminder-modal-font-inc")?.addEventListener("click", () => {
+    const cur = getModalTextSize();
+    const next = setModalTextSize(cur + REMINDER_MODAL_SIZE_LIMITS.step);
+    if (next !== cur) updateModalFontButtonsState();
+  });
+}
+
+function updateModalFontButtonsState() {
+  const cur = getModalTextSize();
+  const decBtn = document.getElementById("reminder-modal-font-dec");
+  const incBtn = document.getElementById("reminder-modal-font-inc");
+  if (decBtn) decBtn.disabled = cur <= REMINDER_MODAL_SIZE_LIMITS.min;
+  if (incBtn) incBtn.disabled = cur >= REMINDER_MODAL_SIZE_LIMITS.max;
 }
 
 function renderReminderModalContent() {
