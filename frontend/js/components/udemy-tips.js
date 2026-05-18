@@ -8,8 +8,8 @@
  *   - 編集モーダル内のみ自動保存タイマーが動く
  */
 
-import { udemyTipsApi } from "../api.js?v=20260518d";
-import { showToast } from "../app.js?v=20260518d";
+import { udemyTipsApi } from "../api.js?v=20260518e";
+import { showToast } from "../app.js?v=20260518e";
 
 // ===== ユーティリティ =====
 
@@ -1161,6 +1161,7 @@ async function saveCurrentEntry() {
   const content = textarea?.value.trim() || "";
   if (!content) {
     setDirty(false);
+    await closeTipModal({ save: false });
     return;
   }
   try {
@@ -1174,6 +1175,7 @@ async function saveCurrentEntry() {
     }
     showToast("保存しました");
     setDirty(false);
+    await closeTipModal({ save: false });
   } catch (e) {
     showToast(`保存に失敗しました: ${e.message}`, "error");
   }
