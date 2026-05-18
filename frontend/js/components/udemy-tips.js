@@ -1,11 +1,15 @@
 /**
- * Udemy コース制作 Tips コンポーネント
- * ブレインダンプと同形式のメモ帳。Udemy コース制作で見つけた小技を記録。
- * タグ複数付与可、タグ OR 検索、専用管理モーダル、自動保存、長押し削除確認。
+ * Udemy コース制作 Tips コンポーネント（一覧メイン + 中央モーダル編集）
+ *
+ * レイアウト方針:
+ *   - メインは Tip 一覧（2 行カードのグリッド）
+ *   - 上部ヘッダーに「＋ 新しい Tip」「⚙ タグ管理」+ ソートタブ + タグフィルタを横並び
+ *   - Tip クリックで中央モーダルが開いて編集（自動保存・タグ編集・削除はモーダル内）
+ *   - 編集モーダル内のみ自動保存タイマーが動く
  */
 
-import { udemyTipsApi } from "../api.js?v=20260518c";
-import { showToast } from "../app.js?v=20260518c";
+import { udemyTipsApi } from "../api.js?v=20260518d";
+import { showToast } from "../app.js?v=20260518d";
 
 // ===== ユーティリティ =====
 
@@ -26,15 +30,6 @@ function formatDateTimeHeader() {
   const wd = ["日", "月", "火", "水", "木", "金", "土"][d.getDay()];
   const mi = String(d.getMinutes()).padStart(2, "0");
   return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日(${wd}) ${d.getHours()}時${mi}分`;
-}
-
-function insertDateTimeHeader() {
-  const ta = document.getElementById("ut-new-textarea");
-  if (!ta) return;
-  ta.value = `${formatDateTimeHeader()}\n\n`;
-  const pos = ta.value.length;
-  ta.setSelectionRange(pos, pos);
-  ta.focus();
 }
 
 function isHeaderOnly(text) {
@@ -68,22 +63,32 @@ function labelChipStyle(name) {
   return `--bd-chip-bg:${c.bg}; --bd-chip-fg:${c.fg}; --bd-chip-bg-dark:${c.bgDark}; --bd-chip-fg-dark:${c.fgDark};`;
 }
 
-// ===== 状態管理 =====
+/** タイトル: 日時ヘッダー除去後の先頭行を最大 60 文字 */
+function entryTitle(entry) {
+  const body = stripDateHeader(entry.content || "").trim();
+  if (!body) return "(無題)";
+  const firstLine = body.split("\n")[0];
+  return firstLine.slice(0, 60);
+}
 
-let currentDate = today();
-let allEntries = [];      // 全期間の Tips
-let editingEntryId = null;
-let newAutoSaveTimer = null;
-let newEntryId = null;
-let currentLabels = [];
-let isDirty = false;
-let allLabels = [];
-let filterLabels = [];
-const scrollPositions = new Map();
+/** プレビュー: タイトル直後の本文を 1〜2 行分（最大 120 文字） */
+function entryPreview(entry) {
+  const body = stripDateHeader(entry.content || "").trim();
+  const lines = body.split("\n");
+  if (lines.length <= 1) return "";
+  // タイトル行（lines[0]）の後を 120 文字に丸める
+  const rest = lines.slice(1).join(" ").trim();
+  return rest.slice(0, 120);
+}
 
-// ソートモード: 'tag'=タグ別グループ / 'date'=新しい順（日付グループ） / 'name'=タイトル五十音順
+// ===== 状態 =====
+
 const SORT_MODE_KEY = "udemy-tips-sort-mode";
 const VALID_SORT_MODES = new Set(["tag", "date", "name"]);
+
+let allEntries = [];
+let allLabels = [];
+let filterLabels = [];
 let sortMode = (() => {
   try {
     const saved = localStorage.getItem(SORT_MODE_KEY);
@@ -93,50 +98,86 @@ let sortMode = (() => {
   }
 })();
 
+// 編集モーダル内の状態
+let editingEntryId = null;   // 既存編集中: その ID
+let newEntryId = null;       // 新規 → 初回オートセーブで割り当てられる ID
+let currentLabels = [];      // モーダル内で編集中のタグ
+let isDirty = false;
+let newAutoSaveTimer = null;
+let modalEl = null;          // 開いているモーダル要素
+
 function setSortMode(mode) {
   if (!VALID_SORT_MODES.has(mode)) return;
   sortMode = mode;
   try { localStorage.setItem(SORT_MODE_KEY, mode); } catch {}
 }
 
-function saveCurrentScroll() {
-  const textarea = document.getElementById("ut-new-textarea");
-  if (!textarea) return;
-  const key = editingEntryId || newEntryId;
-  if (key) scrollPositions.set(key, textarea.scrollTop);
+function setDirty(d) {
+  isDirty = d;
+  const btn = document.getElementById("ut-modal-save-btn");
+  if (btn) {
+    btn.classList.toggle("ut-btn-pulse", d);
+  }
 }
 
-function setDirty(dirty) {
-  isDirty = dirty;
-  const btn = document.getElementById("ut-save-header-btn");
-  if (btn) btn.style.display = dirty ? "" : "none";
-}
+// ===== スタイル注入 =====
 
-// ===== コンパクトリスト/ソートタブ スタイル注入 =====
-
-function injectCompactStyles() {
-  if (document.getElementById("ut-compact-styles")) return;
+function injectStyles() {
+  if (document.getElementById("ut-page-styles")) return;
   const style = document.createElement("style");
-  style.id = "ut-compact-styles";
+  style.id = "ut-page-styles";
   style.textContent = `
+    .ut-page {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 12px 16px 80px;
+    }
+
+    /* ----- ヘッダー ----- */
+    .ut-page-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 8px;
+    }
+    .ut-page-title {
+      font-size: 1.2rem;
+      font-weight: 700;
+      margin: 0;
+      flex-shrink: 0;
+    }
+    .ut-page-count {
+      font-size: 0.78rem;
+      opacity: 0.6;
+      flex-shrink: 0;
+    }
+    .ut-page-actions {
+      margin-left: auto;
+      display: flex;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+
+    /* ----- ソートタブ ----- */
     .ut-sort-tabs {
       display: flex;
       gap: 4px;
-      padding: 6px 0 8px 0;
       flex-wrap: wrap;
+      align-items: center;
+      padding-bottom: 6px;
     }
     .ut-sort-tab {
-      padding: 4px 10px;
+      padding: 4px 12px;
       font-size: 0.78rem;
       border: 1px solid var(--border, #d1d5db);
       border-radius: 999px;
       background: transparent;
-      color: var(--text, inherit);
+      color: inherit;
       cursor: pointer;
-      transition: background 0.1s, border-color 0.1s;
     }
     .ut-sort-tab:hover {
-      background: var(--hover-bg, rgba(0,0,0,0.04));
+      background: rgba(0,0,0,0.04);
     }
     [data-theme="dark"] .ut-sort-tab:hover {
       background: rgba(255,255,255,0.06);
@@ -146,100 +187,399 @@ function injectCompactStyles() {
       color: #fff;
       border-color: var(--accent, #2563eb);
     }
+
+    /* ----- フィルタバー ----- */
+    .ut-filter-bar {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+      padding: 4px 0 12px;
+      border-bottom: 1px solid var(--border, #e5e7eb);
+      margin-bottom: 12px;
+    }
+    .ut-filter-label {
+      font-size: 0.75rem;
+      opacity: 0.6;
+      margin-right: 4px;
+    }
+    .ut-filter-chip {
+      padding: 3px 10px;
+      font-size: 0.72rem;
+      border-radius: 999px;
+      cursor: pointer;
+      background: var(--bd-chip-bg);
+      color: var(--bd-chip-fg);
+      border: 1px solid transparent;
+      opacity: 0.7;
+      transition: opacity 0.1s, transform 0.05s;
+    }
+    [data-theme="dark"] .ut-filter-chip {
+      background: var(--bd-chip-bg-dark);
+      color: var(--bd-chip-fg-dark);
+    }
+    .ut-filter-chip:hover { opacity: 1; }
+    .ut-filter-chip.active {
+      opacity: 1;
+      box-shadow: 0 0 0 2px var(--accent, #2563eb);
+    }
+    .ut-filter-clear {
+      padding: 3px 10px;
+      font-size: 0.72rem;
+      border-radius: 999px;
+      cursor: pointer;
+      border: 1px solid var(--border, #d1d5db);
+      background: transparent;
+      color: inherit;
+      opacity: 0.7;
+    }
+    .ut-filter-clear:hover { opacity: 1; }
+    .ut-filter-empty { font-size: 0.75rem; opacity: 0.5; }
+
+    /* ----- グループ ----- */
+    .ut-group {
+      margin-bottom: 24px;
+    }
     .ut-group-header {
       display: flex;
       align-items: center;
       gap: 8px;
-      padding: 12px 4px 4px;
-      font-size: 0.8rem;
+      font-size: 0.85rem;
       font-weight: 600;
-      opacity: 0.85;
+      padding: 6px 2px;
+      margin-bottom: 6px;
       border-bottom: 1px dashed var(--border, #e5e7eb);
-      margin-bottom: 4px;
     }
-    .ut-group-header-count {
+    .ut-group-count {
       font-size: 0.72rem;
-      opacity: 0.6;
+      opacity: 0.55;
       font-weight: 400;
     }
-    .ut-row {
+
+    /* ----- カードグリッド ----- */
+    .ut-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 10px;
+    }
+    .ut-card {
+      position: relative;
+      padding: 10px 12px;
+      border: 1px solid var(--border, #e5e7eb);
+      border-radius: 8px;
+      background: var(--card-bg, #fff);
+      cursor: pointer;
+      transition: transform 0.08s, box-shadow 0.08s, border-color 0.08s;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      min-height: 76px;
+    }
+    [data-theme="dark"] .ut-card {
+      background: var(--card-bg, rgba(255,255,255,0.04));
+      border-color: rgba(255,255,255,0.10);
+    }
+    .ut-card:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+      border-color: var(--accent, #2563eb);
+    }
+    [data-theme="dark"] .ut-card:hover {
+      box-shadow: 0 4px 14px rgba(0,0,0,0.5);
+    }
+    .ut-card-title {
+      font-size: 0.92rem;
+      font-weight: 600;
+      line-height: 1.35;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .ut-card-preview {
+      font-size: 0.78rem;
+      opacity: 0.65;
+      line-height: 1.35;
+      display: -webkit-box;
+      -webkit-line-clamp: 1;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .ut-card-footer {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: auto;
+    }
+    .ut-card-tags {
+      display: flex;
+      gap: 3px;
+      flex-wrap: wrap;
+      flex: 1;
+      min-width: 0;
+    }
+    .ut-card-meta {
+      font-size: 0.7rem;
+      opacity: 0.55;
+      font-variant-numeric: tabular-nums;
+      flex-shrink: 0;
+    }
+    .ut-card .bd-label-chip {
+      font-size: 0.66rem;
+      padding: 1px 7px;
+      white-space: nowrap;
+    }
+    .ut-card-delete {
+      position: absolute;
+      top: 6px;
+      right: 6px;
+      width: 22px;
+      height: 22px;
+      border-radius: 4px;
+      border: none;
+      background: transparent;
+      color: inherit;
+      opacity: 0;
+      cursor: pointer;
+      font-size: 0.85rem;
+      line-height: 1;
+      transition: opacity 0.1s, background 0.1s;
+    }
+    .ut-card:hover .ut-card-delete {
+      opacity: 0.5;
+    }
+    .ut-card-delete:hover {
+      opacity: 1 !important;
+      background: rgba(239, 68, 68, 0.15);
+    }
+    .ut-card-delete.bd-longpress-active {
+      opacity: 1 !important;
+      background: rgba(239, 68, 68, 0.3) !important;
+    }
+
+    /* ----- 空状態 ----- */
+    .ut-empty {
+      text-align: center;
+      padding: 64px 16px;
+      opacity: 0.6;
+    }
+    .ut-empty-icon { font-size: 2.5rem; margin-bottom: 8px; }
+
+    /* ----- 編集モーダル ----- */
+    .ut-modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.55);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      padding: 16px;
+      backdrop-filter: blur(2px);
+    }
+    .ut-modal {
+      background: var(--card-bg, #fff);
+      color: inherit;
+      width: 100%;
+      max-width: 760px;
+      max-height: 86vh;
+      border-radius: 12px;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.4);
+      overflow: hidden;
+    }
+    [data-theme="dark"] .ut-modal {
+      background: #1a1d24;
+      border: 1px solid rgba(255,255,255,0.10);
+    }
+    .ut-modal-header {
       display: flex;
       align-items: center;
       gap: 8px;
-      padding: 5px 8px;
-      border: 1px solid transparent;
-      border-radius: 6px;
-      margin-bottom: 2px;
-      cursor: pointer;
-      font-size: 0.85rem;
-      line-height: 1.4;
-      transition: background 0.08s, border-color 0.08s;
-    }
-    .ut-row:hover {
-      background: var(--hover-bg, rgba(0,0,0,0.04));
-    }
-    [data-theme="dark"] .ut-row:hover {
-      background: rgba(255,255,255,0.05);
-    }
-    .ut-row.active {
-      background: var(--accent-bg, rgba(37,99,235,0.10));
-      border-color: var(--accent, #2563eb);
-    }
-    .ut-row-tags {
-      display: flex;
-      gap: 3px;
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border, #e5e7eb);
       flex-shrink: 0;
-      max-width: 40%;
-      overflow: hidden;
     }
-    .ut-row-title {
+    .ut-modal-title {
+      font-size: 0.95rem;
+      font-weight: 600;
       flex: 1;
+      min-width: 0;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
-      min-width: 0;
     }
-    .ut-row-meta {
-      font-size: 0.72rem;
-      opacity: 0.55;
-      flex-shrink: 0;
-      font-variant-numeric: tabular-nums;
-    }
-    .ut-row-actions {
-      display: flex;
-      gap: 2px;
-      flex-shrink: 0;
-    }
-    .ut-row-actions button {
-      background: transparent;
+    .ut-modal-close {
+      width: 32px;
+      height: 32px;
+      border-radius: 6px;
       border: none;
-      cursor: pointer;
-      padding: 2px 5px;
-      font-size: 0.7rem;
-      opacity: 0.45;
+      background: transparent;
       color: inherit;
-      border-radius: 3px;
-      transition: opacity 0.1s, background 0.1s;
+      cursor: pointer;
+      font-size: 1.1rem;
     }
-    .ut-row-actions button:hover:not(:disabled) {
-      opacity: 1;
-      background: rgba(0,0,0,0.08);
+    .ut-modal-close:hover { background: rgba(0,0,0,0.06); }
+    [data-theme="dark"] .ut-modal-close:hover { background: rgba(255,255,255,0.08); }
+
+    .ut-modal-labels {
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border, #e5e7eb);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+      flex-shrink: 0;
+      position: relative;
     }
-    [data-theme="dark"] .ut-row-actions button:hover:not(:disabled) {
-      background: rgba(255,255,255,0.10);
+    .ut-modal-labels-icon { opacity: 0.5; }
+    .ut-modal-labels-chips {
+      display: flex;
+      gap: 4px;
+      flex-wrap: wrap;
     }
-    .ut-row-actions button:disabled {
-      opacity: 0.15;
-      cursor: default;
+    .ut-modal-add-label {
+      padding: 3px 10px;
+      font-size: 0.72rem;
+      border-radius: 999px;
+      border: 1px dashed var(--border, #d1d5db);
+      background: transparent;
+      color: inherit;
+      cursor: pointer;
     }
-    .ut-row-actions .braindump-entry-delete.bd-longpress-active {
-      background: rgba(239,68,68,0.25) !important;
-      opacity: 1 !important;
+    .ut-modal-add-label:hover {
+      border-style: solid;
+      border-color: var(--accent, #2563eb);
     }
-    .ut-row .bd-label-chip {
-      font-size: 0.68rem;
-      padding: 1px 6px;
-      white-space: nowrap;
+    .ut-label-picker {
+      position: absolute;
+      top: calc(100% - 2px);
+      left: 14px;
+      right: 14px;
+      max-width: 360px;
+      background: var(--card-bg, #fff);
+      border: 1px solid var(--border, #e5e7eb);
+      border-radius: 8px;
+      padding: 8px;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.12);
+      z-index: 10;
+    }
+    [data-theme="dark"] .ut-label-picker {
+      background: #232830;
+      border-color: rgba(255,255,255,0.12);
+    }
+    .ut-label-picker-input {
+      width: 100%;
+      padding: 6px 8px;
+      border: 1px solid var(--border, #d1d5db);
+      border-radius: 4px;
+      background: transparent;
+      color: inherit;
+      font-size: 0.85rem;
+      margin-bottom: 6px;
+    }
+    .ut-label-picker-options {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+    .ut-label-picker-option {
+      padding: 3px 9px;
+      font-size: 0.72rem;
+      border-radius: 999px;
+      cursor: pointer;
+      border: 1px solid transparent;
+      background: var(--bd-chip-bg);
+      color: var(--bd-chip-fg);
+    }
+    [data-theme="dark"] .ut-label-picker-option {
+      background: var(--bd-chip-bg-dark);
+      color: var(--bd-chip-fg-dark);
+    }
+    .ut-label-picker-empty {
+      font-size: 0.75rem;
+      opacity: 0.5;
+      padding: 4px;
+    }
+    .ut-label-picker-hint {
+      font-size: 0.65rem;
+      opacity: 0.5;
+      margin-top: 6px;
+    }
+    .ut-label-count {
+      font-size: 0.65rem;
+      opacity: 0.7;
+      margin-left: 4px;
+    }
+
+    .ut-modal-body {
+      flex: 1;
+      min-height: 0;
+      padding: 12px 14px;
+      display: flex;
+      flex-direction: column;
+    }
+    .ut-modal-textarea {
+      flex: 1;
+      min-height: 280px;
+      width: 100%;
+      padding: 10px;
+      border: 1px solid var(--border, #d1d5db);
+      border-radius: 6px;
+      font-family: inherit;
+      font-size: 0.92rem;
+      line-height: 1.55;
+      resize: vertical;
+      background: transparent;
+      color: inherit;
+    }
+    .ut-modal-textarea:focus {
+      outline: 2px solid var(--accent, #2563eb);
+      outline-offset: -2px;
+      border-color: transparent;
+    }
+
+    .ut-modal-footer {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 14px;
+      border-top: 1px solid var(--border, #e5e7eb);
+      flex-shrink: 0;
+    }
+    .ut-modal-footer-spacer { flex: 1; }
+    .ut-btn-pulse {
+      animation: ut-pulse 1.4s infinite;
+    }
+    @keyframes ut-pulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(37,99,235,0.4); }
+      50%      { box-shadow: 0 0 0 4px rgba(37,99,235,0); }
+    }
+
+    /* ----- タグ管理モーダル（共通モーダルラッパー） ----- */
+    .ut-labels-manager-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border, #e5e7eb);
+    }
+    .ut-labels-manager-row:last-child { border-bottom: none; }
+    .ut-labels-manager-count {
+      font-size: 0.75rem;
+      opacity: 0.6;
+      flex: 1;
+    }
+
+    /* モバイル */
+    @media (max-width: 640px) {
+      .ut-page { padding: 8px; }
+      .ut-grid { grid-template-columns: 1fr; }
+      .ut-modal { max-height: 92vh; }
+      .ut-modal-textarea { min-height: 220px; }
     }
   `;
   document.head.appendChild(style);
@@ -248,267 +588,44 @@ function injectCompactStyles() {
 // ===== メインレンダー =====
 
 export async function renderUdemyTips() {
-  currentDate = today();
-  newEntryId = null;
-  currentLabels = [];
+  injectStyles();
   filterLabels = [];
-  injectCompactStyles();
   const main = document.querySelector("main");
   main.innerHTML = `<div class="loading"><div class="spinner"></div><p>読み込み中...</p></div>`;
 
-  // 全期間の Tips を取得（日付範囲指定なし）
+  await loadAllData();
+
+  main.innerHTML = `
+    <div class="ut-page">
+      <div class="ut-page-header">
+        <h2 class="ut-page-title">Udemy 制作 Tips</h2>
+        <span class="ut-page-count" id="ut-page-count">${allEntries.length} 件</span>
+        <div class="ut-page-actions">
+          <button class="btn btn-outline btn-sm" id="ut-manage-labels-btn" title="タグを管理">⚙ タグ管理</button>
+          <button class="btn btn-primary btn-sm" id="ut-new-btn">＋ 新しい Tip</button>
+        </div>
+      </div>
+      <div id="ut-sort-tabs-wrap">${renderSortTabs()}</div>
+      <div class="ut-filter-bar" id="ut-filter-bar">${renderFilterBar()}</div>
+      <div id="ut-entries">${renderEntriesGrid()}</div>
+    </div>
+  `;
+
+  attachPageEvents();
+}
+
+async function loadAllData() {
   try {
     allEntries = await udemyTipsApi.list() || [];
   } catch {
     allEntries = [];
   }
-
   try {
     const res = await udemyTipsApi.listLabels();
     allLabels = (res && res.labels) || [];
   } catch {
     allLabels = [];
   }
-
-  main.innerHTML = `
-    <div class="braindump-container">
-      <!-- 左カラム: 入力エリア -->
-      <div class="braindump-left">
-        <div class="braindump-header">
-          <h2 class="braindump-title">Udemy 制作 Tips</h2>
-          <div class="braindump-header-actions">
-            <button class="btn btn-primary btn-sm" id="ut-save-header-btn" style="display: none;">💾 保存</button>
-            <button class="btn btn-primary btn-sm" id="ut-new-btn">＋ 新しい Tip</button>
-            <button class="btn btn-outline btn-sm" id="ut-manage-labels-btn" title="タグを管理">⚙ タグ管理</button>
-          </div>
-        </div>
-        <div class="braindump-new-form" id="ut-new-form">
-          <div class="braindump-labels-editor" id="ut-labels-editor">
-            ${renderLabelsEditor()}
-          </div>
-          <div class="braindump-textarea-wrap">
-            <textarea class="braindump-textarea" id="ut-new-textarea" placeholder="コース制作で見つけた小技を書いてください..." rows="36"></textarea>
-            <div class="braindump-resize-bar" id="ut-resize-bar" aria-hidden="true" title="ドラッグして縦幅を調整"></div>
-          </div>
-          <div class="braindump-form-actions">
-            <button class="btn btn-danger btn-sm" id="ut-delete-btn" style="display: none;">🗑 削除</button>
-            <button class="btn btn-primary btn-sm" id="ut-save-new-btn">保存</button>
-            <button class="btn btn-outline btn-sm" id="ut-cancel-new-btn">クリア</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- 右カラム: Tips 一覧 -->
-      <div class="braindump-right">
-        <div id="ut-sort-tabs-wrap">
-          ${renderSortTabs()}
-        </div>
-        <div class="braindump-filter-bar" id="ut-filter-bar">
-          ${renderFilterBar()}
-        </div>
-        <div class="braindump-entries" id="ut-entries">
-          ${renderEntriesList()}
-        </div>
-      </div>
-    </div>
-  `;
-
-  attachEvents();
-}
-
-// ===== タグ入力エリア =====
-
-function renderLabelsEditor() {
-  const chips = currentLabels.map(name => `
-    <span class="bd-label-chip" style="${labelChipStyle(name)}" data-label="${escapeHTML(name)}">
-      ${escapeHTML(name)}
-      <button class="bd-label-chip-remove" type="button" data-label="${escapeHTML(name)}" title="このタグを外す">×</button>
-    </span>
-  `).join("");
-
-  return `
-    <div class="bd-labels-editor-inner">
-      <span class="bd-labels-editor-icon" aria-hidden="true">🏷</span>
-      <div class="bd-labels-editor-chips" id="ut-labels-editor-chips">${chips}</div>
-      <button class="bd-label-add-btn" id="ut-label-add-btn" type="button" title="タグを追加">＋ タグ</button>
-      <div class="bd-label-picker" id="ut-label-picker" style="display:none;"></div>
-    </div>
-  `;
-}
-
-function refreshLabelsEditor() {
-  const el = document.getElementById("ut-labels-editor");
-  if (!el) return;
-  el.innerHTML = renderLabelsEditor();
-  attachLabelsEditorEvents();
-}
-
-function attachLabelsEditorEvents() {
-  document.querySelectorAll("#ut-labels-editor .bd-label-chip-remove").forEach(btn => {
-    btn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      const name = btn.dataset.label;
-      currentLabels = currentLabels.filter(l => l !== name);
-      refreshLabelsEditor();
-      onLabelsChanged();
-    });
-  });
-
-  const addBtn = document.getElementById("ut-label-add-btn");
-  const picker = document.getElementById("ut-label-picker");
-  if (addBtn && picker) {
-    addBtn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      if (picker.style.display === "none") {
-        renderLabelPicker();
-        picker.style.display = "";
-        const input = picker.querySelector(".bd-label-picker-input");
-        if (input) {
-          input.value = "";
-          input.focus();
-        }
-      } else {
-        picker.style.display = "none";
-      }
-    });
-  }
-}
-
-function renderLabelPicker() {
-  const picker = document.getElementById("ut-label-picker");
-  if (!picker) return;
-
-  const available = allLabels.filter(l => !currentLabels.includes(l.name));
-
-  const options = available.map(l => `
-    <button class="bd-label-picker-option" type="button" data-name="${escapeHTML(l.name)}" style="${labelChipStyle(l.name)}">
-      ${escapeHTML(l.name)} <span class="bd-label-count">${l.count}</span>
-    </button>
-  `).join("");
-
-  picker.innerHTML = `
-    <input type="text" class="bd-label-picker-input" placeholder="新規タグ名を入力 / 既存から選択" maxlength="50" />
-    <div class="bd-label-picker-options">${options || '<div class="bd-label-picker-empty">既存タグなし</div>'}</div>
-    <div class="bd-label-picker-hint">Enter で確定 / Esc で閉じる</div>
-  `;
-
-  const input = picker.querySelector(".bd-label-picker-input");
-  if (input) {
-    input.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") {
-        e.preventDefault();
-        const val = input.value.trim();
-        if (val) addLabelToCurrent(val);
-      } else if (e.key === "Escape") {
-        e.preventDefault();
-        picker.style.display = "none";
-      }
-    });
-    input.addEventListener("input", () => {
-      const q = input.value.trim().toLowerCase();
-      picker.querySelectorAll(".bd-label-picker-option").forEach(btn => {
-        const name = btn.dataset.name.toLowerCase();
-        btn.style.display = !q || name.includes(q) ? "" : "none";
-      });
-    });
-  }
-
-  picker.querySelectorAll(".bd-label-picker-option").forEach(btn => {
-    btn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      const name = btn.dataset.name;
-      addLabelToCurrent(name);
-    });
-  });
-}
-
-function addLabelToCurrent(rawName) {
-  const name = rawName.trim();
-  if (!name) return;
-  if (currentLabels.includes(name)) return;
-  currentLabels.push(name);
-  if (!allLabels.find(l => l.name === name)) {
-    allLabels.unshift({ name, count: 1 });
-  }
-  refreshLabelsEditor();
-  onLabelsChanged();
-  const picker = document.getElementById("ut-label-picker");
-  if (picker) picker.style.display = "none";
-}
-
-async function onLabelsChanged() {
-  if (editingEntryId) {
-    try {
-      await udemyTipsApi.update(editingEntryId, null, currentLabels);
-      const idx = allEntries.findIndex(e => e.id === editingEntryId);
-      if (idx >= 0) allEntries[idx].labels = [...currentLabels];
-      refreshFilterBar();
-      refreshEntries(editingEntryId);
-    } catch {}
-  } else if (newEntryId) {
-    try {
-      await udemyTipsApi.update(newEntryId, null, currentLabels);
-      const idx = allEntries.findIndex(e => e.id === newEntryId);
-      if (idx >= 0) allEntries[idx].labels = [...currentLabels];
-      refreshFilterBar();
-      refreshEntries(newEntryId);
-    } catch {}
-  }
-}
-
-// ===== フィルタバー =====
-
-function renderFilterBar() {
-  if (allLabels.length === 0) {
-    return `<div class="bd-filter-empty">タグなし</div>`;
-  }
-  const chips = allLabels.map(l => {
-    const active = filterLabels.includes(l.name);
-    return `
-      <button class="bd-filter-chip${active ? ' active' : ''}" type="button"
-              data-name="${escapeHTML(l.name)}"
-              style="${labelChipStyle(l.name)}">
-        ${escapeHTML(l.name)} <span class="bd-label-count">${l.count}</span>
-      </button>
-    `;
-  }).join("");
-  const clearBtn = filterLabels.length > 0
-    ? `<button class="bd-filter-clear" type="button" id="ut-filter-clear-btn">× クリア</button>`
-    : "";
-  return `
-    <div class="bd-filter-bar-inner">
-      <span class="bd-filter-label">フィルタ:</span>
-      <div class="bd-filter-chips">${chips}</div>
-      ${clearBtn}
-    </div>
-  `;
-}
-
-function refreshFilterBar() {
-  const el = document.getElementById("ut-filter-bar");
-  if (!el) return;
-  el.innerHTML = renderFilterBar();
-  attachFilterBarEvents();
-}
-
-function attachFilterBarEvents() {
-  document.querySelectorAll("#ut-filter-bar .bd-filter-chip").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const name = btn.dataset.name;
-      if (filterLabels.includes(name)) {
-        filterLabels = filterLabels.filter(n => n !== name);
-      } else {
-        filterLabels.push(name);
-      }
-      refreshFilterBar();
-      refreshEntries();
-    });
-  });
-  document.getElementById("ut-filter-clear-btn")?.addEventListener("click", () => {
-    filterLabels = [];
-    refreshFilterBar();
-    refreshEntries();
-  });
 }
 
 // ===== ソートタブ =====
@@ -546,12 +663,65 @@ function attachSortTabEvents() {
       if (mode === sortMode) return;
       setSortMode(mode);
       refreshSortTabs();
-      refreshEntriesList();
+      refreshEntries();
     });
   });
 }
 
-// ===== エントリ一覧 =====
+// ===== フィルタバー =====
+
+function renderFilterBar() {
+  if (allLabels.length === 0) {
+    return `<span class="ut-filter-empty">タグなし</span>`;
+  }
+  const chips = allLabels.map(l => {
+    const active = filterLabels.includes(l.name);
+    return `
+      <button class="ut-filter-chip${active ? " active" : ""}" type="button"
+              data-name="${escapeHTML(l.name)}"
+              style="${labelChipStyle(l.name)}">
+        ${escapeHTML(l.name)} <span class="ut-label-count">${l.count}</span>
+      </button>
+    `;
+  }).join("");
+  const clearBtn = filterLabels.length > 0
+    ? `<button class="ut-filter-clear" type="button" id="ut-filter-clear-btn">× クリア</button>`
+    : "";
+  return `
+    <span class="ut-filter-label">フィルタ:</span>
+    ${chips}
+    ${clearBtn}
+  `;
+}
+
+function refreshFilterBar() {
+  const el = document.getElementById("ut-filter-bar");
+  if (!el) return;
+  el.innerHTML = renderFilterBar();
+  attachFilterBarEvents();
+}
+
+function attachFilterBarEvents() {
+  document.querySelectorAll("#ut-filter-bar .ut-filter-chip").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const name = btn.dataset.name;
+      if (filterLabels.includes(name)) {
+        filterLabels = filterLabels.filter(n => n !== name);
+      } else {
+        filterLabels.push(name);
+      }
+      refreshFilterBar();
+      refreshEntries();
+    });
+  });
+  document.getElementById("ut-filter-clear-btn")?.addEventListener("click", () => {
+    filterLabels = [];
+    refreshFilterBar();
+    refreshEntries();
+  });
+}
+
+// ===== 一覧グリッド =====
 
 function getFilteredEntries() {
   if (filterLabels.length === 0) return allEntries;
@@ -561,38 +731,26 @@ function getFilteredEntries() {
   });
 }
 
-/** タイトル抽出: 先頭日時ヘッダーを取り除いた 1 行分（最大 60 文字） */
-function entryTitle(entry) {
-  const body = stripDateHeader(entry.content || "").trim();
-  if (!body) return "(無題)";
-  return body.slice(0, 60).replace(/\n/g, " ");
-}
-
-/** 1 行コンパクト表示。reorderable=true のときのみ ▲▼ ボタンを描画 */
-function renderCompactRow(entry, { reorderable = false, upDisabled = false, downDisabled = false } = {}) {
+function renderCard(entry) {
+  const title = entryTitle(entry);
+  const preview = entryPreview(entry);
+  const labels = entry.labels || [];
   const time = entry.created_at ? entry.created_at.slice(11, 16) : "";
   const dateShort = entry.date ? entry.date.slice(5) : "";
-  const title = entryTitle(entry);
-  const labels = entry.labels || [];
-  const tagsHTML = labels.length > 0
-    ? `<div class="ut-row-tags">${labels.map(l =>
-        `<span class="bd-label-chip bd-label-chip-sm" style="${labelChipStyle(l)}">${escapeHTML(l)}</span>`
-      ).join("")}</div>`
-    : "";
-
-  const reorderHTML = reorderable
-    ? `<button class="braindump-entry-reorder" data-id="${entry.id}" data-dir="up" title="上へ移動"${upDisabled ? " disabled" : ""}>▲</button>
-       <button class="braindump-entry-reorder" data-id="${entry.id}" data-dir="down" title="下へ移動"${downDisabled ? " disabled" : ""}>▼</button>`
-    : "";
-
+  const tagsHTML = labels.map(l =>
+    `<span class="bd-label-chip" style="${labelChipStyle(l)}">${escapeHTML(l)}</span>`
+  ).join("");
+  const previewHTML = preview
+    ? `<div class="ut-card-preview">${escapeHTML(preview)}</div>`
+    : `<div class="ut-card-preview" style="opacity:0.3;">（本文なし）</div>`;
   return `
-    <div class="ut-row braindump-entry" data-id="${entry.id}" data-date="${entry.date}">
-      ${tagsHTML}
-      <span class="ut-row-title">${escapeHTML(title)}</span>
-      <span class="ut-row-meta">${dateShort} ${time}</span>
-      <div class="ut-row-actions">
-        ${reorderHTML}
-        <button class="braindump-entry-delete" data-id="${entry.id}" title="削除">×</button>
+    <div class="ut-card" data-id="${entry.id}" tabindex="0">
+      <button class="ut-card-delete" data-id="${entry.id}" title="削除（長押し）" aria-label="削除">×</button>
+      <div class="ut-card-title">${escapeHTML(title)}</div>
+      ${previewHTML}
+      <div class="ut-card-footer">
+        <div class="ut-card-tags">${tagsHTML}</div>
+        <span class="ut-card-meta">${dateShort} ${time}</span>
       </div>
     </div>
   `;
@@ -600,13 +758,14 @@ function renderCompactRow(entry, { reorderable = false, upDisabled = false, down
 
 function renderEmptyState() {
   const msg = filterLabels.length > 0
-    ? `選択中のタグに該当する Tips はありません`
-    : `まだ Tips がありません。左側に書き込んで保存してください。`;
+    ? "選択中のタグに該当する Tips はありません"
+    : "まだ Tips がありません。右上の「＋ 新しい Tip」から書き始めましょう。";
   return `
-    <div class="empty-state" style="padding: 32px 0;">
-      <div class="icon">💡</div>
+    <div class="ut-empty">
+      <div class="ut-empty-icon">💡</div>
       <p>${msg}</p>
-    </div>`;
+    </div>
+  `;
 }
 
 function renderByDate(list) {
@@ -624,41 +783,28 @@ function renderByDate(list) {
   for (const date of sortedDates) {
     grouped[date].sort((a, b) => sortKey(a) - sortKey(b) || (a.entry_number || 0) - (b.entry_number || 0));
   }
-
   return sortedDates.map(date => {
-    const dateEntries = grouped[date];
+    const entries = grouped[date];
     const d = new Date(date + "T00:00:00");
     const weekdays = ["日", "月", "火", "水", "木", "金", "土"];
     const md = `${d.getMonth() + 1}/${d.getDate()}`;
     const wd = weekdays[d.getDay()];
     const isToday = date === today();
-    const dateHeader = `
-      <span class="braindump-date-pill">
-        <span class="braindump-date-pill-md">${md}</span>
-        <span class="braindump-date-pill-wd">${wd}</span>
-      </span>
-      ${isToday ? '<span class="braindump-today-badge"><span class="braindump-today-dot"></span>today</span>' : ''}
-      <span class="ut-group-header-count">${dateEntries.length} 件</span>
-    `;
-    const lastIndex = dateEntries.length - 1;
-    const rows = dateEntries.map((entry, idx) =>
-      renderCompactRow(entry, {
-        reorderable: true,
-        upDisabled: idx === 0,
-        downDisabled: idx === lastIndex,
-      })
-    ).join("");
     return `
-      <div class="braindump-date-group">
-        <div class="ut-group-header">${dateHeader}</div>
-        ${rows}
-      </div>`;
+      <div class="ut-group">
+        <div class="ut-group-header">
+          <span>${md}（${wd}）</span>
+          ${isToday ? '<span class="ut-group-count" style="color: var(--accent, #2563eb);">today</span>' : ""}
+          <span class="ut-group-count">${entries.length} 件</span>
+        </div>
+        <div class="ut-grid">${entries.map(renderCard).join("")}</div>
+      </div>
+    `;
   }).join("");
 }
 
 function renderByTag(list) {
-  // タグごとに Tip をグループ化（複数タグ持ちは複数グループに登場）
-  const grouped = new Map();        // tagName → entries[]
+  const grouped = new Map();
   const untagged = [];
   for (const entry of list) {
     const labels = entry.labels || [];
@@ -671,39 +817,32 @@ function renderByTag(list) {
       grouped.get(lbl).push(entry);
     }
   }
-  // タグ順: allLabels の並び（使用件数降順）に合わせ、grouped にあるもののみ
-  const orderedTags = allLabels
-    .map(l => l.name)
-    .filter(name => grouped.has(name));
-  // allLabels に載ってない（集計が古い場合の保険）
+  const orderedTags = allLabels.map(l => l.name).filter(name => grouped.has(name));
   for (const tag of grouped.keys()) {
     if (!orderedTags.includes(tag)) orderedTags.push(tag);
   }
-
   const sections = orderedTags.map(tag => {
     const entries = grouped.get(tag) || [];
-    // タググループ内は新しい順
     entries.sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""));
-    const rows = entries.map(e => renderCompactRow(e)).join("");
     return `
-      <div class="braindump-date-group">
+      <div class="ut-group">
         <div class="ut-group-header">
           <span class="bd-label-chip" style="${labelChipStyle(tag)}">${escapeHTML(tag)}</span>
-          <span class="ut-group-header-count">${entries.length} 件</span>
+          <span class="ut-group-count">${entries.length} 件</span>
         </div>
-        ${rows}
-      </div>`;
+        <div class="ut-grid">${entries.map(renderCard).join("")}</div>
+      </div>
+    `;
   });
-
   if (untagged.length > 0) {
     untagged.sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""));
     sections.push(`
-      <div class="braindump-date-group">
+      <div class="ut-group">
         <div class="ut-group-header">
           <span>タグなし</span>
-          <span class="ut-group-header-count">${untagged.length} 件</span>
+          <span class="ut-group-count">${untagged.length} 件</span>
         </div>
-        ${untagged.map(e => renderCompactRow(e)).join("")}
+        <div class="ut-grid">${untagged.map(renderCard).join("")}</div>
       </div>
     `);
   }
@@ -714,105 +853,525 @@ function renderByName(list) {
   const sorted = [...list].sort((a, b) =>
     entryTitle(a).localeCompare(entryTitle(b), "ja")
   );
-  return sorted.map(e => renderCompactRow(e)).join("");
+  return `<div class="ut-grid">${sorted.map(renderCard).join("")}</div>`;
 }
 
-function renderEntriesList() {
+function renderEntriesGrid() {
   const list = getFilteredEntries();
   if (list.length === 0) return renderEmptyState();
-
   if (sortMode === "date") return renderByDate(list);
   if (sortMode === "name") return renderByName(list);
   return renderByTag(list);
 }
 
-function refreshEntriesList(activeId) {
-  const container = document.getElementById("ut-entries");
-  if (container) {
-    container.innerHTML = renderEntriesList();
-    const targetId = activeId || editingEntryId;
-    if (targetId) {
-      // タグ別モードでは同じ Tip が複数グループに登場するので、すべてに active を付与
-      container.querySelectorAll(`.braindump-entry[data-id="${targetId}"]`).forEach(el => {
-        el.classList.add("active");
-      });
-    }
-  }
+async function refreshEntries() {
+  await loadAllData();
+  const countEl = document.getElementById("ut-page-count");
+  if (countEl) countEl.textContent = `${allEntries.length} 件`;
+  refreshFilterBar();
+  const ent = document.getElementById("ut-entries");
+  if (ent) ent.innerHTML = renderEntriesGrid();
+  initCardLongPress(ent);
 }
 
-// ===== 削除確認モーダル + 長押し =====
+// ===== ページレベルのイベント =====
+
+function attachPageEvents() {
+  document.getElementById("ut-new-btn")?.addEventListener("click", () => openTipModal(null));
+  document.getElementById("ut-manage-labels-btn")?.addEventListener("click", openLabelsManager);
+  attachSortTabEvents();
+  attachFilterBarEvents();
+
+  // カードクリックで編集モーダル
+  const entriesEl = document.getElementById("ut-entries");
+  initCardLongPress(entriesEl);
+  entriesEl?.addEventListener("click", (e) => {
+    const deleteBtn = e.target.closest(".ut-card-delete");
+    if (deleteBtn) {
+      e.stopPropagation();
+      if (suppressNextClick) { suppressNextClick = false; return; }
+      showToast("削除するにはボタンを長押ししてください");
+      return;
+    }
+    const card = e.target.closest(".ut-card");
+    if (!card) return;
+    const id = card.dataset.id;
+    const entry = allEntries.find(en => en.id === id);
+    if (entry) openTipModal(entry);
+  });
+  // Enter キーでカードを開く
+  entriesEl?.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter") return;
+    const card = e.target.closest(".ut-card");
+    if (!card) return;
+    const id = card.dataset.id;
+    const entry = allEntries.find(en => en.id === id);
+    if (entry) openTipModal(entry);
+  });
+}
+
+// ===== カードの長押し削除 =====
 
 const LONG_PRESS_MS = 500;
 let suppressNextClick = false;
 
-function getEntryDisplayInfo(entryId) {
-  const entry = allEntries.find(en => en.id === entryId);
-  if (!entry) return { title: "(不明な Tip)", labels: [] };
-  const bodyContent = stripDateHeader(entry.content).trim();
-  const title = bodyContent.slice(0, 40).replace(/\n/g, " ") || "(無題)";
-  return { title, labels: entry.labels || [] };
+function initCardLongPress(container) {
+  if (!container || container.dataset.lpInit === "1") return;
+  container.dataset.lpInit = "1";
+
+  let timer = null;
+  let activeBtn = null;
+  const cancel = () => {
+    if (timer) { clearTimeout(timer); timer = null; }
+    if (activeBtn) activeBtn.classList.remove("bd-longpress-active");
+    activeBtn = null;
+  };
+  container.addEventListener("pointerdown", (e) => {
+    const btn = e.target.closest(".ut-card-delete");
+    if (!btn) return;
+    if (e.button !== undefined && e.button !== 0) return;
+    cancel();
+    activeBtn = btn;
+    btn.classList.add("bd-longpress-active");
+    const entryId = btn.dataset.id;
+    timer = setTimeout(() => {
+      cancel();
+      suppressNextClick = true;
+      if (navigator.vibrate) { try { navigator.vibrate(20); } catch {} }
+      const entry = allEntries.find(en => en.id === entryId);
+      const info = getDeleteInfo(entry);
+      showDeleteConfirmModal({
+        title: info.title,
+        labels: info.labels,
+        onConfirm: async () => {
+          await deleteEntry(entryId);
+          showToast("削除しました");
+        },
+      });
+    }, LONG_PRESS_MS);
+  });
+  container.addEventListener("pointerup", cancel);
+  container.addEventListener("pointerleave", cancel);
+  container.addEventListener("pointercancel", cancel);
 }
 
-function showDeleteConfirmModal({ title, labels, onConfirm }) {
-  document.getElementById("ut-delete-confirm-modal")?.remove();
+function getDeleteInfo(entry) {
+  if (!entry) return { title: "(不明な Tip)", labels: [] };
+  return { title: entryTitle(entry), labels: entry.labels || [] };
+}
 
+// ===== 編集モーダル =====
+
+function openTipModal(entry) {
+  closeTipModal({ save: false }); // 既存があれば閉じる（保存は呼び出し元責任）
+  const isNew = !entry;
+  editingEntryId = isNew ? null : entry.id;
+  newEntryId = null;
+  currentLabels = isNew ? [] : [...(entry.labels || [])];
+  isDirty = false;
+
+  modalEl = document.createElement("div");
+  modalEl.className = "ut-modal-overlay";
+  modalEl.id = "ut-tip-modal";
+  modalEl.innerHTML = `
+    <div class="ut-modal" role="dialog" aria-modal="true">
+      <div class="ut-modal-header">
+        <span class="ut-modal-title" id="ut-modal-title">${escapeHTML(isNew ? "新しい Tip" : (entryTitle(entry) || "(無題)"))}</span>
+        <button class="ut-modal-close" type="button" aria-label="閉じる" id="ut-modal-close-btn">×</button>
+      </div>
+      <div class="ut-modal-labels" id="ut-modal-labels">
+        ${renderModalLabels()}
+      </div>
+      <div class="ut-modal-body">
+        <textarea class="ut-modal-textarea" id="ut-modal-textarea"
+                  placeholder="コース制作で見つけた小技を書いてください...">${escapeHTML(isNew ? "" : (entry.content || ""))}</textarea>
+      </div>
+      <div class="ut-modal-footer">
+        ${isNew ? "" : '<button class="btn btn-danger btn-sm" id="ut-modal-delete-btn" title="長押しで削除">🗑 削除</button>'}
+        <div class="ut-modal-footer-spacer"></div>
+        <button class="btn btn-outline btn-sm" id="ut-modal-cancel-btn">閉じる</button>
+        <button class="btn btn-primary btn-sm" id="ut-modal-save-btn">💾 保存</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modalEl);
+
+  // 新規モードの場合は日時ヘッダーを初期挿入
+  const textarea = document.getElementById("ut-modal-textarea");
+  if (isNew && textarea) {
+    textarea.value = `${formatDateTimeHeader()}\n\n`;
+    const pos = textarea.value.length;
+    setTimeout(() => {
+      textarea.setSelectionRange(pos, pos);
+      textarea.focus();
+    }, 30);
+  } else if (textarea) {
+    setTimeout(() => textarea.focus(), 30);
+  }
+
+  attachModalEvents();
+}
+
+function attachModalEvents() {
+  // 閉じる
+  const closeBtn = document.getElementById("ut-modal-close-btn");
+  const cancelBtn = document.getElementById("ut-modal-cancel-btn");
+  closeBtn?.addEventListener("click", () => closeTipModal());
+  cancelBtn?.addEventListener("click", () => closeTipModal());
+  modalEl?.addEventListener("click", (e) => {
+    if (e.target === modalEl) closeTipModal();
+  });
+  document.addEventListener("keydown", onModalKeydown);
+
+  // 保存
+  document.getElementById("ut-modal-save-btn")?.addEventListener("click", saveCurrentEntry);
+
+  // テキストエリア入力で自動保存
+  const textarea = document.getElementById("ut-modal-textarea");
+  textarea?.addEventListener("input", handleTextareaInput);
+  textarea?.addEventListener("keydown", handleTabInsert);
+
+  // 削除（長押し）
+  const deleteBtn = document.getElementById("ut-modal-delete-btn");
+  if (deleteBtn) {
+    deleteBtn.addEventListener("click", (e) => {
+      if (suppressNextClick) { suppressNextClick = false; e.preventDefault(); return; }
+      showToast("削除するにはボタンを長押ししてください");
+    });
+    attachLongPressToButton(deleteBtn, () => {
+      const targetId = editingEntryId || newEntryId;
+      if (!targetId) return;
+      const entry = allEntries.find(en => en.id === targetId);
+      const info = getDeleteInfo(entry);
+      showDeleteConfirmModal({
+        title: info.title,
+        labels: info.labels,
+        onConfirm: async () => {
+          await deleteEntry(targetId);
+          closeTipModal({ save: false });
+          showToast("削除しました");
+        },
+      });
+    });
+  }
+
+  // タグエディタ
+  attachLabelsEditorEvents();
+}
+
+function onModalKeydown(e) {
+  if (e.key === "Escape" && modalEl) {
+    e.preventDefault();
+    closeTipModal();
+  }
+}
+
+async function closeTipModal({ save = true } = {}) {
+  if (!modalEl) return;
+  if (save) {
+    // 閉じる前に内容を保存（新規で空メモは作らない）
+    const textarea = document.getElementById("ut-modal-textarea");
+    const text = textarea ? textarea.value : "";
+    const hasText = text.trim().length > 0 && !isHeaderOnly(text);
+    if (hasText) {
+      if (editingEntryId) {
+        await autoSaveExisting(editingEntryId);
+      } else if (newEntryId) {
+        await autoSaveExisting(newEntryId);
+      } else {
+        await createNewEntry(text.trim());
+      }
+    }
+  }
+  if (newAutoSaveTimer) { clearTimeout(newAutoSaveTimer); newAutoSaveTimer = null; }
+  document.removeEventListener("keydown", onModalKeydown);
+  modalEl.remove();
+  modalEl = null;
+  editingEntryId = null;
+  newEntryId = null;
+  currentLabels = [];
+  setDirty(false);
+  await refreshEntries();
+}
+
+function handleTextareaInput() {
+  setDirty(true);
+  if (newAutoSaveTimer) clearTimeout(newAutoSaveTimer);
+  newAutoSaveTimer = setTimeout(() => {
+    if (editingEntryId || newEntryId) {
+      autoSaveExisting(editingEntryId || newEntryId);
+    } else {
+      autoSaveCreate();
+    }
+  }, 2000);
+}
+
+async function autoSaveCreate() {
+  const textarea = document.getElementById("ut-modal-textarea");
+  if (!textarea) return;
+  const text = textarea.value;
+  if (text.trim() === "" || isHeaderOnly(text)) {
+    setDirty(false);
+    return;
+  }
+  try {
+    const created = await udemyTipsApi.create(today(), text.trim(), currentLabels);
+    if (created && created.id) {
+      newEntryId = created.id;
+      // 楽観的に allEntries にも追加
+      allEntries.unshift(created);
+      const countEl = document.getElementById("ut-page-count");
+      if (countEl) countEl.textContent = `${allEntries.length} 件`;
+    }
+    setDirty(false);
+  } catch {}
+}
+
+async function autoSaveExisting(entryId) {
+  if (!entryId) return;
+  const textarea = document.getElementById("ut-modal-textarea");
+  if (!textarea) return;
+  const content = textarea.value.trim();
+  if (!content) return;
+  try {
+    const updated = await udemyTipsApi.update(entryId, content, currentLabels);
+    const idx = allEntries.findIndex(e => e.id === entryId);
+    if (idx >= 0 && updated) allEntries[idx] = updated;
+    setDirty(false);
+    // モーダルのタイトルを更新
+    const titleEl = document.getElementById("ut-modal-title");
+    if (titleEl) titleEl.textContent = entryTitle(updated || { content }) || "(無題)";
+  } catch {}
+}
+
+async function createNewEntry(content) {
+  try {
+    const created = await udemyTipsApi.create(today(), content, currentLabels);
+    if (created && created.id) {
+      newEntryId = created.id;
+      allEntries.unshift(created);
+    }
+  } catch (e) {
+    showToast(`保存に失敗しました: ${e.message}`, "error");
+  }
+}
+
+async function saveCurrentEntry() {
+  const textarea = document.getElementById("ut-modal-textarea");
+  const content = textarea?.value.trim() || "";
+  if (!content) {
+    setDirty(false);
+    return;
+  }
+  try {
+    if (editingEntryId) {
+      await udemyTipsApi.update(editingEntryId, content, currentLabels);
+    } else if (newEntryId) {
+      await udemyTipsApi.update(newEntryId, content, currentLabels);
+    } else {
+      const created = await udemyTipsApi.create(today(), content, currentLabels);
+      if (created && created.id) newEntryId = created.id;
+    }
+    showToast("保存しました");
+    setDirty(false);
+  } catch (e) {
+    showToast(`保存に失敗しました: ${e.message}`, "error");
+  }
+}
+
+async function deleteEntry(entryId) {
+  try {
+    await udemyTipsApi.delete(entryId);
+    allEntries = allEntries.filter(e => e.id !== entryId);
+    await refreshEntries();
+  } catch (e) {
+    showToast(`削除に失敗しました: ${e.message}`, "error");
+  }
+}
+
+// ===== モーダル内タグ編集 =====
+
+function renderModalLabels() {
+  const chips = currentLabels.map(name => `
+    <span class="bd-label-chip" style="${labelChipStyle(name)}" data-label="${escapeHTML(name)}">
+      ${escapeHTML(name)}
+      <button class="bd-label-chip-remove" type="button" data-label="${escapeHTML(name)}" title="このタグを外す" style="background:transparent;border:none;cursor:pointer;color:inherit;opacity:0.6;margin-left:2px;">×</button>
+    </span>
+  `).join("");
+  return `
+    <span class="ut-modal-labels-icon" aria-hidden="true">🏷</span>
+    <div class="ut-modal-labels-chips">${chips}</div>
+    <button class="ut-modal-add-label" id="ut-modal-add-label" type="button" title="タグを追加">＋ タグ</button>
+    <div class="ut-label-picker" id="ut-label-picker" style="display:none;"></div>
+  `;
+}
+
+function refreshModalLabels() {
+  const el = document.getElementById("ut-modal-labels");
+  if (!el) return;
+  el.innerHTML = renderModalLabels();
+  attachLabelsEditorEvents();
+}
+
+function attachLabelsEditorEvents() {
+  document.querySelectorAll("#ut-modal-labels .bd-label-chip-remove").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const name = btn.dataset.label;
+      currentLabels = currentLabels.filter(l => l !== name);
+      refreshModalLabels();
+      onLabelsChanged();
+    });
+  });
+  const addBtn = document.getElementById("ut-modal-add-label");
+  const picker = document.getElementById("ut-label-picker");
+  if (addBtn && picker) {
+    addBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (picker.style.display === "none") {
+        renderLabelPicker();
+        picker.style.display = "";
+        const input = picker.querySelector(".ut-label-picker-input");
+        if (input) { input.value = ""; input.focus(); }
+      } else {
+        picker.style.display = "none";
+      }
+    });
+  }
+  // ピッカー外クリックで閉じる
+  if (!document._utPickerCloseInit) {
+    document._utPickerCloseInit = true;
+    document.addEventListener("click", (e) => {
+      const picker = document.getElementById("ut-label-picker");
+      const addBtn = document.getElementById("ut-modal-add-label");
+      if (!picker || picker.style.display === "none") return;
+      if (picker.contains(e.target)) return;
+      if (addBtn && addBtn.contains(e.target)) return;
+      picker.style.display = "none";
+    });
+  }
+}
+
+function renderLabelPicker() {
+  const picker = document.getElementById("ut-label-picker");
+  if (!picker) return;
+  const available = allLabels.filter(l => !currentLabels.includes(l.name));
+  const options = available.map(l => `
+    <button class="ut-label-picker-option" type="button" data-name="${escapeHTML(l.name)}" style="${labelChipStyle(l.name)}">
+      ${escapeHTML(l.name)} <span class="ut-label-count">${l.count}</span>
+    </button>
+  `).join("");
+  picker.innerHTML = `
+    <input type="text" class="ut-label-picker-input" placeholder="新規タグ名を入力 / 既存から選択" maxlength="50" />
+    <div class="ut-label-picker-options">${options || '<div class="ut-label-picker-empty">既存タグなし</div>'}</div>
+    <div class="ut-label-picker-hint">Enter で確定 / Esc で閉じる</div>
+  `;
+  const input = picker.querySelector(".ut-label-picker-input");
+  if (input) {
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        const val = input.value.trim();
+        if (val) addLabelToCurrent(val);
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+        picker.style.display = "none";
+      }
+    });
+    input.addEventListener("input", () => {
+      const q = input.value.trim().toLowerCase();
+      picker.querySelectorAll(".ut-label-picker-option").forEach(btn => {
+        const name = btn.dataset.name.toLowerCase();
+        btn.style.display = !q || name.includes(q) ? "" : "none";
+      });
+    });
+  }
+  picker.querySelectorAll(".ut-label-picker-option").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      addLabelToCurrent(btn.dataset.name);
+    });
+  });
+}
+
+function addLabelToCurrent(rawName) {
+  const name = rawName.trim();
+  if (!name || currentLabels.includes(name)) return;
+  currentLabels.push(name);
+  if (!allLabels.find(l => l.name === name)) {
+    allLabels.unshift({ name, count: 1 });
+  }
+  refreshModalLabels();
+  onLabelsChanged();
+  const picker = document.getElementById("ut-label-picker");
+  if (picker) picker.style.display = "none";
+}
+
+async function onLabelsChanged() {
+  const targetId = editingEntryId || newEntryId;
+  if (!targetId) return;
+  try {
+    await udemyTipsApi.update(targetId, null, currentLabels);
+    const idx = allEntries.findIndex(e => e.id === targetId);
+    if (idx >= 0) allEntries[idx].labels = [...currentLabels];
+  } catch {}
+}
+
+// ===== 削除確認モーダル =====
+
+function showDeleteConfirmModal({ title, labels, onConfirm }) {
+  document.getElementById("ut-delete-confirm")?.remove();
   const labelsHTML = labels && labels.length
-    ? `<div class="bd-delete-confirm-labels">${labels.map(l =>
-        `<span class="bd-label-chip bd-label-chip-sm" style="${labelChipStyle(l)}">${escapeHTML(l)}</span>`
+    ? `<div style="display:flex;gap:4px;flex-wrap:wrap;margin:8px 0;">${labels.map(l =>
+        `<span class="bd-label-chip" style="${labelChipStyle(l)}">${escapeHTML(l)}</span>`
       ).join("")}</div>`
     : "";
-
   const modal = document.createElement("div");
-  modal.id = "ut-delete-confirm-modal";
-  modal.className = "bd-modal-overlay";
+  modal.id = "ut-delete-confirm";
+  modal.className = "ut-modal-overlay";
+  modal.style.zIndex = "1100";
   modal.innerHTML = `
-    <div class="bd-modal bd-delete-confirm" role="alertdialog" aria-labelledby="ut-delete-confirm-heading">
-      <div class="bd-modal-header">
-        <h3 id="ut-delete-confirm-heading">本当に削除しますか？</h3>
-        <button class="bd-modal-close" type="button" aria-label="閉じる">×</button>
+    <div class="ut-modal" style="max-width:420px;">
+      <div class="ut-modal-header">
+        <span class="ut-modal-title">本当に削除しますか？</span>
+        <button class="ut-modal-close" type="button" aria-label="閉じる">×</button>
       </div>
-      <div class="bd-modal-body">
-        <div class="bd-delete-confirm-title">${escapeHTML(title || "(無題)")}</div>
+      <div class="ut-modal-body" style="min-height:auto;">
+        <div style="font-weight:600;">${escapeHTML(title || "(無題)")}</div>
         ${labelsHTML}
-        <div class="bd-delete-confirm-warning">この操作は取り消せません。</div>
+        <div style="font-size:0.8rem;opacity:0.7;margin-top:8px;">この操作は取り消せません。</div>
       </div>
-      <div class="bd-modal-footer">
-        <button class="btn btn-outline btn-sm" id="ut-delete-confirm-cancel" type="button">キャンセル</button>
-        <button class="btn btn-danger btn-sm" id="ut-delete-confirm-ok" type="button">削除する</button>
+      <div class="ut-modal-footer">
+        <div class="ut-modal-footer-spacer"></div>
+        <button class="btn btn-outline btn-sm" id="ut-delete-cancel">キャンセル</button>
+        <button class="btn btn-danger btn-sm" id="ut-delete-ok">削除する</button>
       </div>
     </div>
   `;
   document.body.appendChild(modal);
-
   const close = () => modal.remove();
-  modal.querySelector(".bd-modal-close")?.addEventListener("click", close);
-  modal.querySelector("#ut-delete-confirm-cancel")?.addEventListener("click", close);
-  modal.addEventListener("click", (e) => {
-    if (e.target === modal) close();
-  });
+  modal.querySelector(".ut-modal-close")?.addEventListener("click", close);
+  modal.querySelector("#ut-delete-cancel")?.addEventListener("click", close);
+  modal.addEventListener("click", (e) => { if (e.target === modal) close(); });
   document.addEventListener("keydown", function onEsc(e) {
-    if (e.key === "Escape") {
-      close();
-      document.removeEventListener("keydown", onEsc);
-    }
+    if (e.key === "Escape") { close(); document.removeEventListener("keydown", onEsc); }
   });
-  modal.querySelector("#ut-delete-confirm-ok")?.addEventListener("click", async () => {
+  modal.querySelector("#ut-delete-ok")?.addEventListener("click", async () => {
     close();
     await onConfirm();
   });
-  setTimeout(() => modal.querySelector("#ut-delete-confirm-cancel")?.focus(), 30);
+  setTimeout(() => modal.querySelector("#ut-delete-cancel")?.focus(), 30);
 }
 
 function attachLongPressToButton(btn, onTrigger) {
   if (!btn || btn.dataset.lpInit === "1") return;
   btn.dataset.lpInit = "1";
-
   let timer = null;
   const cancel = () => {
     if (timer) { clearTimeout(timer); timer = null; }
     btn.classList.remove("bd-longpress-active");
   };
-
   btn.addEventListener("pointerdown", (e) => {
     if (e.button !== undefined && e.button !== 0) return;
     cancel();
@@ -829,407 +1388,6 @@ function attachLongPressToButton(btn, onTrigger) {
   btn.addEventListener("pointercancel", cancel);
 }
 
-function initEntriesLongPress(container) {
-  if (!container || container.dataset.lpInit === "1") return;
-  container.dataset.lpInit = "1";
-
-  let timer = null;
-  let activeBtn = null;
-  const cancel = () => {
-    if (timer) { clearTimeout(timer); timer = null; }
-    if (activeBtn) activeBtn.classList.remove("bd-longpress-active");
-    activeBtn = null;
-  };
-
-  container.addEventListener("pointerdown", (e) => {
-    const btn = e.target.closest(".braindump-entry-delete");
-    if (!btn) return;
-    if (e.button !== undefined && e.button !== 0) return;
-    cancel();
-    activeBtn = btn;
-    btn.classList.add("bd-longpress-active");
-    const entryId = btn.dataset.id;
-    timer = setTimeout(() => {
-      cancel();
-      suppressNextClick = true;
-      if (navigator.vibrate) { try { navigator.vibrate(20); } catch {} }
-      const { title, labels } = getEntryDisplayInfo(entryId);
-      showDeleteConfirmModal({
-        title,
-        labels,
-        onConfirm: async () => {
-          await deleteEntry(entryId);
-          if (editingEntryId === entryId) resetToNewMode();
-          showToast("削除しました");
-        },
-      });
-    }, LONG_PRESS_MS);
-  });
-  container.addEventListener("pointerup", cancel);
-  container.addEventListener("pointerleave", cancel);
-  container.addEventListener("pointercancel", cancel);
-}
-
-// ===== イベントハンドリング =====
-
-function attachEvents() {
-  document.getElementById("ut-new-btn")?.addEventListener("click", startNewTip);
-  document.getElementById("ut-manage-labels-btn")?.addEventListener("click", openLabelsManager);
-
-  setTimeout(() => {
-    document.getElementById("ut-new-textarea")?.focus();
-  }, 100);
-
-  document.getElementById("ut-save-new-btn")?.addEventListener("click", saveCurrentEntry);
-  document.getElementById("ut-save-header-btn")?.addEventListener("click", saveCurrentEntry);
-
-  document.getElementById("ut-new-textarea")?.addEventListener("input", handleTextareaInput);
-  document.getElementById("ut-new-textarea")?.addEventListener("keydown", handleTabInsert);
-
-  initResizeBar();
-  attachLabelsEditorEvents();
-  attachFilterBarEvents();
-  attachSortTabEvents();
-
-  // ピッカー外クリックで閉じる
-  document.addEventListener("click", (e) => {
-    const picker = document.getElementById("ut-label-picker");
-    const addBtn = document.getElementById("ut-label-add-btn");
-    if (!picker || picker.style.display === "none") return;
-    if (picker.contains(e.target)) return;
-    if (addBtn && addBtn.contains(e.target)) return;
-    picker.style.display = "none";
-  });
-
-  // フォーム内の削除ボタン（長押し）
-  const formDeleteBtn = document.getElementById("ut-delete-btn");
-  if (formDeleteBtn) {
-    formDeleteBtn.addEventListener("click", (e) => {
-      if (suppressNextClick) {
-        suppressNextClick = false;
-        e.preventDefault();
-        return;
-      }
-      showToast("削除するにはボタンを長押ししてください");
-    });
-    attachLongPressToButton(formDeleteBtn, () => {
-      const targetId = editingEntryId || newEntryId;
-      if (!targetId) return;
-      const { title, labels } = getEntryDisplayInfo(targetId);
-      showDeleteConfirmModal({
-        title,
-        labels,
-        onConfirm: async () => {
-          await deleteEntry(targetId);
-          resetToNewMode();
-          showToast("削除しました");
-        },
-      });
-    });
-  }
-
-  // クリアボタン
-  document.getElementById("ut-cancel-new-btn")?.addEventListener("click", () => {
-    if (editingEntryId) {
-      resetToNewMode();
-    } else {
-      saveCurrentScroll();
-      newEntryId = null;
-      currentLabels = [];
-      refreshLabelsEditor();
-      document.getElementById("ut-new-textarea").value = "";
-      setDirty(false);
-      document.getElementById("ut-new-textarea")?.focus();
-    }
-  });
-
-  const entriesEl = document.getElementById("ut-entries");
-  initEntriesLongPress(entriesEl);
-
-  entriesEl?.addEventListener("click", async (e) => {
-    const reorderBtn = e.target.closest(".braindump-entry-reorder");
-    if (reorderBtn) {
-      e.stopPropagation();
-      if (reorderBtn.disabled) return;
-      await handleReorderClick(reorderBtn.dataset.id, reorderBtn.dataset.dir);
-      return;
-    }
-
-    const deleteBtn = e.target.closest(".braindump-entry-delete");
-    if (deleteBtn) {
-      e.stopPropagation();
-      e.stopImmediatePropagation();
-      if (suppressNextClick) {
-        suppressNextClick = false;
-        return;
-      }
-      showToast("削除するにはボタンを長押ししてください");
-      return;
-    }
-  });
-
-  // エントリクリック → 左側に読み込み
-  document.getElementById("ut-entries")?.addEventListener("click", (e) => {
-    const entryEl = e.target.closest(".braindump-entry");
-    if (!entryEl) return;
-
-    const entryId = entryEl.dataset.id;
-    if (!entryId) return;
-
-    const entry = allEntries.find(en => en.id === entryId);
-    if (!entry) return;
-
-    const textarea = document.getElementById("ut-new-textarea");
-    if (!textarea) return;
-
-    saveCurrentScroll();
-
-    textarea.value = entry.content;
-    currentLabels = [...(entry.labels || [])];
-    editingEntryId = entryId;
-    newEntryId = null;
-    setDirty(false);
-    refreshLabelsEditor();
-
-    document.querySelectorAll(".braindump-entry").forEach(el => el.classList.remove("active"));
-    entryEl.classList.add("active");
-
-    updateHeaderForEditing(entry);
-
-    textarea.scrollTop = scrollPositions.get(entryId) || 0;
-
-    if (newAutoSaveTimer) clearTimeout(newAutoSaveTimer);
-    textarea.removeEventListener("input", handleTextareaInput);
-    textarea.addEventListener("input", handleTextareaInput);
-  });
-}
-
-// ===== ヘッダーモード切替 =====
-
-function updateHeaderForEditing(entry) {
-  const bodyContent = stripDateHeader(entry.content).trim();
-  const title = bodyContent.slice(0, 40).replace(/\n/g, " ") || "(無題)";
-  const header = document.querySelector(".braindump-header");
-  if (!header) return;
-  header.innerHTML = `
-    <h2 class="braindump-title" style="font-size: 1rem;">編集中: ${escapeHTML(title)}</h2>
-    <div class="braindump-header-actions">
-      <button class="btn btn-primary btn-sm" id="ut-save-header-btn" style="display: ${isDirty ? "" : "none"};">💾 保存</button>
-      <button class="btn btn-outline btn-sm" id="ut-back-to-new-btn">＋ 新しい Tip</button>
-      <button class="btn btn-outline btn-sm" id="ut-manage-labels-btn" title="タグを管理">⚙ タグ管理</button>
-    </div>
-  `;
-  document.getElementById("ut-back-to-new-btn")?.addEventListener("click", () => {
-    resetToNewMode();
-    insertDateTimeHeader();
-  });
-  document.getElementById("ut-save-header-btn")?.addEventListener("click", saveCurrentEntry);
-  document.getElementById("ut-manage-labels-btn")?.addEventListener("click", openLabelsManager);
-
-  const deleteBtn = document.getElementById("ut-delete-btn");
-  if (deleteBtn) deleteBtn.style.display = "";
-}
-
-async function startNewTip() {
-  if (newAutoSaveTimer) {
-    clearTimeout(newAutoSaveTimer);
-    newAutoSaveTimer = null;
-  }
-  const textarea = document.getElementById("ut-new-textarea");
-  const text = textarea ? textarea.value : "";
-  const hasText = text.trim().length > 0 && !isHeaderOnly(text);
-  if (hasText) {
-    if (editingEntryId) {
-      await autoSaveExistingEntry(editingEntryId);
-    } else {
-      await autoSaveNewEntry();
-    }
-  }
-  resetToNewMode();
-  insertDateTimeHeader();
-}
-
-function resetToNewMode() {
-  saveCurrentScroll();
-  editingEntryId = null;
-  newEntryId = null;
-  const textarea = document.getElementById("ut-new-textarea");
-  if (textarea) textarea.value = "";
-  currentLabels = [];
-  refreshLabelsEditor();
-
-  const header = document.querySelector(".braindump-header");
-  if (header) {
-    header.innerHTML = `
-      <h2 class="braindump-title">Udemy 制作 Tips</h2>
-      <div class="braindump-header-actions">
-        <button class="btn btn-primary btn-sm" id="ut-save-header-btn" style="display: none;">💾 保存</button>
-        <button class="btn btn-primary btn-sm" id="ut-new-btn">＋ 新しい Tip</button>
-        <button class="btn btn-outline btn-sm" id="ut-manage-labels-btn" title="タグを管理">⚙ タグ管理</button>
-      </div>
-    `;
-    document.getElementById("ut-new-btn")?.addEventListener("click", startNewTip);
-    document.getElementById("ut-save-header-btn")?.addEventListener("click", saveCurrentEntry);
-    document.getElementById("ut-manage-labels-btn")?.addEventListener("click", openLabelsManager);
-  }
-
-  const deleteBtn = document.getElementById("ut-delete-btn");
-  if (deleteBtn) deleteBtn.style.display = "none";
-
-  document.querySelectorAll(".braindump-entry").forEach(el => el.classList.remove("active"));
-
-  setDirty(false);
-  textarea?.focus();
-}
-
-function handleTextareaInput() {
-  setDirty(true);
-  if (newAutoSaveTimer) clearTimeout(newAutoSaveTimer);
-  newAutoSaveTimer = setTimeout(() => {
-    if (editingEntryId) {
-      autoSaveExistingEntry(editingEntryId);
-    } else {
-      autoSaveNewEntry();
-    }
-  }, 2000);
-}
-
-async function autoSaveExistingEntry(entryId) {
-  const textarea = document.getElementById("ut-new-textarea");
-  if (!textarea) return;
-  const content = textarea.value.trim();
-  if (!content) return;
-
-  try {
-    const updated = await udemyTipsApi.update(entryId, content, currentLabels);
-    const idx = allEntries.findIndex(e => e.id === entryId);
-    if (idx >= 0 && updated) {
-      allEntries[idx] = updated;
-    }
-    refreshEntriesList(entryId);
-    setDirty(false);
-  } catch {}
-}
-
-// ===== CRUD =====
-
-async function saveCurrentEntry() {
-  const textarea = document.getElementById("ut-new-textarea");
-  const content = textarea.value.trim();
-  if (!content) {
-    setDirty(false);
-    return;
-  }
-
-  try {
-    if (editingEntryId) {
-      await udemyTipsApi.update(editingEntryId, content, currentLabels);
-    } else if (newEntryId) {
-      await udemyTipsApi.update(newEntryId, content, currentLabels);
-    } else {
-      const created = await udemyTipsApi.create(currentDate, content, currentLabels);
-      if (created && created.id) {
-        newEntryId = created.id;
-      }
-    }
-    showToast("保存しました");
-    await refreshEntries();
-    if (editingEntryId) {
-      const activeEl = document.querySelector(`.braindump-entry[data-id="${editingEntryId}"]`);
-      if (activeEl) activeEl.classList.add("active");
-    }
-    setDirty(false);
-  } catch (e) {
-    showToast(`保存に失敗しました: ${e.message}`, "error");
-  }
-}
-
-async function autoSaveNewEntry() {
-  const textarea = document.getElementById("ut-new-textarea");
-  if (!textarea) return;
-
-  const text = textarea.value;
-  if (text.trim() === "" || isHeaderOnly(text)) {
-    setDirty(false);
-    return;
-  }
-
-  const content = text.trim();
-  if (!content) {
-    setDirty(false);
-    return;
-  }
-
-  try {
-    if (newEntryId) {
-      await udemyTipsApi.update(newEntryId, content, currentLabels);
-    } else {
-      const created = await udemyTipsApi.create(currentDate, content, currentLabels);
-      if (created && created.id) {
-        newEntryId = created.id;
-      }
-    }
-    await refreshEntries();
-    setDirty(false);
-  } catch {}
-}
-
-async function deleteEntry(entryId) {
-  try {
-    await udemyTipsApi.delete(entryId);
-    editingEntryId = null;
-    allEntries = allEntries.filter(e => e.id !== entryId);
-    await refreshEntries();
-  } catch (e) {
-    showToast(`削除に失敗しました: ${e.message}`, "error");
-  }
-}
-
-async function handleReorderClick(entryId, direction) {
-  if (!entryId || (direction !== "up" && direction !== "down")) return;
-  const target = allEntries.find(e => e.id === entryId);
-  if (!target) return;
-
-  const sortKey = (e) => {
-    const so = e.sort_order;
-    return so == null ? (e.entry_number || 1) : so;
-  };
-  const sameDate = allEntries
-    .filter(e => e.date === target.date)
-    .sort((a, b) => sortKey(a) - sortKey(b) || (a.entry_number || 0) - (b.entry_number || 0));
-
-  const idx = sameDate.findIndex(e => e.id === entryId);
-  if (idx === -1) return;
-  const swapIdx = direction === "up" ? idx - 1 : idx + 1;
-  if (swapIdx < 0 || swapIdx >= sameDate.length) return;
-
-  [sameDate[idx], sameDate[swapIdx]] = [sameDate[swapIdx], sameDate[idx]];
-
-  sameDate.forEach((e, i) => {
-    e.sort_order = i + 1;
-  });
-  refreshEntriesList();
-
-  try {
-    await udemyTipsApi.reorder(target.date, sameDate.map(e => e.id));
-  } catch (err) {
-    showToast(`並び替えに失敗しました: ${err.message}`, "error");
-    await refreshEntries();
-  }
-}
-
-async function refreshEntries(activeId) {
-  try {
-    allEntries = await udemyTipsApi.list() || [];
-  } catch {}
-  try {
-    const res = await udemyTipsApi.listLabels();
-    allLabels = (res && res.labels) || [];
-  } catch {}
-  refreshFilterBar();
-  refreshEntriesList(activeId);
-}
-
 // ===== タグ管理モーダル =====
 
 async function openLabelsManager() {
@@ -1237,47 +1395,43 @@ async function openLabelsManager() {
     const res = await udemyTipsApi.listLabels();
     allLabels = (res && res.labels) || [];
   } catch {}
-
-  document.getElementById("ut-labels-modal")?.remove();
+  document.getElementById("ut-labels-manager")?.remove();
 
   const rows = allLabels.length === 0
-    ? `<div class="bd-labels-modal-empty">まだタグがありません。Tip の「＋ タグ」から追加してください。</div>`
+    ? `<div style="opacity:0.5;padding:16px 0;text-align:center;">まだタグがありません。</div>`
     : allLabels.map(l => `
-        <div class="bd-labels-modal-row" data-name="${escapeHTML(l.name)}">
+        <div class="ut-labels-manager-row">
           <span class="bd-label-chip" style="${labelChipStyle(l.name)}">${escapeHTML(l.name)}</span>
-          <span class="bd-labels-modal-count">${l.count}件</span>
-          <div class="bd-labels-modal-actions">
-            <button class="btn btn-outline btn-sm ut-label-rename-btn" data-name="${escapeHTML(l.name)}">リネーム</button>
-            <button class="btn btn-danger btn-sm ut-label-delete-btn" data-name="${escapeHTML(l.name)}">削除</button>
-          </div>
+          <span class="ut-labels-manager-count">${l.count} 件</span>
+          <button class="btn btn-outline btn-sm ut-label-rename-btn" data-name="${escapeHTML(l.name)}">リネーム</button>
+          <button class="btn btn-danger btn-sm ut-label-delete-btn" data-name="${escapeHTML(l.name)}">削除</button>
         </div>
       `).join("");
 
   const modal = document.createElement("div");
-  modal.id = "ut-labels-modal";
-  modal.className = "bd-modal-overlay";
+  modal.id = "ut-labels-manager";
+  modal.className = "ut-modal-overlay";
+  modal.style.zIndex = "1050";
   modal.innerHTML = `
-    <div class="bd-modal">
-      <div class="bd-modal-header">
-        <h3>タグ管理</h3>
-        <button class="bd-modal-close" type="button" title="閉じる">×</button>
+    <div class="ut-modal" style="max-width:560px;">
+      <div class="ut-modal-header">
+        <span class="ut-modal-title">タグ管理</span>
+        <button class="ut-modal-close" type="button" aria-label="閉じる">×</button>
       </div>
-      <div class="bd-modal-body">
+      <div class="ut-modal-body" style="min-height:auto;">
         ${rows}
       </div>
-      <div class="bd-modal-footer">
-        <button class="btn btn-outline btn-sm" id="ut-labels-modal-close-btn">閉じる</button>
+      <div class="ut-modal-footer">
+        <div class="ut-modal-footer-spacer"></div>
+        <button class="btn btn-outline btn-sm" id="ut-labels-manager-close">閉じる</button>
       </div>
     </div>
   `;
   document.body.appendChild(modal);
-
   const close = () => modal.remove();
-  modal.querySelector(".bd-modal-close")?.addEventListener("click", close);
-  modal.querySelector("#ut-labels-modal-close-btn")?.addEventListener("click", close);
-  modal.addEventListener("click", (e) => {
-    if (e.target === modal) close();
-  });
+  modal.querySelector(".ut-modal-close")?.addEventListener("click", close);
+  modal.querySelector("#ut-labels-manager-close")?.addEventListener("click", close);
+  modal.addEventListener("click", (e) => { if (e.target === modal) close(); });
 
   modal.querySelectorAll(".ut-label-rename-btn").forEach(btn => {
     btn.addEventListener("click", async () => {
@@ -1291,7 +1445,7 @@ async function openLabelsManager() {
         showToast(`「${oldName}」→「${trimmed}」に変更（${result.affected}件）`);
         if (currentLabels.includes(oldName)) {
           currentLabels = currentLabels.map(l => l === oldName ? trimmed : l);
-          refreshLabelsEditor();
+          refreshModalLabels();
         }
         if (filterLabels.includes(oldName)) {
           filterLabels = filterLabels.map(l => l === oldName ? trimmed : l);
@@ -1304,7 +1458,6 @@ async function openLabelsManager() {
       }
     });
   });
-
   modal.querySelectorAll(".ut-label-delete-btn").forEach(btn => {
     btn.addEventListener("click", async () => {
       const name = btn.dataset.name;
@@ -1315,7 +1468,7 @@ async function openLabelsManager() {
         const result = await udemyTipsApi.deleteLabel(name);
         showToast(`「${name}」を削除（${result.affected}件から除去）`);
         currentLabels = currentLabels.filter(l => l !== name);
-        refreshLabelsEditor();
+        refreshModalLabels();
         filterLabels = filterLabels.filter(l => l !== name);
         await refreshEntries();
         close();
@@ -1324,47 +1477,6 @@ async function openLabelsManager() {
         showToast(`削除失敗: ${err.message}`, "error");
       }
     });
-  });
-}
-
-// ===== 縦幅調整バー =====
-
-function initResizeBar() {
-  const bar = document.getElementById("ut-resize-bar");
-  const ta = document.getElementById("ut-new-textarea");
-  if (!bar || !ta) return;
-
-  let startY = 0;
-  let startHeight = 0;
-  let dragging = false;
-
-  const onMove = (e) => {
-    if (!dragging) return;
-    const delta = e.clientY - startY;
-    const next = Math.max(160, startHeight + delta);
-    ta.style.height = next + "px";
-  };
-
-  const onUp = () => {
-    if (!dragging) return;
-    dragging = false;
-    bar.classList.remove("dragging");
-    document.body.style.cursor = "";
-    document.body.style.userSelect = "";
-    window.removeEventListener("mousemove", onMove);
-    window.removeEventListener("mouseup", onUp);
-  };
-
-  bar.addEventListener("mousedown", (e) => {
-    e.preventDefault();
-    dragging = true;
-    startY = e.clientY;
-    startHeight = ta.getBoundingClientRect().height;
-    bar.classList.add("dragging");
-    document.body.style.cursor = "ns-resize";
-    document.body.style.userSelect = "none";
-    window.addEventListener("mousemove", onMove);
-    window.addEventListener("mouseup", onUp);
   });
 }
 
