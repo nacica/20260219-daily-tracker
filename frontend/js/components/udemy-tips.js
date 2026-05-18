@@ -4,8 +4,8 @@
  * タグ複数付与可、タグ OR 検索、専用管理モーダル、自動保存、長押し削除確認。
  */
 
-import { udemyTipsApi } from "../api.js?v=20260518b";
-import { showToast } from "../app.js?v=20260518b";
+import { udemyTipsApi } from "../api.js?v=20260518c";
+import { showToast } from "../app.js?v=20260518c";
 
 // ===== ユーティリティ =====
 
@@ -81,6 +81,24 @@ let allLabels = [];
 let filterLabels = [];
 const scrollPositions = new Map();
 
+// ソートモード: 'tag'=タグ別グループ / 'date'=新しい順（日付グループ） / 'name'=タイトル五十音順
+const SORT_MODE_KEY = "udemy-tips-sort-mode";
+const VALID_SORT_MODES = new Set(["tag", "date", "name"]);
+let sortMode = (() => {
+  try {
+    const saved = localStorage.getItem(SORT_MODE_KEY);
+    return VALID_SORT_MODES.has(saved) ? saved : "tag";
+  } catch {
+    return "tag";
+  }
+})();
+
+function setSortMode(mode) {
+  if (!VALID_SORT_MODES.has(mode)) return;
+  sortMode = mode;
+  try { localStorage.setItem(SORT_MODE_KEY, mode); } catch {}
+}
+
 function saveCurrentScroll() {
   const textarea = document.getElementById("ut-new-textarea");
   if (!textarea) return;
@@ -94,6 +112,139 @@ function setDirty(dirty) {
   if (btn) btn.style.display = dirty ? "" : "none";
 }
 
+// ===== コンパクトリスト/ソートタブ スタイル注入 =====
+
+function injectCompactStyles() {
+  if (document.getElementById("ut-compact-styles")) return;
+  const style = document.createElement("style");
+  style.id = "ut-compact-styles";
+  style.textContent = `
+    .ut-sort-tabs {
+      display: flex;
+      gap: 4px;
+      padding: 6px 0 8px 0;
+      flex-wrap: wrap;
+    }
+    .ut-sort-tab {
+      padding: 4px 10px;
+      font-size: 0.78rem;
+      border: 1px solid var(--border, #d1d5db);
+      border-radius: 999px;
+      background: transparent;
+      color: var(--text, inherit);
+      cursor: pointer;
+      transition: background 0.1s, border-color 0.1s;
+    }
+    .ut-sort-tab:hover {
+      background: var(--hover-bg, rgba(0,0,0,0.04));
+    }
+    [data-theme="dark"] .ut-sort-tab:hover {
+      background: rgba(255,255,255,0.06);
+    }
+    .ut-sort-tab.active {
+      background: var(--accent, #2563eb);
+      color: #fff;
+      border-color: var(--accent, #2563eb);
+    }
+    .ut-group-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 4px 4px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      opacity: 0.85;
+      border-bottom: 1px dashed var(--border, #e5e7eb);
+      margin-bottom: 4px;
+    }
+    .ut-group-header-count {
+      font-size: 0.72rem;
+      opacity: 0.6;
+      font-weight: 400;
+    }
+    .ut-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 5px 8px;
+      border: 1px solid transparent;
+      border-radius: 6px;
+      margin-bottom: 2px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      line-height: 1.4;
+      transition: background 0.08s, border-color 0.08s;
+    }
+    .ut-row:hover {
+      background: var(--hover-bg, rgba(0,0,0,0.04));
+    }
+    [data-theme="dark"] .ut-row:hover {
+      background: rgba(255,255,255,0.05);
+    }
+    .ut-row.active {
+      background: var(--accent-bg, rgba(37,99,235,0.10));
+      border-color: var(--accent, #2563eb);
+    }
+    .ut-row-tags {
+      display: flex;
+      gap: 3px;
+      flex-shrink: 0;
+      max-width: 40%;
+      overflow: hidden;
+    }
+    .ut-row-title {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      min-width: 0;
+    }
+    .ut-row-meta {
+      font-size: 0.72rem;
+      opacity: 0.55;
+      flex-shrink: 0;
+      font-variant-numeric: tabular-nums;
+    }
+    .ut-row-actions {
+      display: flex;
+      gap: 2px;
+      flex-shrink: 0;
+    }
+    .ut-row-actions button {
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      padding: 2px 5px;
+      font-size: 0.7rem;
+      opacity: 0.45;
+      color: inherit;
+      border-radius: 3px;
+      transition: opacity 0.1s, background 0.1s;
+    }
+    .ut-row-actions button:hover:not(:disabled) {
+      opacity: 1;
+      background: rgba(0,0,0,0.08);
+    }
+    [data-theme="dark"] .ut-row-actions button:hover:not(:disabled) {
+      background: rgba(255,255,255,0.10);
+    }
+    .ut-row-actions button:disabled {
+      opacity: 0.15;
+      cursor: default;
+    }
+    .ut-row-actions .braindump-entry-delete.bd-longpress-active {
+      background: rgba(239,68,68,0.25) !important;
+      opacity: 1 !important;
+    }
+    .ut-row .bd-label-chip {
+      font-size: 0.68rem;
+      padding: 1px 6px;
+      white-space: nowrap;
+    }
+  `;
+  document.head.appendChild(style);
+}
+
 // ===== メインレンダー =====
 
 export async function renderUdemyTips() {
@@ -101,6 +252,7 @@ export async function renderUdemyTips() {
   newEntryId = null;
   currentLabels = [];
   filterLabels = [];
+  injectCompactStyles();
   const main = document.querySelector("main");
   main.innerHTML = `<div class="loading"><div class="spinner"></div><p>読み込み中...</p></div>`;
 
@@ -148,6 +300,9 @@ export async function renderUdemyTips() {
 
       <!-- 右カラム: Tips 一覧 -->
       <div class="braindump-right">
+        <div id="ut-sort-tabs-wrap">
+          ${renderSortTabs()}
+        </div>
         <div class="braindump-filter-bar" id="ut-filter-bar">
           ${renderFilterBar()}
         </div>
@@ -356,6 +511,46 @@ function attachFilterBarEvents() {
   });
 }
 
+// ===== ソートタブ =====
+
+function renderSortTabs() {
+  const tabs = [
+    { mode: "tag",  label: "タグ別" },
+    { mode: "date", label: "新しい順" },
+    { mode: "name", label: "五十音順" },
+  ];
+  return `
+    <div class="ut-sort-tabs" role="tablist" aria-label="一覧のソート切替">
+      ${tabs.map(t => `
+        <button class="ut-sort-tab${sortMode === t.mode ? " active" : ""}"
+                type="button" data-mode="${t.mode}"
+                role="tab" aria-selected="${sortMode === t.mode}">
+          ${t.label}
+        </button>
+      `).join("")}
+    </div>
+  `;
+}
+
+function refreshSortTabs() {
+  const el = document.getElementById("ut-sort-tabs-wrap");
+  if (!el) return;
+  el.innerHTML = renderSortTabs();
+  attachSortTabEvents();
+}
+
+function attachSortTabEvents() {
+  document.querySelectorAll("#ut-sort-tabs-wrap .ut-sort-tab").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const mode = btn.dataset.mode;
+      if (mode === sortMode) return;
+      setSortMode(mode);
+      refreshSortTabs();
+      refreshEntriesList();
+    });
+  });
+}
+
 // ===== エントリ一覧 =====
 
 function getFilteredEntries() {
@@ -366,20 +561,55 @@ function getFilteredEntries() {
   });
 }
 
-function renderEntriesList() {
-  const list = getFilteredEntries();
-  if (list.length === 0) {
-    const msg = filterLabels.length > 0
-      ? `選択中のタグに該当する Tips はありません`
-      : `まだ Tips がありません。左側に書き込んで保存してください。`;
-    return `
-      <div class="empty-state" style="padding: 32px 0;">
-        <div class="icon">💡</div>
-        <p>${msg}</p>
-      </div>`;
-  }
+/** タイトル抽出: 先頭日時ヘッダーを取り除いた 1 行分（最大 60 文字） */
+function entryTitle(entry) {
+  const body = stripDateHeader(entry.content || "").trim();
+  if (!body) return "(無題)";
+  return body.slice(0, 60).replace(/\n/g, " ");
+}
 
-  // 日付ごとにグループ化（新しい日付順）
+/** 1 行コンパクト表示。reorderable=true のときのみ ▲▼ ボタンを描画 */
+function renderCompactRow(entry, { reorderable = false, upDisabled = false, downDisabled = false } = {}) {
+  const time = entry.created_at ? entry.created_at.slice(11, 16) : "";
+  const dateShort = entry.date ? entry.date.slice(5) : "";
+  const title = entryTitle(entry);
+  const labels = entry.labels || [];
+  const tagsHTML = labels.length > 0
+    ? `<div class="ut-row-tags">${labels.map(l =>
+        `<span class="bd-label-chip bd-label-chip-sm" style="${labelChipStyle(l)}">${escapeHTML(l)}</span>`
+      ).join("")}</div>`
+    : "";
+
+  const reorderHTML = reorderable
+    ? `<button class="braindump-entry-reorder" data-id="${entry.id}" data-dir="up" title="上へ移動"${upDisabled ? " disabled" : ""}>▲</button>
+       <button class="braindump-entry-reorder" data-id="${entry.id}" data-dir="down" title="下へ移動"${downDisabled ? " disabled" : ""}>▼</button>`
+    : "";
+
+  return `
+    <div class="ut-row braindump-entry" data-id="${entry.id}" data-date="${entry.date}">
+      ${tagsHTML}
+      <span class="ut-row-title">${escapeHTML(title)}</span>
+      <span class="ut-row-meta">${dateShort} ${time}</span>
+      <div class="ut-row-actions">
+        ${reorderHTML}
+        <button class="braindump-entry-delete" data-id="${entry.id}" title="削除">×</button>
+      </div>
+    </div>
+  `;
+}
+
+function renderEmptyState() {
+  const msg = filterLabels.length > 0
+    ? `選択中のタグに該当する Tips はありません`
+    : `まだ Tips がありません。左側に書き込んで保存してください。`;
+  return `
+    <div class="empty-state" style="padding: 32px 0;">
+      <div class="icon">💡</div>
+      <p>${msg}</p>
+    </div>`;
+}
+
+function renderByDate(list) {
   const grouped = {};
   for (const entry of list) {
     const date = entry.date;
@@ -387,7 +617,6 @@ function renderEntriesList() {
     grouped[date].push(entry);
   }
   const sortedDates = Object.keys(grouped).sort().reverse();
-
   const sortKey = (e) => {
     const so = e.sort_order;
     return so == null ? (e.entry_number || 1) : so;
@@ -409,46 +638,92 @@ function renderEntriesList() {
         <span class="braindump-date-pill-wd">${wd}</span>
       </span>
       ${isToday ? '<span class="braindump-today-badge"><span class="braindump-today-dot"></span>today</span>' : ''}
+      <span class="ut-group-header-count">${dateEntries.length} 件</span>
     `;
-
     const lastIndex = dateEntries.length - 1;
-    const entriesHTML = dateEntries.map((entry, idx) => {
-      const time = entry.created_at ? entry.created_at.slice(11, 16) : "";
-      const bodyContent = stripDateHeader(entry.content).trim();
-      const title = bodyContent ? bodyContent.slice(0, 40).replace(/\n/g, " ") : "(無題)";
-      const preview = bodyContent.slice(0, 80).replace(/\n/g, " ");
-      const labels = entry.labels || [];
-      const labelsHTML = labels.length > 0
-        ? `<div class="bd-entry-labels">${labels.map(l => `
-            <span class="bd-label-chip bd-label-chip-sm" style="${labelChipStyle(l)}">${escapeHTML(l)}</span>
-          `).join("")}</div>`
-        : "";
-
-      const upDisabled = idx === 0 ? "disabled" : "";
-      const downDisabled = idx === lastIndex ? "disabled" : "";
-
-      return `
-        <div class="braindump-entry" data-id="${entry.id}" data-date="${entry.date}" style="cursor: pointer;">
-          <div class="braindump-entry-header">
-            <span class="braindump-entry-title">${escapeHTML(title)}</span>
-            <div class="braindump-entry-actions">
-              <span class="braindump-entry-time">${time}</span>
-              <button class="braindump-entry-reorder" data-id="${entry.id}" data-dir="up" title="上へ移動" ${upDisabled}>▲</button>
-              <button class="braindump-entry-reorder" data-id="${entry.id}" data-dir="down" title="下へ移動" ${downDisabled}>▼</button>
-              <button class="braindump-entry-delete" data-id="${entry.id}" title="削除">×</button>
-            </div>
-          </div>
-          ${labelsHTML}
-          <div class="braindump-entry-preview">${escapeHTML(preview)}${bodyContent.length > 80 ? '...' : ''}</div>
-        </div>`;
-    }).join("");
-
+    const rows = dateEntries.map((entry, idx) =>
+      renderCompactRow(entry, {
+        reorderable: true,
+        upDisabled: idx === 0,
+        downDisabled: idx === lastIndex,
+      })
+    ).join("");
     return `
       <div class="braindump-date-group">
-        <div class="braindump-date-group-header">${dateHeader}</div>
-        ${entriesHTML}
+        <div class="ut-group-header">${dateHeader}</div>
+        ${rows}
       </div>`;
   }).join("");
+}
+
+function renderByTag(list) {
+  // タグごとに Tip をグループ化（複数タグ持ちは複数グループに登場）
+  const grouped = new Map();        // tagName → entries[]
+  const untagged = [];
+  for (const entry of list) {
+    const labels = entry.labels || [];
+    if (labels.length === 0) {
+      untagged.push(entry);
+      continue;
+    }
+    for (const lbl of labels) {
+      if (!grouped.has(lbl)) grouped.set(lbl, []);
+      grouped.get(lbl).push(entry);
+    }
+  }
+  // タグ順: allLabels の並び（使用件数降順）に合わせ、grouped にあるもののみ
+  const orderedTags = allLabels
+    .map(l => l.name)
+    .filter(name => grouped.has(name));
+  // allLabels に載ってない（集計が古い場合の保険）
+  for (const tag of grouped.keys()) {
+    if (!orderedTags.includes(tag)) orderedTags.push(tag);
+  }
+
+  const sections = orderedTags.map(tag => {
+    const entries = grouped.get(tag) || [];
+    // タググループ内は新しい順
+    entries.sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""));
+    const rows = entries.map(e => renderCompactRow(e)).join("");
+    return `
+      <div class="braindump-date-group">
+        <div class="ut-group-header">
+          <span class="bd-label-chip" style="${labelChipStyle(tag)}">${escapeHTML(tag)}</span>
+          <span class="ut-group-header-count">${entries.length} 件</span>
+        </div>
+        ${rows}
+      </div>`;
+  });
+
+  if (untagged.length > 0) {
+    untagged.sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""));
+    sections.push(`
+      <div class="braindump-date-group">
+        <div class="ut-group-header">
+          <span>タグなし</span>
+          <span class="ut-group-header-count">${untagged.length} 件</span>
+        </div>
+        ${untagged.map(e => renderCompactRow(e)).join("")}
+      </div>
+    `);
+  }
+  return sections.join("");
+}
+
+function renderByName(list) {
+  const sorted = [...list].sort((a, b) =>
+    entryTitle(a).localeCompare(entryTitle(b), "ja")
+  );
+  return sorted.map(e => renderCompactRow(e)).join("");
+}
+
+function renderEntriesList() {
+  const list = getFilteredEntries();
+  if (list.length === 0) return renderEmptyState();
+
+  if (sortMode === "date") return renderByDate(list);
+  if (sortMode === "name") return renderByName(list);
+  return renderByTag(list);
 }
 
 function refreshEntriesList(activeId) {
@@ -457,8 +732,10 @@ function refreshEntriesList(activeId) {
     container.innerHTML = renderEntriesList();
     const targetId = activeId || editingEntryId;
     if (targetId) {
-      const activeEl = container.querySelector(`.braindump-entry[data-id="${targetId}"]`);
-      if (activeEl) activeEl.classList.add("active");
+      // タグ別モードでは同じ Tip が複数グループに登場するので、すべてに active を付与
+      container.querySelectorAll(`.braindump-entry[data-id="${targetId}"]`).forEach(el => {
+        el.classList.add("active");
+      });
     }
   }
 }
@@ -612,6 +889,7 @@ function attachEvents() {
   initResizeBar();
   attachLabelsEditorEvents();
   attachFilterBarEvents();
+  attachSortTabEvents();
 
   // ピッカー外クリックで閉じる
   document.addEventListener("click", (e) => {
