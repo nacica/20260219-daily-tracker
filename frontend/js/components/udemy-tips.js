@@ -8,8 +8,8 @@
  *   - 編集モーダル内のみ自動保存タイマーが動く
  */
 
-import { udemyTipsApi } from "../api.js?v=20260518g";
-import { showToast } from "../app.js?v=20260518g";
+import { udemyTipsApi } from "../api.js?v=20260518h";
+import { showToast } from "../app.js?v=20260518h";
 
 // ===== ユーティリティ =====
 
@@ -409,31 +409,38 @@ function injectStyles() {
       border-bottom: 1px solid var(--border, #e5e7eb);
       flex-shrink: 0;
     }
-    .ut-modal-nav-next {
+    .ut-modal-nav-prev {
+      width: 36px;
+      height: 32px;
+      border: 1px solid var(--border, #d1d5db);
+      border-radius: 6px;
+      background: transparent;
+      color: inherit;
+      cursor: pointer;
+      font-size: 0.95rem;
+      flex-shrink: 0;
+      transition: background 0.1s, transform 0.1s;
+    }
+    .ut-modal-nav-prev:hover:not(:disabled) {
+      background: rgba(0,0,0,0.05);
+    }
+    [data-theme="dark"] .ut-modal-nav-prev:hover:not(:disabled) {
+      background: rgba(255,255,255,0.06);
+    }
+    .ut-modal-nav-prev:hover:not(:disabled) {
+      transform: translateX(-1px);
+    }
+    .ut-modal-nav-prev:disabled {
+      opacity: 0.3;
+      cursor: default;
+    }
+    .ut-modal-title-area {
       flex: 1;
       min-width: 0;
       display: flex;
       align-items: center;
       gap: 8px;
-      padding: 4px 10px;
-      border: 1px solid transparent;
-      border-radius: 6px;
-      background: transparent;
-      color: inherit;
-      cursor: pointer;
-      text-align: left;
-      font: inherit;
-      transition: background 0.1s, border-color 0.1s;
-    }
-    .ut-modal-nav-next:hover:not(:disabled) {
-      background: rgba(0,0,0,0.05);
-      border-color: var(--border, #d1d5db);
-    }
-    [data-theme="dark"] .ut-modal-nav-next:hover:not(:disabled) {
-      background: rgba(255,255,255,0.06);
-    }
-    .ut-modal-nav-next:disabled {
-      cursor: default;
+      padding: 0 6px;
     }
     .ut-modal-title {
       font-size: 0.95rem;
@@ -449,19 +456,6 @@ function injectStyles() {
       opacity: 0.55;
       font-variant-numeric: tabular-nums;
       flex-shrink: 0;
-    }
-    .ut-modal-nav-arrow {
-      font-size: 0.95rem;
-      opacity: 0.45;
-      flex-shrink: 0;
-      transition: opacity 0.1s, transform 0.1s;
-    }
-    .ut-modal-nav-next:hover:not(:disabled) .ut-modal-nav-arrow {
-      opacity: 1;
-      transform: translateX(2px);
-    }
-    .ut-modal-nav-next:disabled .ut-modal-nav-arrow {
-      opacity: 0.2;
     }
     .ut-modal-close {
       width: 32px;
@@ -612,6 +606,25 @@ function injectStyles() {
       tab-size: 4;
       overflow-y: auto;
       user-select: text;
+    }
+    .ut-modal[data-mode="view"] .ut-modal-view {
+      cursor: pointer;
+      transition: background 0.1s;
+    }
+    .ut-modal[data-mode="view"] .ut-modal-view:hover {
+      background: rgba(37,99,235,0.04);
+    }
+    [data-theme="dark"] .ut-modal[data-mode="view"] .ut-modal-view:hover {
+      background: rgba(37,99,235,0.10);
+    }
+    .ut-modal[data-mode="view"] .ut-modal-view::after {
+      content: "クリックで次へ →";
+      display: block;
+      margin-top: 16px;
+      font-size: 0.72rem;
+      opacity: 0.35;
+      font-style: italic;
+      user-select: none;
     }
     .ut-modal-view-empty {
       opacity: 0.4;
@@ -1134,12 +1147,12 @@ function openTipModal(entry) {
   modalEl.innerHTML = `
     <div class="ut-modal" role="dialog" aria-modal="true" data-mode="${modalMode}">
       <div class="ut-modal-header">
-        <button class="ut-modal-nav-next" id="ut-modal-nav-next" type="button"
-                title="クリックで次のカードへ"${navDisabled ? " disabled" : ""}>
+        <button class="ut-modal-nav-prev" id="ut-modal-nav-prev" type="button"
+                title="前のカードへ" aria-label="前のカードへ"${navDisabled ? " disabled" : ""}>←</button>
+        <div class="ut-modal-title-area">
           <span class="ut-modal-title" id="ut-modal-title">${escapeHTML(isNew ? "新しい Tip" : (entryTitle(entry) || "(無題)"))}</span>
           <span class="ut-modal-pos" id="ut-modal-pos">${posText}</span>
-          <span class="ut-modal-nav-arrow" aria-hidden="true">→</span>
-        </button>
+        </div>
         <button class="ut-modal-close" type="button" aria-label="閉じる" id="ut-modal-close-btn">×</button>
       </div>
       <div class="ut-modal-labels" id="ut-modal-labels">
@@ -1203,8 +1216,19 @@ function attachModalEvents() {
   // 保存
   document.getElementById("ut-modal-save-btn")?.addEventListener("click", saveCurrentEntry);
 
-  // 次のカードへ（タイトル+位置エリアのクリック）
-  document.getElementById("ut-modal-nav-next")?.addEventListener("click", navigateToNextTip);
+  // 前のカードへ（ヘッダー左の ← ボタン）
+  document.getElementById("ut-modal-nav-prev")?.addEventListener("click", navigateToPrevTip);
+
+  // 本文クリック → 次のカードへ（閲覧モード、かつテキスト未選択時のみ）
+  const viewEl = document.getElementById("ut-modal-view");
+  viewEl?.addEventListener("mouseup", (e) => {
+    if (modalMode !== "view") return;
+    if (e.button !== 0) return;
+    // 直前にドラッグでテキスト選択していたら遷移しない（コピー操作を尊重）
+    const sel = window.getSelection();
+    if (sel && sel.toString().length > 0 && viewEl.contains(sel.anchorNode)) return;
+    navigateToNextTip();
+  });
 
   // 閲覧 → 編集モード切替
   document.getElementById("ut-modal-edit-btn")?.addEventListener("click", switchToEditMode);
@@ -1252,11 +1276,19 @@ function onModalKeydown(e) {
 /**
  * 「次のカードへ」: 現在の編集内容を自動保存してから、表示順の次の Tip を
  * モーダル内に読み込む。端で先頭に戻る（ループ）。
+ * 本文クリックや、外部ロジックから呼ばれる。
  */
 async function navigateToNextTip() {
+  await navigateTip(+1);
+}
+
+/** 「前のカードへ」: 端で末尾に戻る（ループ）。ヘッダー左の ← ボタン用 */
+async function navigateToPrevTip() {
+  await navigateTip(-1);
+}
+
+async function navigateTip(direction) {
   if (!modalEl) return;
-  const navBtn = document.getElementById("ut-modal-nav-next");
-  if (navBtn && navBtn.disabled) return;
 
   // 進行中の自動保存タイマーを止め、現在の内容を確実に保存
   if (newAutoSaveTimer) { clearTimeout(newAutoSaveTimer); newAutoSaveTimer = null; }
@@ -1282,14 +1314,16 @@ async function navigateToNextTip() {
   const currentId = editingEntryId || newEntryId;
   let idx = ordered.findIndex(e => e.id === currentId);
   if (idx === -1) {
-    // 自分が ordered に居ない（フィルタから外れた等）→ 先頭から
-    loadTipIntoModal(ordered[0], 0, ordered.length);
+    // 自分が ordered に居ない（フィルタから外れた等）→ 端から
+    const fallback = direction > 0 ? 0 : ordered.length - 1;
+    loadTipIntoModal(ordered[fallback], fallback, ordered.length);
     return;
   }
-  if (ordered.length <= 1) return; // 1 件しかなければ何もしない（disabled で来ないはずだが保険）
+  if (ordered.length <= 1) return;
 
-  const nextIdx = (idx + 1) % ordered.length; // 端でループ
-  loadTipIntoModal(ordered[nextIdx], nextIdx, ordered.length);
+  const len = ordered.length;
+  const targetIdx = ((idx + direction) % len + len) % len; // 端でループ
+  loadTipIntoModal(ordered[targetIdx], targetIdx, len);
 }
 
 /** モーダル内のフィールドを別の entry の内容に差し替える（モーダル自体は再生成しない） */
@@ -1308,7 +1342,7 @@ function loadTipIntoModal(entry, idx, total) {
   if (titleEl) titleEl.textContent = entryTitle(entry) || "(無題)";
   const posEl = document.getElementById("ut-modal-pos");
   if (posEl) posEl.textContent = `${idx + 1} / ${total}`;
-  const navBtn = document.getElementById("ut-modal-nav-next");
+  const navBtn = document.getElementById("ut-modal-nav-prev");
   if (navBtn) navBtn.disabled = total <= 1;
 
   // 本文（textarea + 閲覧用 pre 両方を更新）
