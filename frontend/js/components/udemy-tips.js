@@ -8,8 +8,8 @@
  *   - 編集モーダル内のみ自動保存タイマーが動く
  */
 
-import { udemyTipsApi } from "../api.js?v=20260518f";
-import { showToast } from "../app.js?v=20260518f";
+import { udemyTipsApi } from "../api.js?v=20260518g";
+import { showToast } from "../app.js?v=20260518g";
 
 // ===== ユーティリティ =====
 
@@ -105,6 +105,14 @@ let currentLabels = [];      // モーダル内で編集中のタグ
 let isDirty = false;
 let newAutoSaveTimer = null;
 let modalEl = null;          // 開いているモーダル要素
+let modalMode = "view";      // "view" | "edit"
+
+function setModalMode(mode) {
+  if (mode !== "view" && mode !== "edit") return;
+  modalMode = mode;
+  const modal = modalEl?.querySelector(".ut-modal");
+  if (modal) modal.dataset.mode = mode;
+}
 
 function setSortMode(mode) {
   if (!VALID_SORT_MODES.has(mode)) return;
@@ -586,6 +594,41 @@ function injectStyles() {
       outline-offset: -2px;
       border-color: transparent;
     }
+    .ut-modal-view {
+      flex: 1;
+      min-height: 280px;
+      width: 100%;
+      padding: 10px;
+      margin: 0;
+      border: 1px solid transparent;
+      border-radius: 6px;
+      font-family: inherit;
+      font-size: 0.92rem;
+      line-height: 1.55;
+      background: transparent;
+      color: inherit;
+      white-space: pre-wrap;
+      word-break: break-word;
+      tab-size: 4;
+      overflow-y: auto;
+      user-select: text;
+    }
+    .ut-modal-view-empty {
+      opacity: 0.4;
+      font-style: italic;
+    }
+
+    /* ----- 閲覧/編集モード切替 ----- */
+    .ut-modal[data-mode="view"] .ut-modal-textarea { display: none; }
+    .ut-modal[data-mode="view"] .ut-modal-add-label { display: none; }
+    .ut-modal[data-mode="view"] .bd-label-chip-remove { display: none; }
+    .ut-modal[data-mode="view"] #ut-modal-save-btn { display: none; }
+    .ut-modal[data-mode="view"] #ut-modal-delete-btn { display: none; }
+
+    .ut-modal[data-mode="edit"] .ut-modal-view { display: none; }
+    .ut-modal[data-mode="edit"] #ut-modal-edit-btn { display: none; }
+    .ut-modal[data-mode="edit"] .ut-modal-labels { background: rgba(37,99,235,0.04); }
+    [data-theme="dark"] .ut-modal[data-mode="edit"] .ut-modal-labels { background: rgba(37,99,235,0.10); }
 
     .ut-modal-footer {
       display: flex;
@@ -1077,11 +1120,19 @@ function openTipModal(entry) {
   const posText = isNew ? "新規" : (idx >= 0 ? `${idx + 1} / ${ordered.length}` : `- / ${ordered.length}`);
   const navDisabled = (isNew && ordered.length === 0) || (!isNew && ordered.length <= 1);
 
+  // 初期モード: 新規なら edit、既存なら view
+  modalMode = isNew ? "edit" : "view";
+
+  const contentForView = isNew ? "" : (entry.content || "");
+  const viewHTML = contentForView
+    ? escapeHTML(contentForView)
+    : '<span class="ut-modal-view-empty">（本文なし）</span>';
+
   modalEl = document.createElement("div");
   modalEl.className = "ut-modal-overlay";
   modalEl.id = "ut-tip-modal";
   modalEl.innerHTML = `
-    <div class="ut-modal" role="dialog" aria-modal="true">
+    <div class="ut-modal" role="dialog" aria-modal="true" data-mode="${modalMode}">
       <div class="ut-modal-header">
         <button class="ut-modal-nav-next" id="ut-modal-nav-next" type="button"
                 title="クリックで次のカードへ"${navDisabled ? " disabled" : ""}>
@@ -1095,12 +1146,14 @@ function openTipModal(entry) {
         ${renderModalLabels()}
       </div>
       <div class="ut-modal-body">
+        <pre class="ut-modal-view" id="ut-modal-view">${viewHTML}</pre>
         <textarea class="ut-modal-textarea" id="ut-modal-textarea"
                   placeholder="コース制作で見つけた小技を書いてください...">${escapeHTML(isNew ? "" : (entry.content || ""))}</textarea>
       </div>
       <div class="ut-modal-footer">
-        <button class="btn btn-danger btn-sm" id="ut-modal-delete-btn" title="長押しで削除" style="${isNew ? "display:none;" : ""}">🗑 削除</button>
+        <button class="btn btn-danger btn-sm" id="ut-modal-delete-btn" title="長押しで削除"${isNew ? ' style="display:none;"' : ""}>🗑 削除</button>
         <div class="ut-modal-footer-spacer"></div>
+        <button class="btn btn-primary btn-sm" id="ut-modal-edit-btn">✏ 編集</button>
         <button class="btn btn-outline btn-sm" id="ut-modal-cancel-btn">閉じる</button>
         <button class="btn btn-primary btn-sm" id="ut-modal-save-btn">💾 保存</button>
       </div>
@@ -1124,6 +1177,18 @@ function openTipModal(entry) {
   attachModalEvents();
 }
 
+/** 閲覧 → 編集モードへ切替。textarea にフォーカスし、カーソルを末尾へ */
+function switchToEditMode() {
+  setModalMode("edit");
+  const textarea = document.getElementById("ut-modal-textarea");
+  if (textarea) {
+    textarea.focus();
+    const len = textarea.value.length;
+    textarea.setSelectionRange(len, len);
+    textarea.scrollTop = textarea.scrollHeight;
+  }
+}
+
 function attachModalEvents() {
   // 閉じる
   const closeBtn = document.getElementById("ut-modal-close-btn");
@@ -1140,6 +1205,9 @@ function attachModalEvents() {
 
   // 次のカードへ（タイトル+位置エリアのクリック）
   document.getElementById("ut-modal-nav-next")?.addEventListener("click", navigateToNextTip);
+
+  // 閲覧 → 編集モード切替
+  document.getElementById("ut-modal-edit-btn")?.addEventListener("click", switchToEditMode);
 
   // テキストエリア入力で自動保存
   const textarea = document.getElementById("ut-modal-textarea");
@@ -1232,6 +1300,9 @@ function loadTipIntoModal(entry, idx, total) {
   currentLabels = [...(entry.labels || [])];
   setDirty(false);
 
+  // モードを閲覧にリセット
+  setModalMode("view");
+
   // タイトル & 位置インジケーター
   const titleEl = document.getElementById("ut-modal-title");
   if (titleEl) titleEl.textContent = entryTitle(entry) || "(無題)";
@@ -1240,13 +1311,21 @@ function loadTipIntoModal(entry, idx, total) {
   const navBtn = document.getElementById("ut-modal-nav-next");
   if (navBtn) navBtn.disabled = total <= 1;
 
-  // 本文
+  // 本文（textarea + 閲覧用 pre 両方を更新）
   const textarea = document.getElementById("ut-modal-textarea");
   if (textarea) {
     textarea.value = entry.content || "";
     textarea.scrollTop = 0;
-    textarea.focus();
     textarea.setSelectionRange(0, 0);
+  }
+  const viewEl = document.getElementById("ut-modal-view");
+  if (viewEl) {
+    if (entry.content) {
+      viewEl.textContent = entry.content;
+    } else {
+      viewEl.innerHTML = '<span class="ut-modal-view-empty">（本文なし）</span>';
+    }
+    viewEl.scrollTop = 0;
   }
 
   // タグエディタ
@@ -1338,6 +1417,11 @@ async function autoSaveCreate() {
       allEntries.unshift(created);
       const countEl = document.getElementById("ut-page-count");
       if (countEl) countEl.textContent = `${allEntries.length} 件`;
+      // 新規 → 既存になったので削除ボタンを表示
+      const deleteBtn = document.getElementById("ut-modal-delete-btn");
+      if (deleteBtn && deleteBtn.style.display === "none") {
+        deleteBtn.style.display = "";
+      }
     }
     setDirty(false);
   } catch {}
