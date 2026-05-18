@@ -10,27 +10,27 @@
  *     リダイレクトのみ提供する。
  */
 
-import { addRoute, navigate, updateNavActive } from "./router.js?v=20260518e";
-import { recordsApi } from "./api.js?v=20260518e";
-import { initSwipeNav } from "./swipe-nav.js?v=20260518e";
-import { initBedtimeTimer } from "./bedtime-timer.js?v=20260518e";
+import { addRoute, navigate, updateNavActive } from "./router.js?v=20260518f";
+import { recordsApi } from "./api.js?v=20260518f";
+import { initSwipeNav } from "./swipe-nav.js?v=20260518f";
+import { initBedtimeTimer } from "./bedtime-timer.js?v=20260518f";
 
 // ===== 動的 import ヘルパー =====
 // 各コンポーネントは初回訪問時に初めてネットワーク取得（以降は SW キャッシュから即応答）
-const loadInputForm       = () => import("./components/input-form.js?v=20260518e");
-const loadAnalysisView    = () => import("./components/analysis-view.js?v=20260518e");
-const loadHistoryList     = () => import("./components/history-list.js?v=20260518e");
-const loadWeeklyReport    = () => import("./components/weekly-report.js?v=20260518e");
-const loadSuggestions     = () => import("./components/suggestions.js?v=20260518e");
-const loadMonthlyReport   = () => import("./components/monthly-report.js?v=20260518e");
-const loadJournal         = () => import("./components/journal.js?v=20260518e");
-const loadBraindump       = () => import("./components/braindump.js?v=20260518e");
-const loadTaskStats       = () => import("./components/task-stats.js?v=20260518e");
-const loadFlashcardList   = () => import("./components/flashcard-list.js?v=20260518e");
-const loadFlashcardStudy  = () => import("./components/flashcard-study.js?v=20260518e");
-const loadWishlist        = () => import("./components/wishlist.js?v=20260518e");
-const loadGratitude       = () => import("./components/gratitude.js?v=20260518e");
-const loadUdemyTips       = () => import("./components/udemy-tips.js?v=20260518e");
+const loadInputForm       = () => import("./components/input-form.js?v=20260518f");
+const loadAnalysisView    = () => import("./components/analysis-view.js?v=20260518f");
+const loadHistoryList     = () => import("./components/history-list.js?v=20260518f");
+const loadWeeklyReport    = () => import("./components/weekly-report.js?v=20260518f");
+const loadSuggestions     = () => import("./components/suggestions.js?v=20260518f");
+const loadMonthlyReport   = () => import("./components/monthly-report.js?v=20260518f");
+const loadJournal         = () => import("./components/journal.js?v=20260518f");
+const loadBraindump       = () => import("./components/braindump.js?v=20260518f");
+const loadTaskStats       = () => import("./components/task-stats.js?v=20260518f");
+const loadFlashcardList   = () => import("./components/flashcard-list.js?v=20260518f");
+const loadFlashcardStudy  = () => import("./components/flashcard-study.js?v=20260518f");
+const loadWishlist        = () => import("./components/wishlist.js?v=20260518f");
+const loadGratitude       = () => import("./components/gratitude.js?v=20260518f");
+const loadUdemyTips       = () => import("./components/udemy-tips.js?v=20260518f");
 
 // ===== ユーティリティ =====
 

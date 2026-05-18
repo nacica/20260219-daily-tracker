@@ -8,8 +8,8 @@
  *   - 編集モーダル内のみ自動保存タイマーが動く
  */
 
-import { udemyTipsApi } from "../api.js?v=20260518e";
-import { showToast } from "../app.js?v=20260518e";
+import { udemyTipsApi } from "../api.js?v=20260518f";
+import { showToast } from "../app.js?v=20260518f";
 
 // ===== ユーティリティ =====
 
@@ -401,6 +401,32 @@ function injectStyles() {
       border-bottom: 1px solid var(--border, #e5e7eb);
       flex-shrink: 0;
     }
+    .ut-modal-nav-next {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 10px;
+      border: 1px solid transparent;
+      border-radius: 6px;
+      background: transparent;
+      color: inherit;
+      cursor: pointer;
+      text-align: left;
+      font: inherit;
+      transition: background 0.1s, border-color 0.1s;
+    }
+    .ut-modal-nav-next:hover:not(:disabled) {
+      background: rgba(0,0,0,0.05);
+      border-color: var(--border, #d1d5db);
+    }
+    [data-theme="dark"] .ut-modal-nav-next:hover:not(:disabled) {
+      background: rgba(255,255,255,0.06);
+    }
+    .ut-modal-nav-next:disabled {
+      cursor: default;
+    }
     .ut-modal-title {
       font-size: 0.95rem;
       font-weight: 600;
@@ -409,6 +435,25 @@ function injectStyles() {
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+    }
+    .ut-modal-pos {
+      font-size: 0.72rem;
+      opacity: 0.55;
+      font-variant-numeric: tabular-nums;
+      flex-shrink: 0;
+    }
+    .ut-modal-nav-arrow {
+      font-size: 0.95rem;
+      opacity: 0.45;
+      flex-shrink: 0;
+      transition: opacity 0.1s, transform 0.1s;
+    }
+    .ut-modal-nav-next:hover:not(:disabled) .ut-modal-nav-arrow {
+      opacity: 1;
+      transform: translateX(2px);
+    }
+    .ut-modal-nav-next:disabled .ut-modal-nav-arrow {
+      opacity: 0.2;
     }
     .ut-modal-close {
       width: 32px;
@@ -864,6 +909,62 @@ function renderEntriesGrid() {
   return renderByTag(list);
 }
 
+/**
+ * モーダルの「次へ」ナビゲーション用に、現在の sortMode/filter を適用した
+ * 表示順の entry を平坦な配列で返す。タグ別モードでは同じ Tip が複数タグ
+ * グループに登場するため重複を含む。
+ */
+function getOrderedFilteredEntries() {
+  const list = getFilteredEntries();
+  if (list.length === 0) return [];
+
+  if (sortMode === "date") {
+    const sortKey = (e) => {
+      const so = e.sort_order;
+      return so == null ? (e.entry_number || 1) : so;
+    };
+    return [...list].sort((a, b) => {
+      const dateCmp = (b.date || "").localeCompare(a.date || "");
+      if (dateCmp !== 0) return dateCmp;
+      return sortKey(a) - sortKey(b) || (a.entry_number || 0) - (b.entry_number || 0);
+    });
+  }
+
+  if (sortMode === "name") {
+    return [...list].sort((a, b) => entryTitle(a).localeCompare(entryTitle(b), "ja"));
+  }
+
+  // tag mode: renderByTag と同じ順序
+  const grouped = new Map();
+  const untagged = [];
+  for (const entry of list) {
+    const labels = entry.labels || [];
+    if (labels.length === 0) {
+      untagged.push(entry);
+      continue;
+    }
+    for (const lbl of labels) {
+      if (!grouped.has(lbl)) grouped.set(lbl, []);
+      grouped.get(lbl).push(entry);
+    }
+  }
+  const orderedTags = allLabels.map(l => l.name).filter(name => grouped.has(name));
+  for (const tag of grouped.keys()) {
+    if (!orderedTags.includes(tag)) orderedTags.push(tag);
+  }
+  const ordered = [];
+  for (const tag of orderedTags) {
+    const entries = grouped.get(tag) || [];
+    entries.sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""));
+    ordered.push(...entries);
+  }
+  if (untagged.length > 0) {
+    untagged.sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""));
+    ordered.push(...untagged);
+  }
+  return ordered;
+}
+
 async function refreshEntries() {
   await loadAllData();
   const countEl = document.getElementById("ut-page-count");
@@ -970,13 +1071,24 @@ function openTipModal(entry) {
   currentLabels = isNew ? [] : [...(entry.labels || [])];
   isDirty = false;
 
+  // 位置情報（新規モード時は "新規" 表示）
+  const ordered = isNew ? [] : getOrderedFilteredEntries();
+  const idx = isNew ? -1 : ordered.findIndex(e => e.id === entry.id);
+  const posText = isNew ? "新規" : (idx >= 0 ? `${idx + 1} / ${ordered.length}` : `- / ${ordered.length}`);
+  const navDisabled = (isNew && ordered.length === 0) || (!isNew && ordered.length <= 1);
+
   modalEl = document.createElement("div");
   modalEl.className = "ut-modal-overlay";
   modalEl.id = "ut-tip-modal";
   modalEl.innerHTML = `
     <div class="ut-modal" role="dialog" aria-modal="true">
       <div class="ut-modal-header">
-        <span class="ut-modal-title" id="ut-modal-title">${escapeHTML(isNew ? "新しい Tip" : (entryTitle(entry) || "(無題)"))}</span>
+        <button class="ut-modal-nav-next" id="ut-modal-nav-next" type="button"
+                title="クリックで次のカードへ"${navDisabled ? " disabled" : ""}>
+          <span class="ut-modal-title" id="ut-modal-title">${escapeHTML(isNew ? "新しい Tip" : (entryTitle(entry) || "(無題)"))}</span>
+          <span class="ut-modal-pos" id="ut-modal-pos">${posText}</span>
+          <span class="ut-modal-nav-arrow" aria-hidden="true">→</span>
+        </button>
         <button class="ut-modal-close" type="button" aria-label="閉じる" id="ut-modal-close-btn">×</button>
       </div>
       <div class="ut-modal-labels" id="ut-modal-labels">
@@ -987,7 +1099,7 @@ function openTipModal(entry) {
                   placeholder="コース制作で見つけた小技を書いてください...">${escapeHTML(isNew ? "" : (entry.content || ""))}</textarea>
       </div>
       <div class="ut-modal-footer">
-        ${isNew ? "" : '<button class="btn btn-danger btn-sm" id="ut-modal-delete-btn" title="長押しで削除">🗑 削除</button>'}
+        <button class="btn btn-danger btn-sm" id="ut-modal-delete-btn" title="長押しで削除" style="${isNew ? "display:none;" : ""}">🗑 削除</button>
         <div class="ut-modal-footer-spacer"></div>
         <button class="btn btn-outline btn-sm" id="ut-modal-cancel-btn">閉じる</button>
         <button class="btn btn-primary btn-sm" id="ut-modal-save-btn">💾 保存</button>
@@ -1026,6 +1138,9 @@ function attachModalEvents() {
   // 保存
   document.getElementById("ut-modal-save-btn")?.addEventListener("click", saveCurrentEntry);
 
+  // 次のカードへ（タイトル+位置エリアのクリック）
+  document.getElementById("ut-modal-nav-next")?.addEventListener("click", navigateToNextTip);
+
   // テキストエリア入力で自動保存
   const textarea = document.getElementById("ut-modal-textarea");
   textarea?.addEventListener("input", handleTextareaInput);
@@ -1063,6 +1178,107 @@ function onModalKeydown(e) {
   if (e.key === "Escape" && modalEl) {
     e.preventDefault();
     closeTipModal();
+  }
+}
+
+/**
+ * 「次のカードへ」: 現在の編集内容を自動保存してから、表示順の次の Tip を
+ * モーダル内に読み込む。端で先頭に戻る（ループ）。
+ */
+async function navigateToNextTip() {
+  if (!modalEl) return;
+  const navBtn = document.getElementById("ut-modal-nav-next");
+  if (navBtn && navBtn.disabled) return;
+
+  // 進行中の自動保存タイマーを止め、現在の内容を確実に保存
+  if (newAutoSaveTimer) { clearTimeout(newAutoSaveTimer); newAutoSaveTimer = null; }
+  const textarea = document.getElementById("ut-modal-textarea");
+  const text = textarea ? textarea.value : "";
+  const hasText = text.trim().length > 0 && !isHeaderOnly(text);
+  if (hasText) {
+    if (editingEntryId) {
+      await autoSaveExisting(editingEntryId);
+    } else if (newEntryId) {
+      await autoSaveExisting(newEntryId);
+    } else {
+      await autoSaveCreate();
+    }
+  }
+
+  const ordered = getOrderedFilteredEntries();
+  if (ordered.length === 0) {
+    await closeTipModal({ save: false });
+    return;
+  }
+
+  const currentId = editingEntryId || newEntryId;
+  let idx = ordered.findIndex(e => e.id === currentId);
+  if (idx === -1) {
+    // 自分が ordered に居ない（フィルタから外れた等）→ 先頭から
+    loadTipIntoModal(ordered[0], 0, ordered.length);
+    return;
+  }
+  if (ordered.length <= 1) return; // 1 件しかなければ何もしない（disabled で来ないはずだが保険）
+
+  const nextIdx = (idx + 1) % ordered.length; // 端でループ
+  loadTipIntoModal(ordered[nextIdx], nextIdx, ordered.length);
+}
+
+/** モーダル内のフィールドを別の entry の内容に差し替える（モーダル自体は再生成しない） */
+function loadTipIntoModal(entry, idx, total) {
+  if (!entry || !modalEl) return;
+  editingEntryId = entry.id;
+  newEntryId = null;
+  currentLabels = [...(entry.labels || [])];
+  setDirty(false);
+
+  // タイトル & 位置インジケーター
+  const titleEl = document.getElementById("ut-modal-title");
+  if (titleEl) titleEl.textContent = entryTitle(entry) || "(無題)";
+  const posEl = document.getElementById("ut-modal-pos");
+  if (posEl) posEl.textContent = `${idx + 1} / ${total}`;
+  const navBtn = document.getElementById("ut-modal-nav-next");
+  if (navBtn) navBtn.disabled = total <= 1;
+
+  // 本文
+  const textarea = document.getElementById("ut-modal-textarea");
+  if (textarea) {
+    textarea.value = entry.content || "";
+    textarea.scrollTop = 0;
+    textarea.focus();
+    textarea.setSelectionRange(0, 0);
+  }
+
+  // タグエディタ
+  refreshModalLabels();
+
+  // 削除ボタン（新規モードで隠していた場合に備えて表示）
+  const deleteBtn = document.getElementById("ut-modal-delete-btn");
+  if (deleteBtn) {
+    deleteBtn.style.display = "";
+    delete deleteBtn.dataset.lpInit; // 長押しを再結線できるよう初期化フラグを外す
+    attachLongPressToButton(deleteBtn, () => {
+      const targetId = editingEntryId || newEntryId;
+      if (!targetId) return;
+      const en = allEntries.find(x => x.id === targetId);
+      const info = getDeleteInfo(en);
+      showDeleteConfirmModal({
+        title: info.title,
+        labels: info.labels,
+        onConfirm: async () => {
+          await deleteEntry(targetId);
+          // 削除後は次の Tip へ進む。残件 0 ならモーダルを閉じる
+          const remaining = getOrderedFilteredEntries();
+          if (remaining.length === 0) {
+            await closeTipModal({ save: false });
+          } else {
+            const ni = Math.min(idx, remaining.length - 1);
+            loadTipIntoModal(remaining[ni], ni, remaining.length);
+          }
+          showToast("削除しました");
+        },
+      });
+    });
   }
 }
 
