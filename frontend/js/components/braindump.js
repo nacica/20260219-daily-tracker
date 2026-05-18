@@ -5,8 +5,8 @@
  * ラベル機能: メモごとに複数ラベル付与可、ラベルOR検索、専用管理モーダル。
  */
 
-import { braindumpApi } from "../api.js?v=20260518h";
-import { showToast } from "../app.js?v=20260518h";
+import { braindumpApi } from "../api.js?v=20260518i";
+import { showToast } from "../app.js?v=20260518i";
 
 // ===== ユーティリティ =====
 

@@ -8,8 +8,8 @@
  *   - 編集モーダル内のみ自動保存タイマーが動く
  */
 
-import { udemyTipsApi } from "../api.js?v=20260518h";
-import { showToast } from "../app.js?v=20260518h";
+import { udemyTipsApi } from "../api.js?v=20260518i";
+import { showToast } from "../app.js?v=20260518i";
 
 // ===== ユーティリティ =====
 
@@ -617,19 +617,6 @@ function injectStyles() {
     [data-theme="dark"] .ut-modal[data-mode="view"] .ut-modal-view:hover {
       background: rgba(37,99,235,0.10);
     }
-    .ut-modal[data-mode="view"] .ut-modal-view::after {
-      content: "クリックで次へ →";
-      display: block;
-      margin-top: 16px;
-      font-size: 0.72rem;
-      opacity: 0.35;
-      font-style: italic;
-      user-select: none;
-    }
-    .ut-modal-view-empty {
-      opacity: 0.4;
-      font-style: italic;
-    }
 
     /* ----- 閲覧/編集モード切替 ----- */
     .ut-modal[data-mode="view"] .ut-modal-textarea { display: none; }
@@ -1137,9 +1124,7 @@ function openTipModal(entry) {
   modalMode = isNew ? "edit" : "view";
 
   const contentForView = isNew ? "" : (entry.content || "");
-  const viewHTML = contentForView
-    ? escapeHTML(contentForView)
-    : '<span class="ut-modal-view-empty">（本文なし）</span>';
+  const viewHTML = contentForView ? escapeHTML(contentForView) : "";
 
   modalEl = document.createElement("div");
   modalEl.className = "ut-modal-overlay";
@@ -1160,8 +1145,7 @@ function openTipModal(entry) {
       </div>
       <div class="ut-modal-body">
         <pre class="ut-modal-view" id="ut-modal-view">${viewHTML}</pre>
-        <textarea class="ut-modal-textarea" id="ut-modal-textarea"
-                  placeholder="コース制作で見つけた小技を書いてください...">${escapeHTML(isNew ? "" : (entry.content || ""))}</textarea>
+        <textarea class="ut-modal-textarea" id="ut-modal-textarea">${escapeHTML(isNew ? "" : (entry.content || ""))}</textarea>
       </div>
       <div class="ut-modal-footer">
         <button class="btn btn-danger btn-sm" id="ut-modal-delete-btn" title="長押しで削除"${isNew ? ' style="display:none;"' : ""}>🗑 削除</button>
@@ -1354,11 +1338,7 @@ function loadTipIntoModal(entry, idx, total) {
   }
   const viewEl = document.getElementById("ut-modal-view");
   if (viewEl) {
-    if (entry.content) {
-      viewEl.textContent = entry.content;
-    } else {
-      viewEl.innerHTML = '<span class="ut-modal-view-empty">（本文なし）</span>';
-    }
+    viewEl.textContent = entry.content || "";
     viewEl.scrollTop = 0;
   }
 
@@ -1598,9 +1578,8 @@ function renderLabelPicker() {
     </button>
   `).join("");
   picker.innerHTML = `
-    <input type="text" class="ut-label-picker-input" placeholder="新規タグ名を入力 / 既存から選択" maxlength="50" />
-    <div class="ut-label-picker-options">${options || '<div class="ut-label-picker-empty">既存タグなし</div>'}</div>
-    <div class="ut-label-picker-hint">Enter で確定 / Esc で閉じる</div>
+    <input type="text" class="ut-label-picker-input" maxlength="50" />
+    <div class="ut-label-picker-options">${options}</div>
   `;
   const input = picker.querySelector(".ut-label-picker-input");
   if (input) {
@@ -1676,7 +1655,6 @@ function showDeleteConfirmModal({ title, labels, onConfirm }) {
       <div class="ut-modal-body" style="min-height:auto;">
         <div style="font-weight:600;">${escapeHTML(title || "(無題)")}</div>
         ${labelsHTML}
-        <div style="font-size:0.8rem;opacity:0.7;margin-top:8px;">この操作は取り消せません。</div>
       </div>
       <div class="ut-modal-footer">
         <div class="ut-modal-footer-spacer"></div>
@@ -1734,7 +1712,7 @@ async function openLabelsManager() {
   document.getElementById("ut-labels-manager")?.remove();
 
   const rows = allLabels.length === 0
-    ? `<div style="opacity:0.5;padding:16px 0;text-align:center;">まだタグがありません。</div>`
+    ? ""
     : allLabels.map(l => `
         <div class="ut-labels-manager-row">
           <span class="bd-label-chip" style="${labelChipStyle(l.name)}">${escapeHTML(l.name)}</span>
