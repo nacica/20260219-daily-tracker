@@ -5,9 +5,9 @@
  * 朝のタスク整理（ソクラテス式問答）統合
  */
 
-import { recordsApi, analysisApi, morningDialogueApi, remindersApi, categoriesApi } from "../api.js?v=20260518a";
-import { showToast } from "../app.js?v=20260518a";
-import { showTaskCompleteAnimation } from "./task-stats.js?v=20260518a";
+import { recordsApi, analysisApi, morningDialogueApi, remindersApi, categoriesApi } from "../api.js?v=20260518b";
+import { showToast } from "../app.js?v=20260518b";
+import { showTaskCompleteAnimation } from "./task-stats.js?v=20260518b";
 
 // ===== 付箋(今日意識すること) の Markdown レンダリング =====
 // Claude などからコピペした表/箇条書き/見出し/太字を整形表示する。

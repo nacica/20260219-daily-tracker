@@ -543,6 +543,164 @@ def delete_braindump_label(name: str) -> int:
     return affected
 
 
+# ---- udemy_tips_entries (Udemy コース制作 Tips) ----
+
+def _udemy_tip_sort_key(entry: dict) -> tuple:
+    order = entry.get("sort_order")
+    if order is None:
+        order = float(entry.get("entry_number", 1))
+    return (float(order), int(entry.get("entry_number", 1)))
+
+
+def get_udemy_tip(entry_id: str) -> Optional[dict]:
+    db = get_db()
+    doc = db.collection("udemy_tips_entries").document(entry_id).get()
+    if doc.exists:
+        return doc.to_dict()
+    return None
+
+
+def list_udemy_tips(start_date: Optional[str] = None, end_date: Optional[str] = None) -> list[dict]:
+    db = get_db()
+    query = db.collection("udemy_tips_entries")
+    if start_date:
+        query = query.where(filter=FieldFilter("date", ">=", start_date))
+    if end_date:
+        query = query.where(filter=FieldFilter("date", "<=", end_date))
+    results = [doc.to_dict() for doc in query.stream()]
+    results.sort(key=_udemy_tip_sort_key)
+    results.sort(key=lambda e: e.get("date", ""), reverse=True)
+    return results
+
+
+def list_udemy_tips_for_date(date: str) -> list[dict]:
+    db = get_db()
+    query = db.collection("udemy_tips_entries").where(filter=FieldFilter("date", "==", date))
+    results = [doc.to_dict() for doc in query.stream()]
+    results.sort(key=_udemy_tip_sort_key)
+    return results
+
+
+def reorder_udemy_tips_for_date(date: str, ordered_ids: list[str]) -> int:
+    db = get_db()
+    existing = list_udemy_tips_for_date(date)
+    existing_ids = {e["id"] for e in existing}
+
+    seen: set[str] = set()
+    final_order: list[str] = []
+    for entry_id in ordered_ids:
+        if entry_id in existing_ids and entry_id not in seen:
+            seen.add(entry_id)
+            final_order.append(entry_id)
+
+    for e in existing:
+        if e["id"] not in seen:
+            seen.add(e["id"])
+            final_order.append(e["id"])
+
+    if not final_order:
+        return 0
+
+    batch = db.batch()
+    now = now_jst()
+    for index, entry_id in enumerate(final_order, start=1):
+        ref = db.collection("udemy_tips_entries").document(entry_id)
+        batch.update(ref, {"sort_order": float(index), "updated_at": now})
+    batch.commit()
+    return len(final_order)
+
+
+def get_next_udemy_tip_entry_number(date: str) -> int:
+    entries = list_udemy_tips_for_date(date)
+    if not entries:
+        return 1
+    max_num = max(e.get("entry_number", 1) for e in entries)
+    return max_num + 1
+
+
+def create_udemy_tip(entry_id: str, data: dict) -> dict:
+    db = get_db()
+    db.collection("udemy_tips_entries").document(entry_id).set(data)
+    return data
+
+
+def update_udemy_tip(entry_id: str, data: dict) -> Optional[dict]:
+    db = get_db()
+    ref = db.collection("udemy_tips_entries").document(entry_id)
+    if not ref.get().exists:
+        return None
+    ref.update(data)
+    return ref.get().to_dict()
+
+
+def delete_udemy_tip(entry_id: str) -> bool:
+    db = get_db()
+    ref = db.collection("udemy_tips_entries").document(entry_id)
+    if not ref.get().exists:
+        return False
+    ref.delete()
+    return True
+
+
+def aggregate_udemy_tip_labels() -> list[dict]:
+    db = get_db()
+    counts: dict[str, int] = {}
+    for doc in db.collection("udemy_tips_entries").stream():
+        data = doc.to_dict() or {}
+        for label in data.get("labels") or []:
+            if not isinstance(label, str):
+                continue
+            name = label.strip()
+            if not name:
+                continue
+            counts[name] = counts.get(name, 0) + 1
+    return [{"name": k, "count": v} for k, v in sorted(counts.items(), key=lambda x: (-x[1], x[0]))]
+
+
+def rename_udemy_tip_label(old_name: str, new_name: str) -> int:
+    db = get_db()
+    old = (old_name or "").strip()
+    new = (new_name or "").strip()
+    if not old or not new or old == new:
+        return 0
+
+    affected = 0
+    for doc in db.collection("udemy_tips_entries").stream():
+        data = doc.to_dict() or {}
+        labels = data.get("labels") or []
+        if not isinstance(labels, list) or old not in labels:
+            continue
+        seen = set()
+        new_labels: list[str] = []
+        for lbl in labels:
+            replaced = new if lbl == old else lbl
+            if replaced in seen:
+                continue
+            seen.add(replaced)
+            new_labels.append(replaced)
+        doc.reference.update({"labels": new_labels, "updated_at": now_jst()})
+        affected += 1
+    return affected
+
+
+def delete_udemy_tip_label(name: str) -> int:
+    db = get_db()
+    target = (name or "").strip()
+    if not target:
+        return 0
+
+    affected = 0
+    for doc in db.collection("udemy_tips_entries").stream():
+        data = doc.to_dict() or {}
+        labels = data.get("labels") or []
+        if not isinstance(labels, list) or target not in labels:
+            continue
+        new_labels = [lbl for lbl in labels if lbl != target]
+        doc.reference.update({"labels": new_labels, "updated_at": now_jst()})
+        affected += 1
+    return affected
+
+
 # ---- reminders (今日意識すること) ----
 
 def get_reminders() -> list[dict]:

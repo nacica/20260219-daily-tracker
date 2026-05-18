@@ -308,6 +308,64 @@ export const braindumpApi = {
     apiFetch(`/braindump/labels/${encodeURIComponent(name)}`, { method: "DELETE" }),
 };
 
+// ---- Udemy コース制作 Tips ----
+
+export const udemyTipsApi = {
+  /** Tip 作成（1日に複数作成可能） */
+  create: (date, content, labels = null) =>
+    apiFetch("/udemy-tips", {
+      method: "POST",
+      body: labels ? { date, content, labels } : { date, content },
+    }),
+
+  /** Tip 一覧（日付範囲） */
+  list: (startDate, endDate) => {
+    const params = new URLSearchParams();
+    if (startDate) params.set("start_date", startDate);
+    if (endDate) params.set("end_date", endDate);
+    return apiFetch(`/udemy-tips?${params}`);
+  },
+
+  /** 指定日の全 Tip 取得 */
+  listByDate: (date) => apiFetch(`/udemy-tips/by-date/${date}`),
+
+  /** 指定日の Tip を並び替え */
+  reorder: (date, orderedIds) =>
+    apiFetch(`/udemy-tips/by-date/${date}/reorder`, {
+      method: "POST",
+      body: { ordered_ids: orderedIds },
+    }),
+
+  /** 単一 Tip 取得 */
+  getEntry: (entryId) => apiFetch(`/udemy-tips/entry/${encodeURIComponent(entryId)}`),
+
+  /** Tip 更新（content / labels いずれかまたは両方） */
+  update: (entryId, content, labels = null) => {
+    const body = {};
+    if (content !== null && content !== undefined) body.content = content;
+    if (labels !== null && labels !== undefined) body.labels = labels;
+    return apiFetch(`/udemy-tips/entry/${encodeURIComponent(entryId)}`, { method: "PUT", body });
+  },
+
+  /** Tip 削除 */
+  delete: (entryId) =>
+    apiFetch(`/udemy-tips/entry/${encodeURIComponent(entryId)}`, { method: "DELETE" }),
+
+  /** タグ一覧 */
+  listLabels: () => apiFetch("/udemy-tips/labels"),
+
+  /** タグをリネーム */
+  renameLabel: (oldName, newName) =>
+    apiFetch("/udemy-tips/labels/rename", {
+      method: "POST",
+      body: { old_name: oldName, new_name: newName },
+    }),
+
+  /** タグを削除 */
+  deleteLabel: (name) =>
+    apiFetch(`/udemy-tips/labels/${encodeURIComponent(name)}`, { method: "DELETE" }),
+};
+
 // ---- 単語帳カード ----
 
 export const flashcardsApi = {
