@@ -5,9 +5,9 @@
  * 朝のタスク整理（ソクラテス式問答）統合
  */
 
-import { recordsApi, analysisApi, morningDialogueApi, remindersApi, categoriesApi } from "../api.js?v=20260518i";
-import { showToast } from "../app.js?v=20260518i";
-import { showTaskCompleteAnimation } from "./task-stats.js?v=20260518i";
+import { recordsApi, analysisApi, morningDialogueApi, remindersApi, categoriesApi } from "../api.js?v=20260519a";
+import { showToast } from "../app.js?v=20260519a";
+import { showTaskCompleteAnimation } from "./task-stats.js?v=20260519a";
 
 // ===== 付箋(今日意識すること) の Markdown レンダリング =====
 // Claude などからコピペした表/箇条書き/見出し/太字を整形表示する。
@@ -61,6 +61,21 @@ function mdParseToHtml(m, text) {
   return "";
 }
 
+// Markdown は連続する空行を 1 つの段落区切りに丸めるため、ユーザーが Enter を
+// 複数回押して入れた空行が 1 行分しか反映されない。余分な改行を NBSP のみの
+// 空段落に置換し、入力どおりの空行数を見た目に保持する。
+// フェンスコードブロック (``` ... ```) 内は対象外。
+function preserveBlankLines(text) {
+  const parts = text.split(/(^```[\s\S]*?^```)/m);
+  return parts.map((part, i) => {
+    if (i % 2 === 1) return part;
+    return part.replace(/\n{3,}/g, (run) => {
+      const extra = run.length - 2;
+      return "\n\n" + " \n\n".repeat(extra);
+    });
+  }).join("");
+}
+
 /** Markdown を sanitize 済み HTML へ変換。未ロード時はエスケープ + 改行のみで応急描画。 */
 function renderStickyMd(text) {
   if (!text) return "";
@@ -68,7 +83,7 @@ function renderStickyMd(text) {
   const p = window.DOMPurify;
   if (m && p) {
     try {
-      const raw = mdParseToHtml(m, text);
+      const raw = mdParseToHtml(m, preserveBlankLines(text));
       return p.sanitize(raw, { USE_PROFILES: { html: true } });
     } catch {
       return escapeHTML(text).replace(/\n/g, "<br>");
