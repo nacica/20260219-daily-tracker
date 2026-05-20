@@ -275,10 +275,6 @@ export const braindumpApi = {
   generateTitle: (entryId) =>
     apiFetch(`/braindump/entry/${encodeURIComponent(entryId)}/generate-title`, { method: "POST" }),
 
-  /** マークダウン要約 */
-  summarize: (content) =>
-    apiFetch("/braindump/summarize", { method: "POST", body: { date: "2000-01-01", content } }),
-
   /** 画像アップロード（FormData を使うため apiFetch を経由しない） */
   uploadImage: async (file) => {
     const url = `${API_BASE}/braindump/upload-image`;

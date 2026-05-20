@@ -5,8 +5,8 @@
  * ラベル機能: メモごとに複数ラベル付与可、ラベルOR検索、専用管理モーダル。
  */
 
-import { braindumpApi } from "../api.js?v=20260520b";
-import { showToast } from "../app.js?v=20260520b";
+import { braindumpApi } from "../api.js?v=20260520c";
+import { showToast } from "../app.js?v=20260520c";
 
 // ===== ユーティリティ =====
 
@@ -178,8 +178,6 @@ export async function renderBraindump() {
           </div>
           <div class="braindump-form-actions">
             <button class="btn btn-danger btn-sm" id="bd-delete-btn" style="display: none;">🗑 削除</button>
-            <button class="btn btn-outline btn-sm" id="bd-summarize-btn">📝 MD要約</button>
-            <button class="btn btn-outline btn-sm" id="bd-cancel-new-btn">クリア</button>
           </div>
         </div>
       </div>
@@ -689,9 +687,6 @@ function attachEvents() {
     picker.style.display = "none";
   });
 
-  // マークダウン要約ボタン
-  document.getElementById("bd-summarize-btn")?.addEventListener("click", summarizeContent);
-
   // フォーム内の削除ボタン（長押し0.5秒で確認モーダル）
   const formDeleteBtn = document.getElementById("bd-delete-btn");
   if (formDeleteBtn) {
@@ -719,22 +714,6 @@ function attachEvents() {
       });
     });
   }
-
-  // クリアボタン
-  document.getElementById("bd-cancel-new-btn")?.addEventListener("click", () => {
-    if (editingEntryId) {
-      resetToNewMode();
-    } else {
-      saveCurrentScroll();
-      newEntryId = null;
-      currentImages = [];
-      currentLabels = [];
-      renderImagePreview();
-      refreshLabelsEditor();
-      document.getElementById("bd-new-textarea").value = "";
-      document.getElementById("bd-new-textarea")?.focus();
-    }
-  });
 
   // エントリ削除ボタン / 並び替えボタン
   const entriesEl = document.getElementById("bd-entries");
@@ -926,40 +905,6 @@ async function autoSaveExistingEntry(entryId) {
 }
 
 // ===== CRUD操作 =====
-
-async function summarizeContent() {
-  const textarea = document.getElementById("bd-new-textarea");
-  const content = textarea.value.trim();
-  if (!content) {
-    showToast("要約する内容を入力してください", "error");
-    return;
-  }
-
-  const btn = document.getElementById("bd-summarize-btn");
-  const origText = btn.textContent;
-  btn.textContent = "要約中...";
-  btn.disabled = true;
-
-  try {
-    const result = await braindumpApi.summarize(content);
-    textarea.value = result.summary;
-    textarea.focus();
-    // 自動保存タイマーをリセット（編集中メモ対応）
-    if (newAutoSaveTimer) clearTimeout(newAutoSaveTimer);
-    newAutoSaveTimer = setTimeout(() => {
-      if (editingEntryId) {
-        autoSaveExistingEntry(editingEntryId);
-      } else {
-        autoSaveNewEntry();
-      }
-    }, 2000);
-  } catch (e) {
-    showToast(`要約に失敗しました: ${e.message}`, "error");
-  } finally {
-    btn.textContent = origText;
-    btn.disabled = false;
-  }
-}
 
 async function autoSaveNewEntry() {
   const textarea = document.getElementById("bd-new-textarea");
