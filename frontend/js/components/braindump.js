@@ -5,8 +5,8 @@
  * ラベル機能: メモごとに複数ラベル付与可、ラベルOR検索、専用管理モーダル。
  */
 
-import { braindumpApi } from "../api.js?v=20260519a";
-import { showToast } from "../app.js?v=20260519a";
+import { braindumpApi } from "../api.js?v=20260520a";
+import { showToast } from "../app.js?v=20260520a";
 
 // ===== ユーティリティ =====
 
@@ -105,7 +105,7 @@ function saveCurrentScroll() {
 function setDirty(dirty) {
   isDirty = dirty;
   const btn = document.getElementById("bd-save-header-btn");
-  if (btn) btn.style.display = dirty ? "" : "none";
+  if (btn) btn.style.visibility = dirty ? "visible" : "hidden";
 }
 
 // ===== 画像とテキストの分離・結合ユーティリティ =====
@@ -171,7 +171,7 @@ export async function renderBraindump() {
         <div class="braindump-header">
           <h2 class="braindump-title">ブレインダンプ</h2>
           <div class="braindump-header-actions">
-            <button class="btn btn-primary btn-sm" id="bd-save-header-btn" style="display: none;">💾 保存</button>
+            <button class="btn btn-primary btn-sm" id="bd-save-header-btn" style="visibility: hidden;">💾 保存</button>
             <button class="btn btn-primary btn-sm" id="bd-new-btn">＋ 新しいメモ</button>
             <button class="btn btn-outline btn-sm" id="bd-manage-labels-btn" title="ラベルを管理">⚙ タグ管理</button>
           </div>
@@ -837,7 +837,7 @@ function updateHeaderForEditing(entry) {
   header.innerHTML = `
     <h2 class="braindump-title" style="font-size: 1rem;">編集中: ${escapeHTML(title)}</h2>
     <div class="braindump-header-actions">
-      <button class="btn btn-primary btn-sm" id="bd-save-header-btn" style="display: ${isDirty ? "" : "none"};">💾 保存</button>
+      <button class="btn btn-primary btn-sm" id="bd-save-header-btn" style="visibility: ${isDirty ? "visible" : "hidden"};">💾 保存</button>
       <button class="btn btn-outline btn-sm" id="bd-back-to-new-btn">＋ 新しいメモ</button>
       <button class="btn btn-outline btn-sm" id="bd-manage-labels-btn" title="ラベルを管理">⚙ タグ管理</button>
     </div>
@@ -894,7 +894,7 @@ function resetToNewMode() {
     header.innerHTML = `
       <h2 class="braindump-title">ブレインダンプ</h2>
       <div class="braindump-header-actions">
-        <button class="btn btn-primary btn-sm" id="bd-save-header-btn" style="display: none;">💾 保存</button>
+        <button class="btn btn-primary btn-sm" id="bd-save-header-btn" style="visibility: hidden;">💾 保存</button>
         <button class="btn btn-primary btn-sm" id="bd-new-btn">＋ 新しいメモ</button>
         <button class="btn btn-outline btn-sm" id="bd-manage-labels-btn" title="ラベルを管理">⚙ タグ管理</button>
       </div>

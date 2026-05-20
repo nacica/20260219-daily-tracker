@@ -4917,18 +4917,33 @@ main.swipe-enter-right {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 16px;
+  gap: 8px;
+  flex-wrap: nowrap;
 }
 
 .braindump-header-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+  flex-shrink: 0;
 }
 
 .braindump-title {
   font-size: 1.3rem;
   font-weight: 600;
   color: var(--text-primary);
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ヘッダー内ボタンは文字幅ぴったり（.btn-primary の width:100% / btn-sm の padding を上書き） */
+.braindump-header-actions .btn {
+  width: auto;
+  flex: 0 0 auto;
+  padding: 8px 10px;
+  white-space: nowrap;
 }
 
 .braindump-new-form {
