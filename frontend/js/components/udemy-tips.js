@@ -8,8 +8,8 @@
  *   - 編集モーダル内のみ自動保存タイマーが動く
  */
 
-import { udemyTipsApi } from "../api.js?v=20260523a";
-import { showToast } from "../app.js?v=20260523a";
+import { udemyTipsApi } from "../api.js?v=20260523b";
+import { showToast } from "../app.js?v=20260523b";
 
 // ===== ユーティリティ =====
 
@@ -71,14 +71,12 @@ function entryTitle(entry) {
   return firstLine.slice(0, 60);
 }
 
-/** プレビュー: タイトル直後の本文を 1〜2 行分（最大 120 文字） */
+/** プレビュー: タイトル直後の本文（改行保持、カード内でスクロール表示する想定） */
 function entryPreview(entry) {
   const body = stripDateHeader(entry.content || "").trim();
   const lines = body.split("\n");
   if (lines.length <= 1) return "";
-  // タイトル行（lines[0]）の後を 120 文字に丸める
-  const rest = lines.slice(1).join(" ").trim();
-  return rest.slice(0, 120);
+  return lines.slice(1).join("\n").trim();
 }
 
 // ===== 状態 =====
@@ -281,7 +279,7 @@ function injectStyles() {
       display: flex;
       flex-direction: column;
       gap: 6px;
-      min-height: 76px;
+      min-height: 304px;
     }
     [data-theme="dark"] .ut-card {
       background: var(--card-bg, rgba(255,255,255,0.04));
@@ -306,12 +304,23 @@ function injectStyles() {
     }
     .ut-card-preview {
       font-size: 0.78rem;
-      opacity: 0.65;
-      line-height: 1.35;
-      display: -webkit-box;
-      -webkit-line-clamp: 1;
-      -webkit-box-orient: vertical;
-      overflow: hidden;
+      opacity: 0.75;
+      line-height: 1.45;
+      white-space: pre-wrap;
+      word-break: break-word;
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      -webkit-overflow-scrolling: touch;
+    }
+    .ut-card-preview::-webkit-scrollbar { width: 6px; }
+    .ut-card-preview::-webkit-scrollbar-thumb {
+      background: rgba(0,0,0,0.18);
+      border-radius: 3px;
+    }
+    [data-theme="dark"] .ut-card-preview::-webkit-scrollbar-thumb {
+      background: rgba(255,255,255,0.18);
     }
     .ut-card-footer {
       display: flex;
