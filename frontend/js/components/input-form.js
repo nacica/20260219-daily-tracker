@@ -5,9 +5,9 @@
  * 朝のタスク整理（ソクラテス式問答）統合
  */
 
-import { recordsApi, analysisApi, morningDialogueApi, remindersApi, categoriesApi } from "../api.js?v=20260520d";
-import { showToast } from "../app.js?v=20260520d";
-import { showTaskCompleteAnimation } from "./task-stats.js?v=20260520d";
+import { recordsApi, analysisApi, morningDialogueApi, remindersApi, categoriesApi } from "../api.js?v=20260523a";
+import { showToast } from "../app.js?v=20260523a";
+import { showTaskCompleteAnimation } from "./task-stats.js?v=20260523a";
 
 // ===== 付箋(今日意識すること) の Markdown レンダリング =====
 // Claude などからコピペした表/箇条書き/見出し/太字を整形表示する。
@@ -1306,12 +1306,12 @@ function renderReminderModalContent() {
         ta.value = target.text;
         ta.dataset.id = target.id;
         ta.dataset.original = target.text;
-        autoResizeTextarea(ta);
-        ta.addEventListener("input", () => autoResizeTextarea(ta));
+        // モーダル側ではCSSのflex伸縮(flex:1 1 auto + overflow-y:auto)に任せる。
+        // autoResizeTextarea で scrollHeight に高さを伸ばすと、textarea が
+        // モーダルを突き抜けて内部スクロールできなくなるため呼ばない。
         setTimeout(() => {
           ta.focus();
           ta.setSelectionRange(ta.value.length, ta.value.length);
-          autoResizeTextarea(ta);
         }, 30);
       }
     } else {
