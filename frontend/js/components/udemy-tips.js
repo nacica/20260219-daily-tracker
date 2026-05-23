@@ -8,8 +8,8 @@
  *   - 編集モーダル内のみ自動保存タイマーが動く
  */
 
-import { udemyTipsApi } from "../api.js?v=20260523b";
-import { showToast } from "../app.js?v=20260523b";
+import { udemyTipsApi } from "../api.js?v=20260523c";
+import { showToast } from "../app.js?v=20260523c";
 
 // ===== ユーティリティ =====
 
@@ -44,6 +44,16 @@ function stripDateHeader(text) {
   return lines.slice(i).join("\n");
 }
 
+/** Markdown 風 `**...**` を <strong> に変換（要：HTMLエスケープ済み文字列） */
+function renderInlineBold(escapedText) {
+  return escapedText.replace(/\*\*([^\n*]+?)\*\*/g, "<strong>$1</strong>");
+}
+
+/** `**...**` マーカーを取り除いて中身だけ残す（カード/モーダルタイトル等で使用） */
+function stripBoldMarkers(s) {
+  return s.replace(/\*\*([^\n*]+?)\*\*/g, "$1");
+}
+
 function labelColor(name) {
   let h = 0;
   for (let i = 0; i < name.length; i++) {
@@ -67,7 +77,7 @@ function labelChipStyle(name) {
 function entryTitle(entry) {
   const body = stripDateHeader(entry.content || "").trim();
   if (!body) return "(無題)";
-  const firstLine = body.split("\n")[0];
+  const firstLine = stripBoldMarkers(body.split("\n")[0]);
   return firstLine.slice(0, 60);
 }
 
@@ -578,6 +588,34 @@ function injectStyles() {
       display: flex;
       flex-direction: column;
     }
+    .ut-modal-toolbar {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 6px;
+      flex-shrink: 0;
+    }
+    .ut-modal[data-mode="view"] .ut-modal-toolbar { display: none; }
+    .ut-toolbar-btn {
+      min-width: 32px;
+      height: 28px;
+      padding: 0 8px;
+      border: 1px solid var(--border, #d1d5db);
+      border-radius: 4px;
+      background: transparent;
+      color: inherit;
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-weight: 700;
+      line-height: 1;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .ut-toolbar-btn:hover { background: rgba(0,0,0,0.05); }
+    [data-theme="dark"] .ut-toolbar-btn:hover { background: rgba(255,255,255,0.08); }
+    .ut-toolbar-btn:active { transform: translateY(1px); }
+    .ut-modal-view strong { font-weight: 700; }
+    .ut-card-preview strong { font-weight: 700; }
     .ut-modal-textarea {
       flex: 1;
       min-height: 280px;
@@ -838,7 +876,7 @@ function renderCard(entry) {
     `<span class="bd-label-chip" style="${labelChipStyle(l)}">${escapeHTML(l)}</span>`
   ).join("");
   const previewHTML = preview
-    ? `<div class="ut-card-preview">${escapeHTML(preview)}</div>`
+    ? `<div class="ut-card-preview">${renderInlineBold(escapeHTML(preview))}</div>`
     : `<div class="ut-card-preview" style="opacity:0.3;">（本文なし）</div>`;
   return `
     <div class="ut-card" data-id="${entry.id}" tabindex="0">
@@ -1133,7 +1171,7 @@ function openTipModal(entry) {
   modalMode = isNew ? "edit" : "view";
 
   const contentForView = isNew ? "" : (entry.content || "");
-  const viewHTML = contentForView ? escapeHTML(contentForView) : "";
+  const viewHTML = contentForView ? renderInlineBold(escapeHTML(contentForView)) : "";
 
   modalEl = document.createElement("div");
   modalEl.className = "ut-modal-overlay";
@@ -1153,6 +1191,10 @@ function openTipModal(entry) {
         ${renderModalLabels()}
       </div>
       <div class="ut-modal-body">
+        <div class="ut-modal-toolbar">
+          <button class="ut-toolbar-btn" id="ut-toolbar-bold" type="button"
+                  title="太字 (Ctrl+B / Cmd+B)" aria-label="太字"><b>B</b></button>
+        </div>
         <pre class="ut-modal-view" id="ut-modal-view">${viewHTML}</pre>
         <textarea class="ut-modal-textarea" id="ut-modal-textarea">${escapeHTML(isNew ? "" : (entry.content || ""))}</textarea>
       </div>
@@ -1230,6 +1272,14 @@ function attachModalEvents() {
   const textarea = document.getElementById("ut-modal-textarea");
   textarea?.addEventListener("input", handleTextareaInput);
   textarea?.addEventListener("keydown", handleTabInsert);
+  textarea?.addEventListener("keydown", handleBoldShortcut);
+
+  // 太字ツールバーボタン
+  document.getElementById("ut-toolbar-bold")?.addEventListener("click", () => {
+    const ta = document.getElementById("ut-modal-textarea");
+    if (!ta) return;
+    wrapSelectionWithBold(ta);
+  });
 
   // 削除（長押し）
   const deleteBtn = document.getElementById("ut-modal-delete-btn");
@@ -1347,7 +1397,8 @@ function loadTipIntoModal(entry, idx, total) {
   }
   const viewEl = document.getElementById("ut-modal-view");
   if (viewEl) {
-    viewEl.textContent = entry.content || "";
+    const c = entry.content || "";
+    viewEl.innerHTML = c ? renderInlineBold(escapeHTML(c)) : "";
     viewEl.scrollTop = 0;
   }
 
@@ -1813,5 +1864,61 @@ function handleTabInsert(e) {
   const end = ta.selectionEnd;
   ta.value = ta.value.slice(0, start) + "\t" + ta.value.slice(end);
   ta.selectionStart = ta.selectionEnd = start + 1;
+  ta.dispatchEvent(new Event("input", { bubbles: true }));
+}
+
+/** Ctrl/Cmd+B で選択テキストを **...** で囲む */
+function handleBoldShortcut(e) {
+  if (e.key !== "b" && e.key !== "B") return;
+  if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+  e.preventDefault();
+  wrapSelectionWithBold(e.target);
+}
+
+/**
+ * textarea の選択範囲を `**...**` で囲む（トグル動作）。
+ * 既に **...** で囲まれていれば外す。選択が空ならカーソル位置に挿入してカーソルを中に置く。
+ */
+function wrapSelectionWithBold(ta) {
+  if (!ta) return;
+  const start = ta.selectionStart;
+  const end = ta.selectionEnd;
+  const value = ta.value;
+  const selected = value.slice(start, end);
+
+  // 既に **...** で囲まれている → トグルで外す
+  if (selected.length >= 4 && selected.startsWith("**") && selected.endsWith("**")) {
+    const inner = selected.slice(2, -2);
+    ta.value = value.slice(0, start) + inner + value.slice(end);
+    ta.selectionStart = start;
+    ta.selectionEnd = start + inner.length;
+    ta.focus();
+    ta.dispatchEvent(new Event("input", { bubbles: true }));
+    return;
+  }
+  // 選択の外側が **...** に挟まれているケースもトグル対象に
+  if (
+    start >= 2 && end <= value.length - 2 &&
+    value.slice(start - 2, start) === "**" && value.slice(end, end + 2) === "**"
+  ) {
+    ta.value = value.slice(0, start - 2) + selected + value.slice(end + 2);
+    ta.selectionStart = start - 2;
+    ta.selectionEnd = end - 2;
+    ta.focus();
+    ta.dispatchEvent(new Event("input", { bubbles: true }));
+    return;
+  }
+
+  // 通常: **...** で囲む
+  ta.value = value.slice(0, start) + "**" + selected + "**" + value.slice(end);
+  if (selected.length === 0) {
+    // 空選択 → カーソルを中央に
+    const caret = start + 2;
+    ta.selectionStart = ta.selectionEnd = caret;
+  } else {
+    ta.selectionStart = start + 2;
+    ta.selectionEnd = end + 2;
+  }
+  ta.focus();
   ta.dispatchEvent(new Event("input", { bubbles: true }));
 }
