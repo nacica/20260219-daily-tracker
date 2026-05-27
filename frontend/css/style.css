@@ -4969,12 +4969,57 @@ main.swipe-enter-right {
   transition: border-color 0.2s;
   display: block;
   border-bottom: none;
+  /* contenteditable 化に伴う追加 */
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  overflow-y: auto;
+  position: relative;
 }
 
 .braindump-textarea:focus {
   outline: none;
   border-color: var(--accent, #00d4ff);
   box-shadow: 0 0 0 2px rgba(0, 212, 255, 0.15);
+}
+
+/* contenteditable のプレースホルダー（空のときだけ表示） */
+.braindump-textarea.is-empty::before {
+  content: attr(data-placeholder);
+  color: rgba(0, 0, 0, 0.4);
+  pointer-events: none;
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  right: 14px;
+  white-space: pre-wrap;
+}
+
+/* 本文中にインライン表示する画像 */
+.braindump-textarea .bd-inline-img,
+.bd-inline-img {
+  display: inline-block;
+  max-width: 300px;
+  max-height: 360px;
+  width: auto;
+  height: auto;
+  vertical-align: middle;
+  margin: 2px 4px;
+  border-radius: 6px;
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+  transition: opacity 0.2s, transform 0.15s;
+}
+
+.braindump-textarea .bd-inline-img:hover {
+  opacity: 0.85;
+  transform: translateY(-1px);
+}
+
+.bd-inline-img-uploading {
+  opacity: 0.5;
+  filter: grayscale(40%);
+  cursor: progress !important;
 }
 
 /* 縦幅調整用フル幅ドラッグバー（デスクトップのみ表示） */
