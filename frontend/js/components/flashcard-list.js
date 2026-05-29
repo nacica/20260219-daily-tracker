@@ -5,8 +5,13 @@
  * カードの追加・編集・削除 + 学習画面への遷移
  */
 
-import { flashcardsApi } from "../api.js?v=20260424i";
-import { showToast } from "../app.js?v=20260424i";
+import { flashcardsApi } from "../api.js?v=20260529e";
+import { showToast } from "../app.js?v=20260529e";
+import {
+  attachFloatingToolbar,
+  appendMarkdownToEditor,
+  serializeEditorMarkdown,
+} from "../floating-toolbar.js?v=20260529e";
 
 // モジュールロード時に読み込み確認ログを出す（キャッシュ診断用）
 const FLASHCARD_LIST_VERSION = "20260424b";
@@ -32,13 +37,17 @@ function escapeHtml(str) {
   );
 }
 
-// 画像マークダウン ![alt](url) をテキストから除去してテキストだけ返す（一覧表示用）
+// 画像マークダウン / size span タグ / **bold** マーカーを除去して素のテキストだけ返す（一覧表示用）
 function stripImages(str) {
-  return str.replace(/!\[[^\]]*\]\([^)]+\)/g, "").trim();
+  return str
+    .replace(/!\[[^\]]*\]\([^)]+\)/g, "")
+    .replace(/<span\s+style="font-size:[^"]*"\s*>|<\/span>/gi, "")
+    .replace(/\*\*([^\n*][^\n]*?)\*\*/g, "$1")
+    .trim();
 }
 
-// テキスト + マークダウン画像を含む文字列を HTML に変換する
-// テキスト部分はエスケープ、画像マークダウンは <img> に変換
+// テキスト + マークダウン画像 + **bold** + <span style="font-size:Xem"> を HTML に変換
+// テキスト部分はエスケープ、画像/書式マーカーは対応 HTML 要素に変換
 function renderFaceContent(str) {
   if (!str) return "";
   const imgRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;
@@ -46,88 +55,105 @@ function renderFaceContent(str) {
   let lastIndex = 0;
   let m;
   while ((m = imgRegex.exec(str)) !== null) {
-    const textBefore = str.slice(lastIndex, m.index);
-    if (textBefore) result += escapeHtml(textBefore);
+    result += renderInlineFormatting(str.slice(lastIndex, m.index));
     const alt = escapeHtml(m[1] || "画像");
     const url = escapeHtml(m[2]);
     result += `<img class="fc-content-image" src="${url}" alt="${alt}" loading="lazy" />`;
     lastIndex = imgRegex.lastIndex;
   }
-  result += escapeHtml(str.slice(lastIndex));
+  result += renderInlineFormatting(str.slice(lastIndex));
+  return result;
+}
+
+/** size span → <span style=..>, **bold** → <strong>, テキストは escape */
+function renderInlineFormatting(text) {
+  if (!text) return "";
+  const sizeRegex = /<span\s+style="font-size:\s*([0-9.]+)em\s*">([\s\S]*?)<\/span>/g;
+  let result = "";
+  let lastIndex = 0;
+  let m;
+  while ((m = sizeRegex.exec(text)) !== null) {
+    result += renderBoldAndEscape(text.slice(lastIndex, m.index));
+    const em = parseFloat(m[1]);
+    const inner = m[2];
+    if (!isNaN(em) && em > 0 && em !== 1.0) {
+      result += `<span style="font-size:${em}em">${renderBoldAndEscape(inner)}</span>`;
+    } else {
+      result += renderBoldAndEscape(inner);
+    }
+    lastIndex = sizeRegex.lastIndex;
+  }
+  result += renderBoldAndEscape(text.slice(lastIndex));
+  return result;
+}
+
+function renderBoldAndEscape(text) {
+  if (!text) return "";
+  const boldRegex = /\*\*([^\n*][^\n]*?)\*\*/g;
+  let result = "";
+  let lastIndex = 0;
+  let m;
+  while ((m = boldRegex.exec(text)) !== null) {
+    result += escapeHtml(text.slice(lastIndex, m.index));
+    result += `<strong>${escapeHtml(m[1])}</strong>`;
+    lastIndex = boldRegex.lastIndex;
+  }
+  result += escapeHtml(text.slice(lastIndex));
   return result;
 }
 
 // ========== contenteditable リッチエディタ ==========
 // textarea の代わりに contenteditable div を使い、画像をインラインで表示する。
-// 保存形式（DB）は従来と同じ Markdown (![画像](url))。表示時のみ HTML に変換。
+// 保存形式（DB）は従来と同じ Markdown (![画像](url))。+ **bold** と <span style="font-size:Xem"> も保存対応。
+// インライン書式の処理は floating-toolbar.js の共通ヘルパに委譲する。
 
-// Markdown → contenteditable 用 HTML
-function markdownToEditorHtml(md) {
-  if (!md) return "";
-  let result = "";
-  let lastIndex = 0;
-  const imgRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;
-  let m;
-  while ((m = imgRegex.exec(md)) !== null) {
-    result += textToEditorHtml(md.slice(lastIndex, m.index));
-    const alt = escapeHtml(m[1] || "画像");
-    const url = escapeHtml(m[2]);
-    result += buildInlineImageHtml(url, alt);
-    lastIndex = imgRegex.lastIndex;
-  }
-  result += textToEditorHtml(md.slice(lastIndex));
-  return result;
+const FC_IMG_PATTERN = /!\[([^\]]*)\]\(([^)]+)\)/g;
+
+/** 削除ボタン付きインライン画像ラッパーを作成 */
+function makeInlineImageWrap(url, alt) {
+  const wrap = document.createElement("span");
+  wrap.className = "fc-inline-image-wrap";
+  wrap.setAttribute("contenteditable", "false");
+  const img = document.createElement("img");
+  img.className = "fc-inline-image";
+  img.src = url;
+  img.alt = alt;
+  img.setAttribute("loading", "lazy");
+  wrap.appendChild(img);
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "fc-inline-image-remove";
+  btn.title = "この画像を削除";
+  btn.textContent = "×";
+  wrap.appendChild(btn);
+  return wrap;
 }
 
-function textToEditorHtml(text) {
-  return escapeHtml(text).replace(/\n/g, "<br>");
+/** Markdown 文字列を editor へ展開（共通ヘルパ + 画像ラッパー factory） */
+function setEditorFromMarkdown(editor, md) {
+  appendMarkdownToEditor(editor, md, {
+    imgPattern: FC_IMG_PATTERN,
+    imgFactory: (m) => makeInlineImageWrap(m[2], m[1] || "画像"),
+  });
 }
 
-function buildInlineImageHtml(url, alt) {
-  return `<span class="fc-inline-image-wrap" contenteditable="false">` +
-    `<img class="fc-inline-image" src="${url}" alt="${alt}" loading="lazy" />` +
-    `<button type="button" class="fc-inline-image-remove" title="この画像を削除">×</button>` +
-    `</span>`;
-}
-
-// contenteditable の DOM から Markdown を復元する
+/** editor の DOM を Markdown 文字列へ復元 */
 function editorToMarkdown(el) {
-  let md = "";
-  function walk(node) {
-    node.childNodes.forEach((child) => {
-      if (child.nodeType === Node.TEXT_NODE) {
-        md += child.textContent;
-      } else if (child.nodeType === Node.ELEMENT_NODE) {
-        const tag = child.tagName.toLowerCase();
-        if (tag === "img") {
-          const src = child.getAttribute("src") || "";
-          const alt = child.getAttribute("alt") || "画像";
-          md += `![${alt}](${src})`;
-          return;
+  const md = serializeEditorMarkdown(el, {
+    serializeElement: (node) => {
+      // 画像ラッパーは中身の img を Markdown 化（削除ボタンは無視）
+      if (node.tagName === "SPAN" && node.classList && node.classList.contains("fc-inline-image-wrap")) {
+        const img = node.querySelector("img");
+        if (img) {
+          const src = img.getAttribute("src") || "";
+          const alt = img.getAttribute("alt") || "画像";
+          return `![${alt}](${src})`;
         }
-        if (tag === "br") {
-          md += "\n";
-          return;
-        }
-        // 画像ラッパーはその中の img だけ拾う
-        if (child.classList && child.classList.contains("fc-inline-image-wrap")) {
-          const img = child.querySelector("img");
-          if (img) {
-            const src = img.getAttribute("src") || "";
-            const alt = img.getAttribute("alt") || "画像";
-            md += `![${alt}](${src})`;
-          }
-          return;
-        }
-        // ブロック要素の前に改行を挿入
-        if (tag === "div" || tag === "p") {
-          if (md && !md.endsWith("\n")) md += "\n";
-        }
-        walk(child);
+        return "";
       }
-    });
-  }
-  walk(el);
+      return undefined;
+    },
+  });
   return md.replace(/\n{3,}/g, "\n\n").trim();
 }
 
@@ -261,14 +287,15 @@ function handleEditorClick(e) {
   if (wrap) wrap.remove();
 }
 
-// contenteditable div のセットアップ（paste/click 装着、初期値設定）
+// contenteditable div のセットアップ（paste/click 装着、初期値設定、書式ツールバー登録）
 function setupEditor(editor, initialMarkdown) {
   if (!editor) return;
-  editor.innerHTML = markdownToEditorHtml(initialMarkdown || "");
+  setEditorFromMarkdown(editor, initialMarkdown || "");
   if (editor.dataset.editorBound) return;
   editor.dataset.editorBound = "1";
   editor.addEventListener("paste", handleEditorPaste);
   editor.addEventListener("click", handleEditorClick);
+  attachFloatingToolbar(editor);
 }
 
 // セレクタ群から対応する contenteditable を初期化

@@ -3,8 +3,34 @@
  * 1日に複数エントリ作成可能。各エントリに独立した分析・MD要約。
  */
 
-import { journalApi, diaryDialogueApi } from "../api.js?v=20260424i";
-import { showToast } from "../app.js?v=20260424i";
+import { journalApi, diaryDialogueApi } from "../api.js?v=20260529e";
+import { showToast } from "../app.js?v=20260529e";
+import {
+  attachFloatingToolbar,
+  appendMarkdownToEditor,
+  serializeEditorMarkdown,
+} from "../floating-toolbar.js?v=20260529e";
+
+/** 旧 textarea 互換: contenteditable / textarea どちらでも markdown を読む */
+function readEditorMarkdown(el) {
+  if (!el) return "";
+  if (el.tagName === "TEXTAREA") return (el.value || "").trim();
+  return serializeEditorMarkdown(el).trim();
+}
+
+/** 旧 textarea 互換: contenteditable / textarea どちらにも markdown をセット */
+function writeEditorMarkdown(el, text) {
+  if (!el) return;
+  if (el.tagName === "TEXTAREA") { el.value = text || ""; return; }
+  appendMarkdownToEditor(el, text || "");
+  updateEditorEmptyClass(el);
+}
+
+function updateEditorEmptyClass(el) {
+  if (!el) return;
+  const hasContent = el.textContent && el.textContent.trim() !== "" || el.querySelector("img");
+  el.classList.toggle("is-empty", !hasContent);
+}
 
 // ===== ユーティリティ =====
 
@@ -146,8 +172,30 @@ export async function renderJournal(date) {
   const last7 = recentEntries.filter((e) => e.is_analyzed).slice(0, 7).reverse();
 
   main.innerHTML = buildJournalHTML(date, entries, last7, monthlyBlockers, recentEntries, diaryDialogue);
+  initJournalEditors();
   attachJournalEvents(date, entries);
   attachDiaryDialogueEvents(date);
+}
+
+/** contenteditable な journal-textarea を初期化してフローティングツールバーを登録 */
+function initJournalEditors() {
+  // 新規入力欄: 空のまま contenteditable として登録
+  const main = document.getElementById("journal-content");
+  if (main) {
+    appendMarkdownToEditor(main, "");
+    updateEditorEmptyClass(main);
+    main.addEventListener("input", () => updateEditorEmptyClass(main));
+    attachFloatingToolbar(main);
+  }
+  // 既存エントリ編集欄: data-initial から markdown を取り込む
+  document.querySelectorAll(".entry-textarea[data-initial]").forEach((el) => {
+    const initial = decodeURIComponent(el.dataset.initial || "");
+    appendMarkdownToEditor(el, initial);
+    el.removeAttribute("data-initial");
+    updateEditorEmptyClass(el);
+    el.addEventListener("input", () => updateEditorEmptyClass(el));
+    attachFloatingToolbar(el);
+  });
 }
 
 function aggregateBlockers(entries) {
@@ -220,12 +268,13 @@ function buildJournalHTML(date, entries, last7, monthlyBlockers, recentEntries, 
           <button class="diary-mode-btn ${activeMode === "socratic" ? "active" : ""}" data-mode="socratic">問答で記録</button>
         </div>
         <div id="journal-free-mode" style="${activeMode === "free" ? "" : "display:none"}">
-          <textarea
-            class="journal-textarea"
+          <div
+            class="journal-textarea is-empty"
             id="journal-content"
-            placeholder=""
-            ${isFuture ? "disabled" : ""}
-          ></textarea>
+            contenteditable="${isFuture ? "false" : "true"}"
+            data-placeholder=""
+            spellcheck="false"
+          ></div>
           <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
             <button class="btn btn-primary" id="journal-save" ${isFuture ? "disabled" : ""}>
               保存する
@@ -278,11 +327,13 @@ function buildEntryListHTML(entries, isFuture) {
 
         <!-- 展開コンテンツ -->
         <div class="entry-detail" data-entry-id="${escapeHTML(entryId)}" style="display:none">
-          <textarea
+          <div
             class="journal-textarea entry-textarea"
             data-entry-id="${escapeHTML(entryId)}"
-            ${isFuture ? "disabled" : ""}
-          >${escapeHTML(entry.content)}</textarea>
+            contenteditable="${isFuture ? "false" : "true"}"
+            spellcheck="false"
+            data-initial="${encodeURIComponent(entry.content || "")}"
+          ></div>
           <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
             <button class="btn btn-secondary btn-sm entry-update-btn" data-entry-id="${escapeHTML(entryId)}" ${isFuture ? "disabled" : ""}>
               更新
@@ -477,9 +528,9 @@ function attachDiaryDialogueEvents(date) {
           // フリー入力に切り替え、テキストエリアに反映
           localStorage.setItem("journal-input-mode", "free");
           await renderJournal(date);
-          const textarea = document.getElementById("journal-content");
-          if (textarea) {
-            textarea.value = text;
+          const editor = document.getElementById("journal-content");
+          if (editor) {
+            writeEditorMarkdown(editor, text);
           }
           showToast("日記テキストを生成しました。保存ボタンで新規エントリとして保存できます。", "success");
         } else {
@@ -733,7 +784,7 @@ function attachJournalEvents(date, entries) {
 
   // 新規エントリ保存
   document.getElementById("journal-save")?.addEventListener("click", async () => {
-    const content = document.getElementById("journal-content")?.value?.trim();
+    const content = readEditorMarkdown(document.getElementById("journal-content"));
     if (!content) {
       showToast("内容を入力してください", "error");
       return;
@@ -774,8 +825,8 @@ function attachJournalEvents(date, entries) {
   document.querySelectorAll(".entry-update-btn").forEach((btn) => {
     btn.addEventListener("click", async () => {
       const entryId = btn.dataset.entryId;
-      const textarea = document.querySelector(`.entry-textarea[data-entry-id="${entryId}"]`);
-      const content = textarea?.value?.trim();
+      const editor = document.querySelector(`.entry-textarea[data-entry-id="${entryId}"]`);
+      const content = readEditorMarkdown(editor);
       if (!content) {
         showToast("内容を入力してください", "error");
         return;
@@ -798,8 +849,8 @@ function attachJournalEvents(date, entries) {
   document.querySelectorAll(".entry-analyze-btn").forEach((btn) => {
     btn.addEventListener("click", async () => {
       const entryId = btn.dataset.entryId;
-      const textarea = document.querySelector(`.entry-textarea[data-entry-id="${entryId}"]`);
-      const content = textarea?.value?.trim();
+      const editor = document.querySelector(`.entry-textarea[data-entry-id="${entryId}"]`);
+      const content = readEditorMarkdown(editor);
 
       btn.disabled = true;
 
@@ -829,8 +880,8 @@ function attachJournalEvents(date, entries) {
       const entryId = btn.dataset.entryId;
       const wrapper = document.querySelector(`.entry-md-wrapper[data-entry-id="${entryId}"]`);
       const output = document.querySelector(`.entry-md-output[data-entry-id="${entryId}"]`);
-      const textarea = document.querySelector(`.entry-textarea[data-entry-id="${entryId}"]`);
-      const content = textarea?.value?.trim();
+      const editor = document.querySelector(`.entry-textarea[data-entry-id="${entryId}"]`);
+      const content = readEditorMarkdown(editor);
 
       // トグル: 既に表示中なら閉じる
       if (wrapper && wrapper.style.display !== "none" && output?.dataset.generated) {

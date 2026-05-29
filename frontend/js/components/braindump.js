@@ -5,8 +5,14 @@
  * ラベル機能: メモごとに複数ラベル付与可、ラベルOR検索、専用管理モーダル。
  */
 
-import { braindumpApi } from "../api.js?v=20260529d";
-import { showToast } from "../app.js?v=20260529d";
+import { braindumpApi } from "../api.js?v=20260529e";
+import { showToast } from "../app.js?v=20260529e";
+import {
+  attachFloatingToolbar,
+  appendMarkdownToEditor,
+  serializeEditorMarkdown,
+  SIZE_SPAN_STRIP,
+} from "../floating-toolbar.js?v=20260529e";
 
 // ===== ユーティリティ =====
 
@@ -111,93 +117,15 @@ function saveCurrentScroll() {
 // タイトル/プレビュー算出用：画像マークダウンを空白に置換するための正規表現
 const IMG_REGEX = /\n?!\[[^\]]*\]\([^)]+\)\n?/g;
 const IMG_MATCH = /!\[([^\]]*)\]\(([^)]+)\)/g;
-// 行内太字 **...** （単一行内、`**` を含まない）
-const BOLD_MATCH = /\*\*([^\n*][^\n]*?)\*\*/g;
-// 文字サイズ <span style="font-size:Xem">...</span>（中身に <br>/<strong>/改行を含み得る）
-const SIZE_SPAN_MATCH = /<span\s+style="font-size:\s*([0-9.]+)em\s*">([\s\S]*?)<\/span>/g;
-// 表示用に size span タグだけ剥がす（中身は残す）
-const SIZE_SPAN_STRIP = /<span\s+style="font-size:[^"]*"\s*>|<\/span>/gi;
-// 文字サイズプリセット（順送り）
-const SIZE_LEVELS = [0.8, 1.0, 1.25, 1.5, 2.0];
-const DEFAULT_SIZE = 1.0;
 
 // ===== contenteditable エディタ ↔ markdown 相互変換 =====
 
-/** markdown 文字列を contenteditable エディタに流し込む（テキスト + <br> + <img>） */
+/** markdown 文字列を contenteditable エディタに流し込む（テキスト + <br> + <img> + bold + size） */
 function setEditorContent(editor, markdown) {
-  editor.innerHTML = "";
-  const text = markdown || "";
-
-  // 画像マークダウンで分割し、テキスト部と画像部のセグメント列を作る
-  const segments = [];
-  let lastIdx = 0;
-  let m;
-  const re = new RegExp(IMG_MATCH.source, "g");
-  while ((m = re.exec(text)) !== null) {
-    if (m.index > lastIdx) segments.push({ type: "text", value: text.slice(lastIdx, m.index) });
-    segments.push({ type: "img", alt: m[1] || "画像", src: m[2] });
-    lastIdx = m.index + m[0].length;
-  }
-  if (lastIdx < text.length) segments.push({ type: "text", value: text.slice(lastIdx) });
-
-  for (const seg of segments) {
-    if (seg.type === "text") {
-      appendTextWithSizeAndBold(editor, seg.value);
-    } else {
-      editor.appendChild(createInlineImg(seg.src, seg.alt));
-    }
-  }
-
-  if (editor.childNodes.length === 0) {
-    editor.appendChild(document.createElement("br"));
-  }
-}
-
-/** 改行を <br> に展開しつつテキストを target に追加 */
-function appendTextLines(target, text) {
-  const lines = text.split("\n");
-  for (let i = 0; i < lines.length; i++) {
-    if (i > 0) target.appendChild(document.createElement("br"));
-    if (lines[i]) target.appendChild(document.createTextNode(lines[i]));
-  }
-}
-
-/** テキストを **...** で分割し、太字部分は <strong> でラップして parent に追加 */
-function appendTextWithBold(parent, text) {
-  const re = new RegExp(BOLD_MATCH.source, "g");
-  let lastIdx = 0;
-  let m;
-  while ((m = re.exec(text)) !== null) {
-    if (m.index > lastIdx) appendTextLines(parent, text.slice(lastIdx, m.index));
-    const strong = document.createElement("strong");
-    appendTextLines(strong, m[1]);
-    if (strong.childNodes.length > 0) parent.appendChild(strong);
-    lastIdx = m.index + m[0].length;
-  }
-  if (lastIdx < text.length) appendTextLines(parent, text.slice(lastIdx));
-}
-
-/** テキストを <span style="font-size:..em"> で分割し、span 内外それぞれで bold + 改行を展開 */
-function appendTextWithSizeAndBold(parent, text) {
-  const re = new RegExp(SIZE_SPAN_MATCH.source, "g");
-  let lastIdx = 0;
-  let m;
-  while ((m = re.exec(text)) !== null) {
-    if (m.index > lastIdx) appendTextWithBold(parent, text.slice(lastIdx, m.index));
-    const em = parseFloat(m[1]);
-    const inner = m[2];
-    if (!isNaN(em) && em > 0 && em !== DEFAULT_SIZE) {
-      const span = document.createElement("span");
-      span.style.fontSize = `${em}em`;
-      appendTextWithBold(span, inner);
-      if (span.childNodes.length > 0) parent.appendChild(span);
-    } else {
-      // 1.0em（リセット相当）や不正値は素通し
-      appendTextWithBold(parent, inner);
-    }
-    lastIdx = m.index + m[0].length;
-  }
-  if (lastIdx < text.length) appendTextWithBold(parent, text.slice(lastIdx));
+  appendMarkdownToEditor(editor, markdown, {
+    imgPattern: IMG_MATCH,
+    imgFactory: (m) => createInlineImg(m[2], m[1] || "画像"),
+  });
 }
 
 /** インライン画像 <img> 要素を生成する */
@@ -212,69 +140,15 @@ function createInlineImg(src, alt = "画像") {
 
 /** contenteditable エディタの内容を markdown 文字列に直す */
 function getEditorMarkdown(editor) {
-  if (!editor) return "";
-  let out = "";
-
-  const walk = (node) => {
-    if (node.nodeType === Node.TEXT_NODE) {
-      out += node.nodeValue;
-      return;
-    }
-    if (node.nodeType !== Node.ELEMENT_NODE) return;
-    const tag = node.tagName;
-    if (tag === "BR") { out += "\n"; return; }
-    if (tag === "IMG") {
-      const src = node.getAttribute("src") || "";
-      const alt = node.getAttribute("alt") || "画像";
+  return serializeEditorMarkdown(editor, {
+    serializeImg: (img) => {
+      const src = img.getAttribute("src") || "";
+      const alt = img.getAttribute("alt") || "画像";
       // アップロード中の一時画像（blob:URL）は markdown には書かない
-      if (src.startsWith("blob:") || node.classList.contains("bd-inline-img-uploading")) return;
-      out += `![${alt}](${src})`;
-      return;
-    }
-    // 文字サイズ <span style="font-size:..em">...</span>: そのまま再シリアライズ
-    if (tag === "SPAN") {
-      const fs = node.style && node.style.fontSize;
-      if (fs && fs.endsWith("em")) {
-        const em = parseFloat(fs);
-        if (!isNaN(em) && em > 0 && em !== DEFAULT_SIZE) {
-          const before = out.length;
-          for (const child of node.childNodes) walk(child);
-          const inner = out.slice(before);
-          if (inner === "") return;
-          out = out.slice(0, before) + `<span style="font-size:${em}em">` + inner + `</span>`;
-          return;
-        }
-      }
-      // 通常の span はスタイル無し扱い（中身だけ出力）
-      for (const child of node.childNodes) walk(child);
-      return;
-    }
-    // 太字: <strong> または <b> を **...** に変換（中身が空白だけならマーカーを付けない）
-    if (tag === "STRONG" || tag === "B") {
-      const before = out.length;
-      for (const child of node.childNodes) walk(child);
-      const inner = out.slice(before);
-      if (inner.trim() === "") return;
-      // 先頭/末尾の空白は ** の外に出す（**foo ** にならないように）
-      const m = inner.match(/^(\s*)([\s\S]*?)(\s*)$/);
-      const left = m ? m[1] : "";
-      const core = m ? m[2] : inner;
-      const right = m ? m[3] : "";
-      // 中身に既存の ** が含まれていれば二重マーカー化を避けて素通しする
-      if (core.includes("**")) return;
-      out = out.slice(0, before) + left + "**" + core + "**" + right;
-      return;
-    }
-    const isBlock = (tag === "DIV" || tag === "P" || tag === "BLOCKQUOTE" || tag === "PRE" || tag === "LI");
-    if (isBlock && out.length > 0 && !out.endsWith("\n")) out += "\n";
-    for (const child of node.childNodes) walk(child);
-  };
-
-  for (const child of editor.childNodes) walk(child);
-  // 先頭/末尾の余分な改行は削らない（ユーザーが意図的に空行入れることがある）
-  // ただし完全に空ならから文字に
-  if (out.replace(/\n+/g, "").trim() === "" && !editor.querySelector("img")) return "";
-  return out;
+      if (src.startsWith("blob:") || img.classList.contains("bd-inline-img-uploading")) return null;
+      return `![${alt}](${src})`;
+    },
+  });
 }
 
 /** エディタが空かどうか（プレースホルダー表示用に CSS クラスをトグル） */
@@ -888,8 +762,8 @@ function attachEvents() {
   // 縦幅調整バーのドラッグ処理（デスクトップ専用）
   initResizeBar();
 
-  // 選択時フローティング太字ツールバー（モジュール単位で1回だけ初期化）
-  ensureFloatingBoldToolbar();
+  // 選択時フローティング書式ツールバー（共有モジュール）にエディタを登録
+  if (editorEl) attachFloatingToolbar(editorEl);
 
   // ラベル編集UIのイベント
   attachLabelsEditorEvents();
@@ -1321,326 +1195,16 @@ function initResizeBar() {
   });
 }
 
-// ===== Tab キー処理 / 太字ショートカット =====
+// ===== Tab キー処理 =====
+// 太字ショートカット (Ctrl+B) は floating-toolbar.js が登録するため、ここでは扱わない。
 
 function handleTabInsert(e) {
-  // Ctrl+B / Cmd+B → 選択範囲の太字トグル
-  if ((e.ctrlKey || e.metaKey) && !e.altKey && (e.key === "b" || e.key === "B")) {
-    e.preventDefault();
-    toggleBoldOnSelection();
-    return;
-  }
   if (e.key !== "Tab" || e.shiftKey || e.ctrlKey || e.metaKey || e.altKey) return;
   e.preventDefault();
   insertPlainTextAtCursor("\t");
   e.target.dispatchEvent(new Event("input", { bubbles: true }));
 }
 
-// ===== 太字トグル =====
-
-/**
- * 選択範囲の太字をトグルする。
- * contenteditable では execCommand('bold') がクロスブラウザで安定し、
- * 完全に太字なら解除、そうでなければ太字化、というトグル動作を内蔵している。
- */
-function toggleBoldOnSelection() {
-  const editor = document.getElementById("bd-new-textarea");
-  if (!editor) return;
-  const sel = window.getSelection();
-  if (!sel || sel.rangeCount === 0) return;
-  const range = sel.getRangeAt(0);
-  if (!editor.contains(range.commonAncestorContainer)) return;
-  // フォーカスを確保してから実行（フローティングボタン経由で focus が外れているケース対策）
-  if (document.activeElement !== editor) editor.focus({ preventScroll: true });
-  try {
-    document.execCommand("bold", false, null);
-  } catch {
-    return;
-  }
-  // 自動保存トリガ
-  editor.dispatchEvent(new Event("input", { bubbles: true }));
-  // ツールバー位置を再計算（選択範囲の rect が変わるため）
-  requestAnimationFrame(updateFloatingBoldToolbarPosition);
-}
-
-// ===== 選択時フローティング太字ツールバー =====
-
-let floatingBoldToolbarInited = false;
-// ツールバー表示中はサイズ変更等で選択範囲の rect が変わっても位置を再計算しない。
-// 選択が一旦なくなる（collapse / blur）と false に戻り、次に出るときに再計算。
-let toolbarPositionLocked = false;
-
-function ensureFloatingBoldToolbar() {
-  if (floatingBoldToolbarInited) return;
-  floatingBoldToolbarInited = true;
-
-  const tb = document.createElement("div");
-  tb.id = "bd-floating-bold-toolbar";
-  tb.className = "bd-floating-bold-toolbar";
-  tb.setAttribute("role", "toolbar");
-  tb.setAttribute("aria-label", "テキスト書式");
-  tb.style.display = "none";
-  // flex 子要素間の空白テキストノード混入を避けるため改行なしで連結
-  tb.innerHTML = [
-    `<button type="button" class="bd-fb-btn bd-fb-bold-btn" title="太字 (Ctrl+B)" aria-label="太字"><b>B</b></button>`,
-    `<span class="bd-fb-sep" aria-hidden="true"></span>`,
-    `<button type="button" class="bd-fb-btn bd-fb-size-down-btn" title="文字を小さく" aria-label="文字を小さく">A<span class="bd-fb-sub">−</span></button>`,
-    `<button type="button" class="bd-fb-btn bd-fb-size-reset-btn" title="文字サイズをデフォルトに戻す" aria-label="文字サイズをデフォルトに戻す">A</button>`,
-    `<button type="button" class="bd-fb-btn bd-fb-size-up-btn" title="文字を大きく" aria-label="文字を大きく">A<span class="bd-fb-sup">+</span></button>`,
-  ].join("");
-  document.body.appendChild(tb);
-
-  // 各ボタン: mousedown で preventDefault して選択範囲を保持したまま発火
-  const bindBtn = (sel, fn) => {
-    const b = tb.querySelector(sel);
-    if (!b) return;
-    b.addEventListener("mousedown", (e) => { e.preventDefault(); fn(); });
-    b.addEventListener("touchstart", (e) => { e.preventDefault(); fn(); }, { passive: false });
-  };
-  bindBtn(".bd-fb-bold-btn", toggleBoldOnSelection);
-  bindBtn(".bd-fb-size-down-btn", () => bumpSelectionFontSize(-1));
-  bindBtn(".bd-fb-size-reset-btn", () => setSelectionFontSize(DEFAULT_SIZE));
-  bindBtn(".bd-fb-size-up-btn", () => bumpSelectionFontSize(+1));
-
-  // 選択範囲が変わるたびに位置を更新
-  document.addEventListener("selectionchange", updateFloatingBoldToolbarPosition);
-  // 編集中のスクロール・リサイズでも追従
-  window.addEventListener("scroll", updateFloatingBoldToolbarPosition, true);
-  window.addEventListener("resize", updateFloatingBoldToolbarPosition);
-}
-
-// ===== 文字サイズ操作 =====
-
-/** 選択範囲の起点側にある最も近い font-size 設定を返す（無ければ DEFAULT_SIZE） */
-function getCurrentSelectionFontSize() {
-  const editor = document.getElementById("bd-new-textarea");
-  if (!editor) return DEFAULT_SIZE;
-  const sel = window.getSelection();
-  if (!sel || sel.rangeCount === 0) return DEFAULT_SIZE;
-  let node = sel.getRangeAt(0).startContainer;
-  if (node.nodeType === Node.TEXT_NODE) node = node.parentElement;
-  while (node && node !== editor) {
-    if (node.style && node.style.fontSize && node.style.fontSize.endsWith("em")) {
-      const em = parseFloat(node.style.fontSize);
-      if (!isNaN(em) && em > 0) return em;
-    }
-    node = node.parentElement;
-  }
-  return DEFAULT_SIZE;
-}
-
-/** SIZE_LEVELS のうち em に最も近いインデックスを返す */
-function nearestSizeLevelIndex(em) {
-  let bestIdx = 1;
-  let bestDiff = Infinity;
-  for (let i = 0; i < SIZE_LEVELS.length; i++) {
-    const diff = Math.abs(SIZE_LEVELS[i] - em);
-    if (diff < bestDiff) { bestDiff = diff; bestIdx = i; }
-  }
-  return bestIdx;
-}
-
-/** 現在のサイズから dir (+1 / -1) 段階ずれた SIZE_LEVELS を適用 */
-function bumpSelectionFontSize(dir) {
-  const cur = getCurrentSelectionFontSize();
-  const idx = nearestSizeLevelIndex(cur);
-  const nextIdx = Math.max(0, Math.min(SIZE_LEVELS.length - 1, idx + dir));
-  setSelectionFontSize(SIZE_LEVELS[nextIdx]);
-}
-
-/**
- * 選択範囲のフォントサイズを em 値に設定する。
- * 重要: 選択範囲を囲む size span 祖先がある場合は、まず span を分割して
- * 選択範囲を span の外側に「持ち上げる」。これにより
- *  - リセット(1.0em)時に外側の span が消えず残るバグを防ぐ
- *  - 連続適用時に em がネスト累積して 1.25 * 1.5 = 1.875em のように
- *    意図しないサイズになるのを防ぐ
- */
-function setSelectionFontSize(targetEm) {
-  const editor = document.getElementById("bd-new-textarea");
-  if (!editor) return;
-  const sel = window.getSelection();
-  if (!sel || sel.rangeCount === 0) return;
-  let range = sel.getRangeAt(0);
-  if (!editor.contains(range.commonAncestorContainer)) return;
-  if (range.collapsed) {
-    showToast("文字を範囲選択してから操作してください");
-    return;
-  }
-  // 選択に画像が含まれる場合は適用しない（保存形式の整合のため）
-  const peek = range.cloneContents();
-  if (peek.querySelector && peek.querySelector("img")) {
-    showToast("画像を含む範囲には文字サイズを適用できません");
-    return;
-  }
-
-  if (document.activeElement !== editor) editor.focus({ preventScroll: true });
-
-  // ① 選択範囲を囲む size span 祖先を全て分割し、選択部分を「外側」に持ち上げる
-  //    （複数階層ネストしているケースに備え繰り返す）
-  for (let safety = 0; safety < 5; safety++) {
-    const enclosing = findEnclosingSizeSpan(editor, range);
-    if (!enclosing) break;
-    const lifted = splitSizeSpanAroundRange(enclosing, range);
-    if (!lifted) {
-      updateFloatingBoldToolbarPosition();
-      return;
-    }
-    range = lifted;
-  }
-
-  // ② 選択範囲を抽出し、内部に残った size span もアンラップ
-  const fragment = range.extractContents();
-  fragment.querySelectorAll("span").forEach((s) => {
-    if (s.style && s.style.fontSize && s.style.fontSize.endsWith("em")) {
-      while (s.firstChild) s.parentNode.insertBefore(s.firstChild, s);
-      s.remove();
-    }
-  });
-
-  // ③ 1.0em ならそのまま戻す。それ以外は新しい size span で包んで戻す。
-  const newRange = document.createRange();
-  if (Math.abs(targetEm - DEFAULT_SIZE) < 1e-3) {
-    const firstChild = fragment.firstChild;
-    const lastChild = fragment.lastChild;
-    range.insertNode(fragment);
-    if (firstChild && lastChild) {
-      newRange.setStartBefore(firstChild);
-      newRange.setEndAfter(lastChild);
-    } else {
-      newRange.setStart(range.startContainer, range.startOffset);
-      newRange.collapse(true);
-    }
-  } else {
-    const span = document.createElement("span");
-    span.style.fontSize = `${targetEm}em`;
-    span.appendChild(fragment);
-    range.insertNode(span);
-    newRange.selectNodeContents(span);
-  }
-  sel.removeAllRanges();
-  sel.addRange(newRange);
-
-  editor.dispatchEvent(new Event("input", { bubbles: true }));
-  requestAnimationFrame(updateFloatingBoldToolbarPosition);
-}
-
-/** 選択範囲を完全に内包する最も内側の size span (font-size 指定の span) を返す。無ければ null */
-function findEnclosingSizeSpan(editor, range) {
-  let node = range.commonAncestorContainer;
-  if (node.nodeType === Node.TEXT_NODE) node = node.parentElement;
-  while (node && node !== editor) {
-    if (node.tagName === "SPAN" && node.style && node.style.fontSize && node.style.fontSize.endsWith("em")) {
-      return node;
-    }
-    node = node.parentElement;
-  }
-  return null;
-}
-
-/**
- * span に完全に内包される range について、span を
- *   [before-span (same fontSize)] [middle (unwrapped)] [after-span (same fontSize)]
- * の3つに分解する。中央のアンラップ済みコンテンツを選択する新しい range を返す。
- */
-function splitSizeSpanAroundRange(span, range) {
-  const fontSize = span.style.fontSize;
-  const parent = span.parentNode;
-  if (!parent) return null;
-
-  // 末尾側を先に切り出す: 先頭側を切ると range の参照オフセットがずれる可能性があるため
-  const afterRange = document.createRange();
-  afterRange.selectNodeContents(span);
-  afterRange.setStart(range.endContainer, range.endOffset);
-  const afterFrag = afterRange.extractContents();
-
-  const beforeRange = document.createRange();
-  beforeRange.selectNodeContents(span);
-  beforeRange.setEnd(range.startContainer, range.startOffset);
-  const beforeFrag = beforeRange.extractContents();
-
-  // span 前に before 用 size span を挿入
-  if (beforeFrag.firstChild) {
-    const bs = document.createElement("span");
-    bs.style.fontSize = fontSize;
-    bs.appendChild(beforeFrag);
-    parent.insertBefore(bs, span);
-  }
-  // span 後ろに after 用 size span を挿入
-  if (afterFrag.firstChild) {
-    const as_ = document.createElement("span");
-    as_.style.fontSize = fontSize;
-    as_.appendChild(afterFrag);
-    parent.insertBefore(as_, span.nextSibling);
-  }
-
-  // span の中身を持ち上げ、span 自体は削除
-  const middleFrag = document.createDocumentFragment();
-  while (span.firstChild) middleFrag.appendChild(span.firstChild);
-  const firstMid = middleFrag.firstChild;
-  const lastMid = middleFrag.lastChild;
-  parent.insertBefore(middleFrag, span);
-  span.remove();
-
-  if (!firstMid || !lastMid) return null;
-
-  const newRange = document.createRange();
-  newRange.setStartBefore(firstMid);
-  newRange.setEndAfter(lastMid);
-  return newRange;
-}
-
-function updateFloatingBoldToolbarPosition() {
-  const tb = document.getElementById("bd-floating-bold-toolbar");
-  if (!tb) return;
-  const editor = document.getElementById("bd-new-textarea");
-  if (!editor) { tb.style.display = "none"; toolbarPositionLocked = false; return; }
-  const sel = window.getSelection();
-  if (!sel || sel.rangeCount === 0 || sel.isCollapsed) {
-    tb.style.display = "none";
-    toolbarPositionLocked = false;
-    return;
-  }
-  const range = sel.getRangeAt(0);
-  if (!editor.contains(range.commonAncestorContainer)) {
-    tb.style.display = "none";
-    toolbarPositionLocked = false;
-    return;
-  }
-  const rect = range.getBoundingClientRect();
-  if (rect.width === 0 && rect.height === 0) {
-    tb.style.display = "none";
-    toolbarPositionLocked = false;
-    return;
-  }
-
-  // 既にツールバーが表示中で位置決定済みなら、選択範囲の rect が変わっても動かさない。
-  // （太字/サイズ変更で選択範囲が再構成される際、ツールバーが上下に飛ぶのを防ぐ）
-  if (toolbarPositionLocked && tb.style.display !== "none") {
-    return;
-  }
-
-  // 初回 / 再表示時のポジショニング
-  tb.style.visibility = "hidden";
-  tb.style.display = "";
-  const tbW = tb.offsetWidth;
-  const tbH = tb.offsetHeight;
-  let top = window.scrollY + rect.top - tbH - 8;
-  let left = window.scrollX + rect.left + rect.width / 2 - tbW / 2;
-  // 画面端を超えないように clamp
-  const minLeft = window.scrollX + 4;
-  const maxLeft = window.scrollX + document.documentElement.clientWidth - tbW - 4;
-  if (left < minLeft) left = minLeft;
-  if (left > maxLeft) left = maxLeft;
-  if (top < window.scrollY + 4) {
-    // 上に出すスペースがなければ選択範囲の下に出す
-    top = window.scrollY + rect.bottom + 8;
-  }
-  tb.style.top = top + "px";
-  tb.style.left = left + "px";
-  tb.style.visibility = "";
-  toolbarPositionLocked = true;
-}
 
 // ===== クリップボード貼り付け（画像はインライン挿入、テキストはプレーン化） =====
 

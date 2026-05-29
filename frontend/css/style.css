@@ -3317,6 +3317,10 @@ textarea {
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   outline: none;
+  /* contenteditable div として使う場合の互換指定 */
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .sticky-add-area {
@@ -3350,10 +3354,14 @@ textarea {
   outline: none;
   transition: border-color 0.2s;
   resize: none;
-  overflow: hidden;
+  overflow-y: auto;
   min-height: 34px;
   max-height: 120px;
   line-height: 1.4;
+  /* contenteditable div として使う場合の互換指定 */
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .sticky-input:focus {
@@ -4571,6 +4579,12 @@ main.swipe-enter-right {
   resize: vertical;
   transition: border-color 0.3s;
   box-sizing: border-box;
+  /* contenteditable div として使う場合の互換指定 */
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  overflow-y: auto;
+  position: relative;
 }
 
 .journal-textarea:focus {
@@ -4581,6 +4595,14 @@ main.swipe-enter-right {
 
 .journal-textarea::placeholder {
   color: var(--text-muted);
+}
+
+/* contenteditable のプレースホルダ表示 */
+div.journal-textarea.is-empty::before {
+  content: attr(data-placeholder);
+  color: var(--text-muted);
+  pointer-events: none;
+  position: absolute;
 }
 
 /* 感情ピル */
@@ -5028,8 +5050,8 @@ main.swipe-enter-right {
   font-weight: 700;
 }
 
-/* 選択時に浮かぶ書式ツールバー（body 直下に挿入される単一要素） */
-.bd-floating-bold-toolbar {
+/* 選択時に浮かぶ書式ツールバー（body 直下に挿入される単一要素、全エディタ共有） */
+.ft-floating-toolbar {
   position: absolute;
   z-index: 9999;
   display: flex;
@@ -5044,7 +5066,7 @@ main.swipe-enter-right {
   -webkit-user-select: none;
 }
 
-.bd-floating-bold-toolbar .bd-fb-btn {
+.ft-floating-toolbar .ft-btn {
   display: inline-flex;
   align-items: baseline;
   justify-content: center;
@@ -5062,16 +5084,16 @@ main.swipe-enter-right {
   line-height: 32px;
 }
 
-.bd-floating-bold-toolbar .bd-fb-btn:hover {
+.ft-floating-toolbar .ft-btn:hover {
   background: rgba(255, 255, 255, 0.12);
 }
 
-.bd-floating-bold-toolbar .bd-fb-btn:active {
+.ft-floating-toolbar .ft-btn:active {
   background: rgba(255, 255, 255, 0.20);
 }
 
 /* B と サイズボタン群の間の縦罫線 */
-.bd-floating-bold-toolbar .bd-fb-sep {
+.ft-floating-toolbar .ft-sep {
   display: inline-block;
   width: 1px;
   height: 18px;
@@ -5079,29 +5101,35 @@ main.swipe-enter-right {
   background: rgba(255, 255, 255, 0.18);
 }
 
-/* A- / A+ の上下添字 */
-.bd-floating-bold-toolbar .bd-fb-sub,
-.bd-floating-bold-toolbar .bd-fb-sup {
+/* A− / A+ の上下添字 */
+.ft-floating-toolbar .ft-sub,
+.ft-floating-toolbar .ft-sup {
   font-size: 0.7rem;
   margin-left: 1px;
   font-weight: 600;
 }
-.bd-floating-bold-toolbar .bd-fb-sup {
+.ft-floating-toolbar .ft-sup {
   vertical-align: super;
 }
-.bd-floating-bold-toolbar .bd-fb-sub {
+.ft-floating-toolbar .ft-sub {
   vertical-align: sub;
 }
 
 /* リセット A は少し小さめに */
-.bd-floating-bold-toolbar .bd-fb-size-reset-btn {
+.ft-floating-toolbar .ft-btn-size-reset {
   font-size: 0.95rem;
   font-weight: 600;
 }
 
-[data-theme="light"] .bd-floating-bold-toolbar {
+[data-theme="light"] .ft-floating-toolbar {
   background: #1f2937;
   border-color: rgba(0, 0, 0, 0.1);
+}
+
+/* 全 contenteditable エディタ共通: <strong> と <span style="font-size:..em"> の表示 */
+.ft-editor strong,
+.ft-editor b {
+  font-weight: 700;
 }
 
 /* 縦幅調整用フル幅ドラッグバー（デスクトップのみ表示） */
@@ -8508,6 +8536,32 @@ main.swipe-enter-right {
   resize: vertical;
   min-height: 60px;
 }
+/* contenteditable のメモ欄 */
+.wl-notes-editor {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  padding: 8px 10px;
+  border-radius: var(--radius-xs);
+  font-size: 0.9rem;
+  font-family: inherit;
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 60px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  overflow-y: auto;
+  outline: none;
+  position: relative;
+  line-height: 1.5;
+}
+.wl-notes-editor:focus { border-color: var(--border-bright); }
+.wl-notes-editor:empty::before {
+  content: attr(data-placeholder);
+  color: var(--text-muted);
+  pointer-events: none;
+}
 .wl-form-actions {
   display: flex;
   gap: 8px;
@@ -8691,8 +8745,21 @@ main.swipe-enter-right {
   font-size: 0.96rem;
   line-height: 1.6;
   resize: none;
-  overflow: hidden;
+  overflow-y: auto;
   box-sizing: border-box;
+  /* contenteditable div として使う場合の互換指定 */
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  position: relative;
+}
+
+/* contenteditable のプレースホルダ表示 */
+div.gr-add-input.is-empty::before {
+  content: attr(data-placeholder);
+  color: var(--text-muted);
+  pointer-events: none;
+  position: absolute;
 }
 
 .gr-add-input:focus {
@@ -8833,9 +8900,14 @@ main.swipe-enter-right {
   font-size: 0.95rem;
   line-height: 1.6;
   resize: none;
-  overflow: hidden;
+  overflow-y: auto;
   box-sizing: border-box;
   margin-bottom: 8px;
+  /* contenteditable div として使う場合の互換指定 */
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  outline: none;
 }
 
 .gr-edit-input:focus {

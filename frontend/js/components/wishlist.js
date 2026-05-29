@@ -8,8 +8,53 @@
  * - 編集・削除メニュー(各項目)
  */
 
-import { wishlistApi } from "../api.js?v=20260505f";
-import { showToast } from "../app.js?v=20260505f";
+import { wishlistApi } from "../api.js?v=20260529e";
+import { showToast } from "../app.js?v=20260529e";
+import {
+  attachFloatingToolbar,
+  appendMarkdownToEditor,
+  serializeEditorMarkdown,
+} from "../floating-toolbar.js?v=20260529e";
+
+/** **bold** + <span style="font-size:Xem"> を保ったまま、テキスト部分はエスケープ + 改行→<br> */
+function renderWishlistNotes(text) {
+  if (!text) return "";
+  return renderWlInlineFormatting(text).replace(/\n/g, "<br>");
+}
+function renderWlInlineFormatting(text) {
+  if (!text) return "";
+  const sizeRegex = /<span\s+style="font-size:\s*([0-9.]+)em\s*">([\s\S]*?)<\/span>/g;
+  let result = "";
+  let lastIndex = 0;
+  let m;
+  while ((m = sizeRegex.exec(text)) !== null) {
+    result += renderWlBoldAndEscape(text.slice(lastIndex, m.index));
+    const em = parseFloat(m[1]);
+    const inner = m[2];
+    if (!isNaN(em) && em > 0 && em !== 1.0) {
+      result += `<span style="font-size:${em}em">${renderWlBoldAndEscape(inner)}</span>`;
+    } else {
+      result += renderWlBoldAndEscape(inner);
+    }
+    lastIndex = sizeRegex.lastIndex;
+  }
+  result += renderWlBoldAndEscape(text.slice(lastIndex));
+  return result;
+}
+function renderWlBoldAndEscape(text) {
+  if (!text) return "";
+  const boldRegex = /\*\*([^\n*][^\n]*?)\*\*/g;
+  let result = "";
+  let lastIndex = 0;
+  let m;
+  while ((m = boldRegex.exec(text)) !== null) {
+    result += escapeHtml(text.slice(lastIndex, m.index));
+    result += `<strong>${escapeHtml(m[1])}</strong>`;
+    lastIndex = boldRegex.lastIndex;
+  }
+  result += escapeHtml(text.slice(lastIndex));
+  return result;
+}
 
 const PRESET_CATEGORIES = ["住居", "家電", "趣味・ガジェット", "旅行・体験", "学び", "その他"];
 const VIEW_MODE_KEY = "wishlist_view_mode_v1"; // "card" | "list"
@@ -245,7 +290,7 @@ function buildCardHTML(item) {
     ? `<a class="wl-ref-link" href="${escapeAttr(item.reference_url)}" target="_blank" rel="noopener noreferrer">参考リンク↗</a>`
     : "";
   const notes = item.notes
-    ? `<div class="wl-card-notes">${escapeHtml(item.notes)}</div>`
+    ? `<div class="wl-card-notes">${renderWishlistNotes(item.notes)}</div>`
     : "";
   const targetPeriod = item.target_period
     ? `<span class="wl-meta-tag">📅 ${escapeHtml(item.target_period)}</span>`
@@ -395,7 +440,14 @@ function buildFormHTML(item) {
 
       <label class="wl-field">
         <span class="wl-field-label">メモ</span>
-        <textarea name="notes" rows="3" maxlength="2000" placeholder="なぜ欲しいか、どこで買うかなど自由に">${escapeHtml(data.notes || "")}</textarea>
+        <div
+          class="wl-notes-editor"
+          id="wl-notes-editor"
+          contenteditable="true"
+          spellcheck="false"
+          data-placeholder="なぜ欲しいか、どこで買うかなど自由に"
+          data-initial="${escapeAttr(encodeURIComponent(data.notes || ""))}"
+        ></div>
       </label>
 
       <div class="wl-form-actions">
@@ -411,6 +463,14 @@ function showForm(item) {
   state.editingId = item ? item.id : null;
   const container = document.getElementById("wl-form-container");
   container.innerHTML = buildFormHTML(item);
+  // メモ欄を contenteditable として初期化（data-initial から markdown 取り込み）
+  const notesEditor = container.querySelector("#wl-notes-editor");
+  if (notesEditor) {
+    const initial = decodeURIComponent(notesEditor.dataset.initial || "");
+    appendMarkdownToEditor(notesEditor, initial);
+    notesEditor.removeAttribute("data-initial");
+    attachFloatingToolbar(notesEditor);
+  }
   attachFormEvents();
   // フォーム上部にスクロール
   container.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -612,7 +672,11 @@ function attachFormEvents() {
       category: String(fd.get("category") || "その他").trim() || "その他",
       priority: Math.max(1, Math.min(5, parseInt(fd.get("priority"), 10) || 3)),
       target_period: String(fd.get("target_period") || "").trim() || null,
-      notes: String(fd.get("notes") || "").trim() || null,
+      notes: (() => {
+        const editor = form.querySelector("#wl-notes-editor");
+        const md = editor ? serializeEditorMarkdown(editor).trim() : "";
+        return md || null;
+      })(),
       image_url: String(fd.get("image_url") || "").trim() || null,
       reference_url: String(fd.get("reference_url") || "").trim() || null,
     };

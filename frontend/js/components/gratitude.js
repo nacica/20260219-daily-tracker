@@ -6,8 +6,25 @@
  * 各エントリは編集・削除可能。
  */
 
-import { gratitudeApi } from "../api.js?v=20260509c";
-import { showToast } from "../app.js?v=20260509c";
+import { gratitudeApi } from "../api.js?v=20260529e";
+import { showToast } from "../app.js?v=20260529e";
+import {
+  attachFloatingToolbar,
+  appendMarkdownToEditor,
+  serializeEditorMarkdown,
+} from "../floating-toolbar.js?v=20260529e";
+
+/** contenteditable から markdown を読む（textarea にも対応） */
+function readEditorMd(el) {
+  if (!el) return "";
+  if (el.tagName === "TEXTAREA") return (el.value || "").trim();
+  return serializeEditorMarkdown(el).trim();
+}
+function writeEditorMd(el, text) {
+  if (!el) return;
+  if (el.tagName === "TEXTAREA") { el.value = text || ""; return; }
+  appendMarkdownToEditor(el, text || "");
+}
 
 const state = {
   items: [],
@@ -54,9 +71,50 @@ function formatDateTime(iso) {
   return date && time ? `${date} ${time}` : (date || time);
 }
 
-// 内容を表示用に改行を <br> に変換（HTMLエスケープ後）
+// 内容を表示用 HTML に変換：改行 → <br>、**bold** → <strong>、<span style="font-size:Xem"> → そのまま
 function nl2br(str) {
-  return escapeHtml(str).replace(/\n/g, "<br>");
+  if (!str) return "";
+  // 1) 画像はサポート対象外（gratitude には画像入力 UI が無いため）
+  // 2) <span style="font-size:..em">...</span> を抜き出して保持
+  // 3) **bold** を <strong> に変換
+  // 4) その他はエスケープ
+  return renderInlineFormatting(str).replace(/\n/g, "<br>");
+}
+
+function renderInlineFormatting(text) {
+  if (!text) return "";
+  const sizeRegex = /<span\s+style="font-size:\s*([0-9.]+)em\s*">([\s\S]*?)<\/span>/g;
+  let result = "";
+  let lastIndex = 0;
+  let m;
+  while ((m = sizeRegex.exec(text)) !== null) {
+    result += renderBoldAndEscape(text.slice(lastIndex, m.index));
+    const em = parseFloat(m[1]);
+    const inner = m[2];
+    if (!isNaN(em) && em > 0 && em !== 1.0) {
+      result += `<span style="font-size:${em}em">${renderBoldAndEscape(inner)}</span>`;
+    } else {
+      result += renderBoldAndEscape(inner);
+    }
+    lastIndex = sizeRegex.lastIndex;
+  }
+  result += renderBoldAndEscape(text.slice(lastIndex));
+  return result;
+}
+
+function renderBoldAndEscape(text) {
+  if (!text) return "";
+  const boldRegex = /\*\*([^\n*][^\n]*?)\*\*/g;
+  let result = "";
+  let lastIndex = 0;
+  let m;
+  while ((m = boldRegex.exec(text)) !== null) {
+    result += escapeHtml(text.slice(lastIndex, m.index));
+    result += `<strong>${escapeHtml(m[1])}</strong>`;
+    lastIndex = boldRegex.lastIndex;
+  }
+  result += escapeHtml(text.slice(lastIndex));
+  return result;
 }
 
 // textarea を内容に合わせて自動拡張
@@ -77,12 +135,12 @@ function buildSkeleton() {
       </div>
 
       <div class="gr-add-card card">
-        <textarea
+        <div
           id="gr-add-input"
-          class="gr-add-input"
-          rows="3"
-          maxlength="2000"
-          placeholder="ありがたいと感じたことを書く…&#10;（例：今日も家族が元気でいてくれたこと、暖かい部屋で眠れること）"></textarea>
+          class="gr-add-input is-empty"
+          contenteditable="true"
+          spellcheck="false"
+          data-placeholder="ありがたいと感じたことを書く…（例：今日も家族が元気でいてくれたこと、暖かい部屋で眠れること）"></div>
         <div class="gr-add-actions">
           <span class="gr-add-hint" id="gr-add-hint">Ctrl + Enter で追加</span>
           <button type="button" id="gr-add-btn" class="btn btn-primary btn-sm">
@@ -133,7 +191,7 @@ function buildEntryHTML(item) {
         <div class="gr-entry-meta">
           ${dateBadge}<span class="gr-time">${timeOnly}</span>
         </div>
-        <textarea class="gr-edit-input" rows="3" maxlength="2000">${escapeHtml(item.content)}</textarea>
+        <div class="gr-edit-input" contenteditable="true" spellcheck="false" data-initial="${escapeAttr(encodeURIComponent(item.content || ""))}"></div>
         <div class="gr-entry-actions">
           <button type="button" class="btn btn-outline btn-sm" data-action="cancel-edit" data-id="${escapeAttr(item.id)}">キャンセル</button>
           <button type="button" class="btn btn-primary btn-sm" data-action="save-edit" data-id="${escapeAttr(item.id)}">保存</button>
@@ -172,7 +230,7 @@ async function loadItems() {
 async function submitAdd() {
   const input = document.getElementById("gr-add-input");
   if (!input) return;
-  const content = input.value.trim();
+  const content = readEditorMd(input);
   if (!content) {
     input.focus();
     return;
@@ -181,8 +239,8 @@ async function submitAdd() {
   if (btn) { btn.disabled = true; btn.textContent = "追加中..."; }
   try {
     await gratitudeApi.create(content);
-    input.value = "";
-    autoResize(input);
+    writeEditorMd(input, "");
+    updateGratitudeEmptyClass(input);
     showToast("ありがたいノートに追加しました 💗", "success");
     await loadItems();
     renderList();
@@ -197,12 +255,18 @@ async function submitAdd() {
   }
 }
 
+function updateGratitudeEmptyClass(el) {
+  if (!el) return;
+  const hasContent = (el.textContent && el.textContent.trim() !== "") || el.querySelector("img");
+  el.classList.toggle("is-empty", !hasContent);
+}
+
 async function saveEdit(id) {
   const wrap = document.querySelector(`.gr-entry[data-id="${CSS.escape(id)}"]`);
   if (!wrap) return;
   const ta = wrap.querySelector(".gr-edit-input");
   if (!ta) return;
-  const content = ta.value.trim();
+  const content = readEditorMd(ta);
   if (!content) {
     ta.focus();
     return;
@@ -238,8 +302,10 @@ function attachEvents() {
   const btn = document.getElementById("gr-add-btn");
 
   if (input) {
-    autoResize(input);
-    input.addEventListener("input", () => autoResize(input));
+    appendMarkdownToEditor(input, "");
+    updateGratitudeEmptyClass(input);
+    attachFloatingToolbar(input);
+    input.addEventListener("input", () => updateGratitudeEmptyClass(input));
     // Ctrl+Enter / Cmd+Enter で追加（Enter 単体は改行のまま）
     input.addEventListener("keydown", (e) => {
       if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
@@ -264,11 +330,18 @@ function attachEvents() {
       renderList();
       const ta = document.querySelector(`.gr-entry[data-id="${CSS.escape(id)}"] .gr-edit-input`);
       if (ta) {
-        autoResize(ta);
+        const initial = decodeURIComponent(ta.dataset.initial || "");
+        appendMarkdownToEditor(ta, initial);
+        ta.removeAttribute("data-initial");
+        attachFloatingToolbar(ta);
         ta.focus();
         // カーソルを末尾に
-        try { ta.setSelectionRange(ta.value.length, ta.value.length); } catch (_) {}
-        ta.addEventListener("input", () => autoResize(ta));
+        const range = document.createRange();
+        range.selectNodeContents(ta);
+        range.collapse(false);
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
       }
     } else if (action === "cancel-edit") {
       state.editingId = null;

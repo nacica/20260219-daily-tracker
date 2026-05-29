@@ -4,8 +4,13 @@
  * 学習中のカード編集にも対応
  */
 
-import { flashcardsApi } from "../api.js?v=20260424i";
-import { showToast } from "../app.js?v=20260424i";
+import { flashcardsApi } from "../api.js?v=20260529e";
+import { showToast } from "../app.js?v=20260529e";
+import {
+  attachFloatingToolbar,
+  appendMarkdownToEditor,
+  serializeEditorMarkdown,
+} from "../floating-toolbar.js?v=20260529e";
 
 const ORDER_STORAGE_KEY = "flashcard-study-order";
 
@@ -30,7 +35,7 @@ function escapeHtml(str) {
   );
 }
 
-// テキスト + 画像マークダウン ![alt](url) を HTML に変換
+// テキスト + 画像 + **bold** + <span style="font-size:Xem"> を HTML に変換
 function renderFaceContent(str) {
   if (!str) return "";
   const imgRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;
@@ -38,71 +43,97 @@ function renderFaceContent(str) {
   let lastIndex = 0;
   let m;
   while ((m = imgRegex.exec(str)) !== null) {
-    const textBefore = str.slice(lastIndex, m.index);
-    if (textBefore) result += escapeHtml(textBefore);
+    result += renderInlineFormatting(str.slice(lastIndex, m.index));
     const alt = escapeHtml(m[1] || "画像");
     const url = escapeHtml(m[2]);
     result += `<img class="fc-content-image" src="${url}" alt="${alt}" loading="lazy" />`;
     lastIndex = imgRegex.lastIndex;
   }
-  result += escapeHtml(str.slice(lastIndex));
+  result += renderInlineFormatting(str.slice(lastIndex));
+  return result;
+}
+
+function renderInlineFormatting(text) {
+  if (!text) return "";
+  const sizeRegex = /<span\s+style="font-size:\s*([0-9.]+)em\s*">([\s\S]*?)<\/span>/g;
+  let result = "";
+  let lastIndex = 0;
+  let m;
+  while ((m = sizeRegex.exec(text)) !== null) {
+    result += renderBoldAndEscape(text.slice(lastIndex, m.index));
+    const em = parseFloat(m[1]);
+    const inner = m[2];
+    if (!isNaN(em) && em > 0 && em !== 1.0) {
+      result += `<span style="font-size:${em}em">${renderBoldAndEscape(inner)}</span>`;
+    } else {
+      result += renderBoldAndEscape(inner);
+    }
+    lastIndex = sizeRegex.lastIndex;
+  }
+  result += renderBoldAndEscape(text.slice(lastIndex));
+  return result;
+}
+
+function renderBoldAndEscape(text) {
+  if (!text) return "";
+  const boldRegex = /\*\*([^\n*][^\n]*?)\*\*/g;
+  let result = "";
+  let lastIndex = 0;
+  let m;
+  while ((m = boldRegex.exec(text)) !== null) {
+    result += escapeHtml(text.slice(lastIndex, m.index));
+    result += `<strong>${escapeHtml(m[1])}</strong>`;
+    lastIndex = boldRegex.lastIndex;
+  }
+  result += escapeHtml(text.slice(lastIndex));
   return result;
 }
 
 // ========== contenteditable リッチエディタ（学習画面の編集用） ==========
 
-function markdownToEditorHtml(md) {
-  if (!md) return "";
-  let result = "";
-  let lastIndex = 0;
-  const imgRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;
-  let m;
-  while ((m = imgRegex.exec(md)) !== null) {
-    const before = md.slice(lastIndex, m.index);
-    result += escapeHtml(before).replace(/\n/g, "<br>");
-    const alt = escapeHtml(m[1] || "画像");
-    const url = escapeHtml(m[2]);
-    result += `<span class="fc-inline-image-wrap" contenteditable="false">` +
-      `<img class="fc-inline-image" src="${url}" alt="${alt}" loading="lazy" />` +
-      `<button type="button" class="fc-inline-image-remove" title="この画像を削除">×</button>` +
-      `</span>`;
-    lastIndex = imgRegex.lastIndex;
-  }
-  result += escapeHtml(md.slice(lastIndex)).replace(/\n/g, "<br>");
-  return result;
+const FCS_IMG_PATTERN = /!\[([^\]]*)\]\(([^)]+)\)/g;
+
+function makeInlineImageWrap(url, alt) {
+  const wrap = document.createElement("span");
+  wrap.className = "fc-inline-image-wrap";
+  wrap.setAttribute("contenteditable", "false");
+  const img = document.createElement("img");
+  img.className = "fc-inline-image";
+  img.src = url;
+  img.alt = alt || "画像";
+  img.loading = "lazy";
+  wrap.appendChild(img);
+  const rm = document.createElement("button");
+  rm.type = "button";
+  rm.className = "fc-inline-image-remove";
+  rm.title = "この画像を削除";
+  rm.textContent = "×";
+  wrap.appendChild(rm);
+  return wrap;
+}
+
+function setEditorFromMarkdown(editor, md) {
+  appendMarkdownToEditor(editor, md, {
+    imgPattern: FCS_IMG_PATTERN,
+    imgFactory: (m) => makeInlineImageWrap(m[2], m[1] || "画像"),
+  });
 }
 
 function editorToMarkdown(el) {
-  let md = "";
-  function walk(node) {
-    node.childNodes.forEach((child) => {
-      if (child.nodeType === Node.TEXT_NODE) {
-        md += child.textContent;
-      } else if (child.nodeType === Node.ELEMENT_NODE) {
-        const tag = child.tagName.toLowerCase();
-        if (tag === "img") {
-          md += `![${child.getAttribute("alt") || "画像"}](${child.getAttribute("src") || ""})`;
-          return;
+  const md = serializeEditorMarkdown(el, {
+    serializeElement: (node) => {
+      if (node.tagName === "SPAN" && node.classList && node.classList.contains("fc-inline-image-wrap")) {
+        const img = node.querySelector("img");
+        if (img) {
+          const src = img.getAttribute("src") || "";
+          const alt = img.getAttribute("alt") || "画像";
+          return `![${alt}](${src})`;
         }
-        if (tag === "br") {
-          md += "\n";
-          return;
-        }
-        if (child.classList && child.classList.contains("fc-inline-image-wrap")) {
-          const img = child.querySelector("img");
-          if (img) {
-            md += `![${img.getAttribute("alt") || "画像"}](${img.getAttribute("src") || ""})`;
-          }
-          return;
-        }
-        if (tag === "div" || tag === "p") {
-          if (md && !md.endsWith("\n")) md += "\n";
-        }
-        walk(child);
+        return "";
       }
-    });
-  }
-  walk(el);
+      return undefined;
+    },
+  });
   return md.replace(/\n{3,}/g, "\n\n").trim();
 }
 
@@ -227,11 +258,12 @@ function handleStudyEditorClick(e) {
 
 function setupStudyEditor(editor, initialMarkdown) {
   if (!editor) return;
-  editor.innerHTML = markdownToEditorHtml(initialMarkdown || "");
+  setEditorFromMarkdown(editor, initialMarkdown || "");
   if (editor.dataset.editorBound) return;
   editor.dataset.editorBound = "1";
   editor.addEventListener("paste", handleStudyPaste);
   editor.addEventListener("click", handleStudyEditorClick);
+  attachFloatingToolbar(editor);
 }
 
 function getSavedOrder() {

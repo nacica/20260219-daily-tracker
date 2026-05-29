@@ -5,9 +5,26 @@
  * 朝のタスク整理（ソクラテス式問答）統合
  */
 
-import { recordsApi, analysisApi, morningDialogueApi, remindersApi, categoriesApi } from "../api.js?v=20260529d";
-import { showToast } from "../app.js?v=20260529d";
-import { showTaskCompleteAnimation } from "./task-stats.js?v=20260529d";
+import { recordsApi, analysisApi, morningDialogueApi, remindersApi, categoriesApi } from "../api.js?v=20260529e";
+import { showToast } from "../app.js?v=20260529e";
+import { showTaskCompleteAnimation } from "./task-stats.js?v=20260529e";
+import {
+  attachFloatingToolbar,
+  appendMarkdownToEditor,
+  serializeEditorMarkdown,
+} from "../floating-toolbar.js?v=20260529e";
+
+/** contenteditable div / textarea いずれでも markdown を読み書きするヘルパ */
+function readEditableMarkdown(el) {
+  if (!el) return "";
+  if (el.tagName === "TEXTAREA") return (el.value || "").trim();
+  return serializeEditorMarkdown(el).trim();
+}
+function writeEditableMarkdown(el, text) {
+  if (!el) return;
+  if (el.tagName === "TEXTAREA") { el.value = text || ""; return; }
+  appendMarkdownToEditor(el, text || "");
+}
 
 // ===== 付箋(今日意識すること) の Markdown レンダリング =====
 // Claude などからコピペした表/箇条書き/見出し/太字を整形表示する。
@@ -809,7 +826,7 @@ function buildReminderBoardHTML() {
       </div>
       <div class="sticky-add-area" id="sticky-add-area"${isArchive ? " hidden" : ""}>
         <div class="sticky-add-row">
-          <textarea id="sticky-input" class="sticky-input" placeholder="" rows="1"></textarea>
+          <div id="sticky-input" class="sticky-input" contenteditable="true" spellcheck="false" data-placeholder=""></div>
           <button class="btn btn-primary btn-sm" id="btn-add-sticky">追加</button>
         </div>
       </div>
@@ -824,9 +841,13 @@ function attachReminderEvents() {
   const input = document.getElementById("sticky-input");
   if (!addBtn || !input) return;
 
+  // contenteditable 化したのでフローティング書式ツールバーを登録
+  appendMarkdownToEditor(input, "");
+  attachFloatingToolbar(input);
+
   // 追加
   function addSticky() {
-    const text = input.value.trim();
+    const text = readEditableMarkdown(input);
     if (!text) return;
     const reminders = getReminders();
     reminders.push({ id: Date.now().toString(36), text, createdAt: Date.now(), archived: false });
@@ -834,16 +855,12 @@ function attachReminderEvents() {
     currentReminderTab = "active"; // アーカイブ閲覧中に追加した場合もアクティブへ戻す
     stickyCurrentIndex = 0; // 新規追加分は降順ソートで先頭(1/N)に来る
     refreshStickyNotes();
-    input.value = "";
+    writeEditableMarkdown(input, "");
     input.focus();
   }
 
   addBtn.addEventListener("click", addSticky);
-  // Enter は改行のみ。登録は「追加」ボタンクリックで行う（スマホで改行できるよう）
-  input.addEventListener("input", () => {
-    input.style.height = "auto";
-    input.style.height = input.scrollHeight + "px";
-  });
+  // contenteditable は内容に合わせて自動でサイズが伸縮するため手動リサイズは不要
 
   // 削除・編集・アーカイブ・復元（イベント委譲）
   const container = document.getElementById("sticky-notes");
@@ -911,15 +928,15 @@ function attachReminderEvents() {
         const textEl = note.querySelector(".sticky-text");
         if (!body || !textEl) return;
 
-        // テキストを編集用 textarea に差し替え
-        const textarea = document.createElement("textarea");
-        textarea.className = "sticky-edit-area";
-        textarea.value = target.text;
-        textEl.replaceWith(textarea);
-        textarea.focus();
-        // 内容に合わせて高さを伸ばす（max-height は CSS で 70vh）
-        autoResizeTextarea(textarea);
-        textarea.addEventListener("input", () => autoResizeTextarea(textarea));
+        // テキストを編集用 contenteditable に差し替え
+        const editor = document.createElement("div");
+        editor.className = "sticky-edit-area";
+        editor.setAttribute("contenteditable", "true");
+        editor.setAttribute("spellcheck", "false");
+        appendMarkdownToEditor(editor, target.text || "");
+        textEl.replaceWith(editor);
+        attachFloatingToolbar(editor);
+        editor.focus();
 
         // 編集ボタンを「保存」に変更
         editBtn.innerHTML = "&#10003;";
@@ -928,7 +945,7 @@ function attachReminderEvents() {
 
         // 保存処理
         function save() {
-          const newText = textarea.value.trim();
+          const newText = readEditableMarkdown(editor);
           if (newText) {
             target.text = newText;
             saveReminders(reminders);
