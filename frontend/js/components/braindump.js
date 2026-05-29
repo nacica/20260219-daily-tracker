@@ -5,8 +5,8 @@
  * ラベル機能: メモごとに複数ラベル付与可、ラベルOR検索、専用管理モーダル。
  */
 
-import { braindumpApi } from "../api.js?v=20260527a";
-import { showToast } from "../app.js?v=20260527a";
+import { braindumpApi } from "../api.js?v=20260529a";
+import { showToast } from "../app.js?v=20260529a";
 
 // ===== ユーティリティ =====
 
@@ -111,6 +111,8 @@ function saveCurrentScroll() {
 // タイトル/プレビュー算出用：画像マークダウンを空白に置換するための正規表現
 const IMG_REGEX = /\n?!\[[^\]]*\]\([^)]+\)\n?/g;
 const IMG_MATCH = /!\[([^\]]*)\]\(([^)]+)\)/g;
+// 行内太字 **...** （単一行内、`**` を含まない）
+const BOLD_MATCH = /\*\*([^\n*][^\n]*?)\*\*/g;
 
 // ===== contenteditable エディタ ↔ markdown 相互変換 =====
 
@@ -133,11 +135,7 @@ function setEditorContent(editor, markdown) {
 
   for (const seg of segments) {
     if (seg.type === "text") {
-      const lines = seg.value.split("\n");
-      for (let i = 0; i < lines.length; i++) {
-        if (i > 0) editor.appendChild(document.createElement("br"));
-        if (lines[i]) editor.appendChild(document.createTextNode(lines[i]));
-      }
+      appendTextWithBold(editor, seg.value);
     } else {
       editor.appendChild(createInlineImg(seg.src, seg.alt));
     }
@@ -146,6 +144,30 @@ function setEditorContent(editor, markdown) {
   if (editor.childNodes.length === 0) {
     editor.appendChild(document.createElement("br"));
   }
+}
+
+/** 改行を <br> に展開しつつテキストを target に追加 */
+function appendTextLines(target, text) {
+  const lines = text.split("\n");
+  for (let i = 0; i < lines.length; i++) {
+    if (i > 0) target.appendChild(document.createElement("br"));
+    if (lines[i]) target.appendChild(document.createTextNode(lines[i]));
+  }
+}
+
+/** テキストを **...** で分割し、太字部分は <strong> でラップして parent に追加 */
+function appendTextWithBold(parent, text) {
+  const re = new RegExp(BOLD_MATCH.source, "g");
+  let lastIdx = 0;
+  let m;
+  while ((m = re.exec(text)) !== null) {
+    if (m.index > lastIdx) appendTextLines(parent, text.slice(lastIdx, m.index));
+    const strong = document.createElement("strong");
+    appendTextLines(strong, m[1]);
+    if (strong.childNodes.length > 0) parent.appendChild(strong);
+    lastIdx = m.index + m[0].length;
+  }
+  if (lastIdx < text.length) appendTextLines(parent, text.slice(lastIdx));
 }
 
 /** インライン画像 <img> 要素を生成する */
@@ -177,6 +199,22 @@ function getEditorMarkdown(editor) {
       // アップロード中の一時画像（blob:URL）は markdown には書かない
       if (src.startsWith("blob:") || node.classList.contains("bd-inline-img-uploading")) return;
       out += `![${alt}](${src})`;
+      return;
+    }
+    // 太字: <strong> または <b> を **...** に変換（中身が空白だけならマーカーを付けない）
+    if (tag === "STRONG" || tag === "B") {
+      const before = out.length;
+      for (const child of node.childNodes) walk(child);
+      const inner = out.slice(before);
+      if (inner.trim() === "") return;
+      // 先頭/末尾の空白は ** の外に出す（**foo ** にならないように）
+      const m = inner.match(/^(\s*)([\s\S]*?)(\s*)$/);
+      const left = m ? m[1] : "";
+      const core = m ? m[2] : inner;
+      const right = m ? m[3] : "";
+      // 中身に既存の ** が含まれていれば二重マーカー化を避けて素通しする
+      if (core.includes("**")) return;
+      out = out.slice(0, before) + left + "**" + core + "**" + right;
       return;
     }
     const isBlock = (tag === "DIV" || tag === "P" || tag === "BLOCKQUOTE" || tag === "PRE" || tag === "LI");
@@ -802,6 +840,9 @@ function attachEvents() {
   // 縦幅調整バーのドラッグ処理（デスクトップ専用）
   initResizeBar();
 
+  // 選択時フローティング太字ツールバー（モジュール単位で1回だけ初期化）
+  ensureFloatingBoldToolbar();
+
   // ラベル編集UIのイベント
   attachLabelsEditorEvents();
 
@@ -1232,13 +1273,123 @@ function initResizeBar() {
   });
 }
 
-// ===== Tab キー処理 =====
+// ===== Tab キー処理 / 太字ショートカット =====
 
 function handleTabInsert(e) {
+  // Ctrl+B / Cmd+B → 選択範囲の太字トグル
+  if ((e.ctrlKey || e.metaKey) && !e.altKey && (e.key === "b" || e.key === "B")) {
+    e.preventDefault();
+    toggleBoldOnSelection();
+    return;
+  }
   if (e.key !== "Tab" || e.shiftKey || e.ctrlKey || e.metaKey || e.altKey) return;
   e.preventDefault();
   insertPlainTextAtCursor("\t");
   e.target.dispatchEvent(new Event("input", { bubbles: true }));
+}
+
+// ===== 太字トグル =====
+
+/**
+ * 選択範囲の太字をトグルする。
+ * contenteditable では execCommand('bold') がクロスブラウザで安定し、
+ * 完全に太字なら解除、そうでなければ太字化、というトグル動作を内蔵している。
+ */
+function toggleBoldOnSelection() {
+  const editor = document.getElementById("bd-new-textarea");
+  if (!editor) return;
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0) return;
+  const range = sel.getRangeAt(0);
+  if (!editor.contains(range.commonAncestorContainer)) return;
+  // フォーカスを確保してから実行（フローティングボタン経由で focus が外れているケース対策）
+  if (document.activeElement !== editor) editor.focus({ preventScroll: true });
+  try {
+    document.execCommand("bold", false, null);
+  } catch {
+    return;
+  }
+  // 自動保存トリガ
+  editor.dispatchEvent(new Event("input", { bubbles: true }));
+  // ツールバー位置を再計算（選択範囲の rect が変わるため）
+  requestAnimationFrame(updateFloatingBoldToolbarPosition);
+}
+
+// ===== 選択時フローティング太字ツールバー =====
+
+let floatingBoldToolbarInited = false;
+
+function ensureFloatingBoldToolbar() {
+  if (floatingBoldToolbarInited) return;
+  floatingBoldToolbarInited = true;
+
+  const tb = document.createElement("div");
+  tb.id = "bd-floating-bold-toolbar";
+  tb.className = "bd-floating-bold-toolbar";
+  tb.setAttribute("role", "toolbar");
+  tb.setAttribute("aria-label", "テキスト書式");
+  tb.style.display = "none";
+  tb.innerHTML = `<button type="button" class="bd-fb-bold-btn" title="太字 (Ctrl+B)" aria-label="太字"><b>B</b></button>`;
+  document.body.appendChild(tb);
+
+  const btn = tb.querySelector(".bd-fb-bold-btn");
+  // mousedown で preventDefault: 選択範囲を保ったままトグル発火
+  btn.addEventListener("mousedown", (e) => {
+    e.preventDefault();
+    toggleBoldOnSelection();
+  });
+  // タッチでも同様に動かす（モバイル）
+  btn.addEventListener("touchstart", (e) => {
+    e.preventDefault();
+    toggleBoldOnSelection();
+  }, { passive: false });
+
+  // 選択範囲が変わるたびに位置を更新
+  document.addEventListener("selectionchange", updateFloatingBoldToolbarPosition);
+  // 編集中のスクロール・リサイズでも追従
+  window.addEventListener("scroll", updateFloatingBoldToolbarPosition, true);
+  window.addEventListener("resize", updateFloatingBoldToolbarPosition);
+}
+
+function updateFloatingBoldToolbarPosition() {
+  const tb = document.getElementById("bd-floating-bold-toolbar");
+  if (!tb) return;
+  const editor = document.getElementById("bd-new-textarea");
+  if (!editor) { tb.style.display = "none"; return; }
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0 || sel.isCollapsed) {
+    tb.style.display = "none";
+    return;
+  }
+  const range = sel.getRangeAt(0);
+  if (!editor.contains(range.commonAncestorContainer)) {
+    tb.style.display = "none";
+    return;
+  }
+  const rect = range.getBoundingClientRect();
+  if (rect.width === 0 && rect.height === 0) {
+    tb.style.display = "none";
+    return;
+  }
+  // 一旦表示してから offsetWidth/Height を取得
+  tb.style.visibility = "hidden";
+  tb.style.display = "";
+  const tbW = tb.offsetWidth;
+  const tbH = tb.offsetHeight;
+  let top = window.scrollY + rect.top - tbH - 8;
+  let left = window.scrollX + rect.left + rect.width / 2 - tbW / 2;
+  // 画面端を超えないように clamp
+  const minLeft = window.scrollX + 4;
+  const maxLeft = window.scrollX + document.documentElement.clientWidth - tbW - 4;
+  if (left < minLeft) left = minLeft;
+  if (left > maxLeft) left = maxLeft;
+  if (top < window.scrollY + 4) {
+    // 上に出すスペースがなければ選択範囲の下に出す
+    top = window.scrollY + rect.bottom + 8;
+  }
+  tb.style.top = top + "px";
+  tb.style.left = left + "px";
+  tb.style.visibility = "";
 }
 
 // ===== クリップボード貼り付け（画像はインライン挿入、テキストはプレーン化） =====

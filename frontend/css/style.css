@@ -5022,6 +5022,57 @@ main.swipe-enter-right {
   cursor: progress !important;
 }
 
+/* 本文中の太字（<strong>） — 編集中・閲覧中いずれもしっかり太く */
+.braindump-textarea strong,
+.braindump-textarea b {
+  font-weight: 700;
+}
+
+/* 選択時に浮かぶ太字ツールバー（body 直下に挿入される単一要素） */
+.bd-floating-bold-toolbar {
+  position: absolute;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  padding: 4px;
+  border-radius: 8px;
+  background: rgba(20, 24, 34, 0.96);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.bd-floating-bold-toolbar .bd-fb-bold-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  height: 32px;
+  padding: 0 8px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #ffffff;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.bd-floating-bold-toolbar .bd-fb-bold-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.bd-floating-bold-toolbar .bd-fb-bold-btn:active {
+  background: rgba(255, 255, 255, 0.20);
+}
+
+[data-theme="light"] .bd-floating-bold-toolbar {
+  background: #1f2937;
+  border-color: rgba(0, 0, 0, 0.1);
+}
+
 /* 縦幅調整用フル幅ドラッグバー（デスクトップのみ表示） */
 .braindump-resize-bar {
   display: none;
