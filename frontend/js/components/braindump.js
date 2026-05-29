@@ -5,8 +5,8 @@
  * ラベル機能: メモごとに複数ラベル付与可、ラベルOR検索、専用管理モーダル。
  */
 
-import { braindumpApi } from "../api.js?v=20260529c";
-import { showToast } from "../app.js?v=20260529c";
+import { braindumpApi } from "../api.js?v=20260529d";
+import { showToast } from "../app.js?v=20260529d";
 
 // ===== ユーティリティ =====
 
@@ -1366,6 +1366,9 @@ function toggleBoldOnSelection() {
 // ===== 選択時フローティング太字ツールバー =====
 
 let floatingBoldToolbarInited = false;
+// ツールバー表示中はサイズ変更等で選択範囲の rect が変わっても位置を再計算しない。
+// 選択が一旦なくなる（collapse / blur）と false に戻り、次に出るときに再計算。
+let toolbarPositionLocked = false;
 
 function ensureFloatingBoldToolbar() {
   if (floatingBoldToolbarInited) return;
@@ -1591,23 +1594,33 @@ function updateFloatingBoldToolbarPosition() {
   const tb = document.getElementById("bd-floating-bold-toolbar");
   if (!tb) return;
   const editor = document.getElementById("bd-new-textarea");
-  if (!editor) { tb.style.display = "none"; return; }
+  if (!editor) { tb.style.display = "none"; toolbarPositionLocked = false; return; }
   const sel = window.getSelection();
   if (!sel || sel.rangeCount === 0 || sel.isCollapsed) {
     tb.style.display = "none";
+    toolbarPositionLocked = false;
     return;
   }
   const range = sel.getRangeAt(0);
   if (!editor.contains(range.commonAncestorContainer)) {
     tb.style.display = "none";
+    toolbarPositionLocked = false;
     return;
   }
   const rect = range.getBoundingClientRect();
   if (rect.width === 0 && rect.height === 0) {
     tb.style.display = "none";
+    toolbarPositionLocked = false;
     return;
   }
-  // 一旦表示してから offsetWidth/Height を取得
+
+  // 既にツールバーが表示中で位置決定済みなら、選択範囲の rect が変わっても動かさない。
+  // （太字/サイズ変更で選択範囲が再構成される際、ツールバーが上下に飛ぶのを防ぐ）
+  if (toolbarPositionLocked && tb.style.display !== "none") {
+    return;
+  }
+
+  // 初回 / 再表示時のポジショニング
   tb.style.visibility = "hidden";
   tb.style.display = "";
   const tbW = tb.offsetWidth;
@@ -1626,6 +1639,7 @@ function updateFloatingBoldToolbarPosition() {
   tb.style.top = top + "px";
   tb.style.left = left + "px";
   tb.style.visibility = "";
+  toolbarPositionLocked = true;
 }
 
 // ===== クリップボード貼り付け（画像はインライン挿入、テキストはプレーン化） =====
