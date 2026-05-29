@@ -5,8 +5,8 @@
  * ラベル機能: メモごとに複数ラベル付与可、ラベルOR検索、専用管理モーダル。
  */
 
-import { braindumpApi } from "../api.js?v=20260529a";
-import { showToast } from "../app.js?v=20260529a";
+import { braindumpApi } from "../api.js?v=20260529b";
+import { showToast } from "../app.js?v=20260529b";
 
 // ===== ユーティリティ =====
 
@@ -113,6 +113,13 @@ const IMG_REGEX = /\n?!\[[^\]]*\]\([^)]+\)\n?/g;
 const IMG_MATCH = /!\[([^\]]*)\]\(([^)]+)\)/g;
 // 行内太字 **...** （単一行内、`**` を含まない）
 const BOLD_MATCH = /\*\*([^\n*][^\n]*?)\*\*/g;
+// 文字サイズ <span style="font-size:Xem">...</span>（中身に <br>/<strong>/改行を含み得る）
+const SIZE_SPAN_MATCH = /<span\s+style="font-size:\s*([0-9.]+)em\s*">([\s\S]*?)<\/span>/g;
+// 表示用に size span タグだけ剥がす（中身は残す）
+const SIZE_SPAN_STRIP = /<span\s+style="font-size:[^"]*"\s*>|<\/span>/gi;
+// 文字サイズプリセット（順送り）
+const SIZE_LEVELS = [0.8, 1.0, 1.25, 1.5, 2.0];
+const DEFAULT_SIZE = 1.0;
 
 // ===== contenteditable エディタ ↔ markdown 相互変換 =====
 
@@ -135,7 +142,7 @@ function setEditorContent(editor, markdown) {
 
   for (const seg of segments) {
     if (seg.type === "text") {
-      appendTextWithBold(editor, seg.value);
+      appendTextWithSizeAndBold(editor, seg.value);
     } else {
       editor.appendChild(createInlineImg(seg.src, seg.alt));
     }
@@ -170,6 +177,29 @@ function appendTextWithBold(parent, text) {
   if (lastIdx < text.length) appendTextLines(parent, text.slice(lastIdx));
 }
 
+/** テキストを <span style="font-size:..em"> で分割し、span 内外それぞれで bold + 改行を展開 */
+function appendTextWithSizeAndBold(parent, text) {
+  const re = new RegExp(SIZE_SPAN_MATCH.source, "g");
+  let lastIdx = 0;
+  let m;
+  while ((m = re.exec(text)) !== null) {
+    if (m.index > lastIdx) appendTextWithBold(parent, text.slice(lastIdx, m.index));
+    const em = parseFloat(m[1]);
+    const inner = m[2];
+    if (!isNaN(em) && em > 0 && em !== DEFAULT_SIZE) {
+      const span = document.createElement("span");
+      span.style.fontSize = `${em}em`;
+      appendTextWithBold(span, inner);
+      if (span.childNodes.length > 0) parent.appendChild(span);
+    } else {
+      // 1.0em（リセット相当）や不正値は素通し
+      appendTextWithBold(parent, inner);
+    }
+    lastIdx = m.index + m[0].length;
+  }
+  if (lastIdx < text.length) appendTextWithBold(parent, text.slice(lastIdx));
+}
+
 /** インライン画像 <img> 要素を生成する */
 function createInlineImg(src, alt = "画像") {
   const img = document.createElement("img");
@@ -199,6 +229,24 @@ function getEditorMarkdown(editor) {
       // アップロード中の一時画像（blob:URL）は markdown には書かない
       if (src.startsWith("blob:") || node.classList.contains("bd-inline-img-uploading")) return;
       out += `![${alt}](${src})`;
+      return;
+    }
+    // 文字サイズ <span style="font-size:..em">...</span>: そのまま再シリアライズ
+    if (tag === "SPAN") {
+      const fs = node.style && node.style.fontSize;
+      if (fs && fs.endsWith("em")) {
+        const em = parseFloat(fs);
+        if (!isNaN(em) && em > 0 && em !== DEFAULT_SIZE) {
+          const before = out.length;
+          for (const child of node.childNodes) walk(child);
+          const inner = out.slice(before);
+          if (inner === "") return;
+          out = out.slice(0, before) + `<span style="font-size:${em}em">` + inner + `</span>`;
+          return;
+        }
+      }
+      // 通常の span はスタイル無し扱い（中身だけ出力）
+      for (const child of node.childNodes) walk(child);
       return;
     }
     // 太字: <strong> または <b> を **...** に変換（中身が空白だけならマーカーを付けない）
@@ -629,7 +677,7 @@ function renderRecentEntries() {
 
     const entriesHTML = dateEntries.map((entry) => {
       const time = entry.created_at ? entry.created_at.slice(11, 16) : "";
-      const cleanContent = entry.content.replace(IMG_REGEX, " ").trim();
+      const cleanContent = entry.content.replace(IMG_REGEX, " ").replace(SIZE_SPAN_STRIP, "").trim();
       const bodyContent = stripDateHeader(cleanContent).trim();
       const title = bodyContent ? bodyContent.slice(0, 40).replace(/\n/g, " ") : "(無題)";
       const preview = bodyContent.slice(0, 80).replace(/\n/g, " ");
@@ -682,7 +730,7 @@ let suppressNextClick = false; // 長押し発火後の click を抑止
 function getEntryDisplayInfo(entryId) {
   const entry = recentEntries.find(en => en.id === entryId);
   if (!entry) return { title: "(不明なメモ)", labels: [] };
-  const cleanContent = entry.content.replace(IMG_REGEX, " ").trim();
+  const cleanContent = entry.content.replace(IMG_REGEX, " ").replace(SIZE_SPAN_STRIP, "").trim();
   const bodyContent = stripDateHeader(cleanContent).trim();
   const title = bodyContent.slice(0, 40).replace(/\n/g, " ") || "(無題)";
   return { title, labels: entry.labels || [] };
@@ -955,7 +1003,7 @@ function attachEvents() {
 // ===== ヘッダーモード切替 =====
 
 function updateHeaderForEditing(entry) {
-  const cleanContent = entry.content.replace(IMG_REGEX, " ").trim();
+  const cleanContent = entry.content.replace(IMG_REGEX, " ").replace(SIZE_SPAN_STRIP, "").trim();
   const bodyContent = stripDateHeader(cleanContent).trim();
   const title = bodyContent.slice(0, 40).replace(/\n/g, " ") || "(無題)";
   const header = document.querySelector(".braindump-header");
@@ -1329,26 +1377,137 @@ function ensureFloatingBoldToolbar() {
   tb.setAttribute("role", "toolbar");
   tb.setAttribute("aria-label", "テキスト書式");
   tb.style.display = "none";
-  tb.innerHTML = `<button type="button" class="bd-fb-bold-btn" title="太字 (Ctrl+B)" aria-label="太字"><b>B</b></button>`;
+  // flex 子要素間の空白テキストノード混入を避けるため改行なしで連結
+  tb.innerHTML = [
+    `<button type="button" class="bd-fb-btn bd-fb-bold-btn" title="太字 (Ctrl+B)" aria-label="太字"><b>B</b></button>`,
+    `<span class="bd-fb-sep" aria-hidden="true"></span>`,
+    `<button type="button" class="bd-fb-btn bd-fb-size-down-btn" title="文字を小さく" aria-label="文字を小さく">A<span class="bd-fb-sub">−</span></button>`,
+    `<button type="button" class="bd-fb-btn bd-fb-size-reset-btn" title="文字サイズをデフォルトに戻す" aria-label="文字サイズをデフォルトに戻す">A</button>`,
+    `<button type="button" class="bd-fb-btn bd-fb-size-up-btn" title="文字を大きく" aria-label="文字を大きく">A<span class="bd-fb-sup">+</span></button>`,
+  ].join("");
   document.body.appendChild(tb);
 
-  const btn = tb.querySelector(".bd-fb-bold-btn");
-  // mousedown で preventDefault: 選択範囲を保ったままトグル発火
-  btn.addEventListener("mousedown", (e) => {
-    e.preventDefault();
-    toggleBoldOnSelection();
-  });
-  // タッチでも同様に動かす（モバイル）
-  btn.addEventListener("touchstart", (e) => {
-    e.preventDefault();
-    toggleBoldOnSelection();
-  }, { passive: false });
+  // 各ボタン: mousedown で preventDefault して選択範囲を保持したまま発火
+  const bindBtn = (sel, fn) => {
+    const b = tb.querySelector(sel);
+    if (!b) return;
+    b.addEventListener("mousedown", (e) => { e.preventDefault(); fn(); });
+    b.addEventListener("touchstart", (e) => { e.preventDefault(); fn(); }, { passive: false });
+  };
+  bindBtn(".bd-fb-bold-btn", toggleBoldOnSelection);
+  bindBtn(".bd-fb-size-down-btn", () => bumpSelectionFontSize(-1));
+  bindBtn(".bd-fb-size-reset-btn", () => setSelectionFontSize(DEFAULT_SIZE));
+  bindBtn(".bd-fb-size-up-btn", () => bumpSelectionFontSize(+1));
 
   // 選択範囲が変わるたびに位置を更新
   document.addEventListener("selectionchange", updateFloatingBoldToolbarPosition);
   // 編集中のスクロール・リサイズでも追従
   window.addEventListener("scroll", updateFloatingBoldToolbarPosition, true);
   window.addEventListener("resize", updateFloatingBoldToolbarPosition);
+}
+
+// ===== 文字サイズ操作 =====
+
+/** 選択範囲の起点側にある最も近い font-size 設定を返す（無ければ DEFAULT_SIZE） */
+function getCurrentSelectionFontSize() {
+  const editor = document.getElementById("bd-new-textarea");
+  if (!editor) return DEFAULT_SIZE;
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0) return DEFAULT_SIZE;
+  let node = sel.getRangeAt(0).startContainer;
+  if (node.nodeType === Node.TEXT_NODE) node = node.parentElement;
+  while (node && node !== editor) {
+    if (node.style && node.style.fontSize && node.style.fontSize.endsWith("em")) {
+      const em = parseFloat(node.style.fontSize);
+      if (!isNaN(em) && em > 0) return em;
+    }
+    node = node.parentElement;
+  }
+  return DEFAULT_SIZE;
+}
+
+/** SIZE_LEVELS のうち em に最も近いインデックスを返す */
+function nearestSizeLevelIndex(em) {
+  let bestIdx = 1;
+  let bestDiff = Infinity;
+  for (let i = 0; i < SIZE_LEVELS.length; i++) {
+    const diff = Math.abs(SIZE_LEVELS[i] - em);
+    if (diff < bestDiff) { bestDiff = diff; bestIdx = i; }
+  }
+  return bestIdx;
+}
+
+/** 現在のサイズから dir (+1 / -1) 段階ずれた SIZE_LEVELS を適用 */
+function bumpSelectionFontSize(dir) {
+  const cur = getCurrentSelectionFontSize();
+  const idx = nearestSizeLevelIndex(cur);
+  const nextIdx = Math.max(0, Math.min(SIZE_LEVELS.length - 1, idx + dir));
+  setSelectionFontSize(SIZE_LEVELS[nextIdx]);
+}
+
+/**
+ * 選択範囲のフォントサイズを em 値に設定する。
+ * - 1.0em の場合は包む span を作らず、既存の size span のみ剥がす（リセット）。
+ * - それ以外は extract → 既存 size span を unwrap → 新規 span で包んで insert。
+ */
+function setSelectionFontSize(targetEm) {
+  const editor = document.getElementById("bd-new-textarea");
+  if (!editor) return;
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0) return;
+  const range = sel.getRangeAt(0);
+  if (!editor.contains(range.commonAncestorContainer)) return;
+  if (range.collapsed) {
+    showToast("文字を範囲選択してから操作してください");
+    return;
+  }
+  // 選択に画像が含まれる場合は適用しない（保存形式の整合のため）
+  const peek = range.cloneContents();
+  if (peek.querySelector && peek.querySelector("img")) {
+    showToast("画像を含む範囲には文字サイズを適用できません");
+    return;
+  }
+
+  if (document.activeElement !== editor) editor.focus({ preventScroll: true });
+
+  const fragment = range.extractContents();
+
+  // fragment 内の既存 size span は中身を残してアンラップ
+  const existingSizeSpans = fragment.querySelectorAll("span");
+  existingSizeSpans.forEach((s) => {
+    if (s.style && s.style.fontSize && s.style.fontSize.endsWith("em")) {
+      while (s.firstChild) s.parentNode.insertBefore(s.firstChild, s);
+      s.remove();
+    }
+  });
+
+  // 選択を新しい挿入物の中身に再設定（連続操作しやすく）
+  const newRange = document.createRange();
+  if (Math.abs(targetEm - DEFAULT_SIZE) < 1e-3) {
+    // リセット: 包まずそのまま戻す。fragment の最初/最後の子を先に掴んでおく
+    const firstChild = fragment.firstChild;
+    const lastChild = fragment.lastChild;
+    range.insertNode(fragment);
+    if (firstChild && lastChild) {
+      newRange.setStartBefore(firstChild);
+      newRange.setEndAfter(lastChild);
+    } else {
+      // fragment が空（イレギュラー） → 元の collapse 位置に置く
+      newRange.setStart(range.startContainer, range.startOffset);
+      newRange.collapse(true);
+    }
+  } else {
+    const span = document.createElement("span");
+    span.style.fontSize = `${targetEm}em`;
+    span.appendChild(fragment);
+    range.insertNode(span);
+    newRange.selectNodeContents(span);
+  }
+  sel.removeAllRanges();
+  sel.addRange(newRange);
+
+  editor.dispatchEvent(new Event("input", { bubbles: true }));
+  requestAnimationFrame(updateFloatingBoldToolbarPosition);
 }
 
 function updateFloatingBoldToolbarPosition() {

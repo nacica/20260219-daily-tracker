@@ -5028,12 +5028,13 @@ main.swipe-enter-right {
   font-weight: 700;
 }
 
-/* 選択時に浮かぶ太字ツールバー（body 直下に挿入される単一要素） */
+/* 選択時に浮かぶ書式ツールバー（body 直下に挿入される単一要素） */
 .bd-floating-bold-toolbar {
   position: absolute;
   z-index: 9999;
   display: flex;
   align-items: center;
+  gap: 2px;
   padding: 4px;
   border-radius: 8px;
   background: rgba(20, 24, 34, 0.96);
@@ -5043,9 +5044,9 @@ main.swipe-enter-right {
   -webkit-user-select: none;
 }
 
-.bd-floating-bold-toolbar .bd-fb-bold-btn {
+.bd-floating-bold-toolbar .bd-fb-btn {
   display: inline-flex;
-  align-items: center;
+  align-items: baseline;
   justify-content: center;
   min-width: 32px;
   height: 32px;
@@ -5058,14 +5059,44 @@ main.swipe-enter-right {
   font-weight: 700;
   cursor: pointer;
   transition: background 0.12s;
+  line-height: 32px;
 }
 
-.bd-floating-bold-toolbar .bd-fb-bold-btn:hover {
+.bd-floating-bold-toolbar .bd-fb-btn:hover {
   background: rgba(255, 255, 255, 0.12);
 }
 
-.bd-floating-bold-toolbar .bd-fb-bold-btn:active {
+.bd-floating-bold-toolbar .bd-fb-btn:active {
   background: rgba(255, 255, 255, 0.20);
+}
+
+/* B と サイズボタン群の間の縦罫線 */
+.bd-floating-bold-toolbar .bd-fb-sep {
+  display: inline-block;
+  width: 1px;
+  height: 18px;
+  margin: 0 4px;
+  background: rgba(255, 255, 255, 0.18);
+}
+
+/* A- / A+ の上下添字 */
+.bd-floating-bold-toolbar .bd-fb-sub,
+.bd-floating-bold-toolbar .bd-fb-sup {
+  font-size: 0.7rem;
+  margin-left: 1px;
+  font-weight: 600;
+}
+.bd-floating-bold-toolbar .bd-fb-sup {
+  vertical-align: super;
+}
+.bd-floating-bold-toolbar .bd-fb-sub {
+  vertical-align: sub;
+}
+
+/* リセット A は少し小さめに */
+.bd-floating-bold-toolbar .bd-fb-size-reset-btn {
+  font-size: 0.95rem;
+  font-weight: 600;
 }
 
 [data-theme="light"] .bd-floating-bold-toolbar {
