@@ -5,8 +5,8 @@
  * ラベル機能: メモごとに複数ラベル付与可、ラベルOR検索、専用管理モーダル。
  */
 
-import { braindumpApi } from "../api.js?v=20260529b";
-import { showToast } from "../app.js?v=20260529b";
+import { braindumpApi } from "../api.js?v=20260529c";
+import { showToast } from "../app.js?v=20260529c";
 
 // ===== ユーティリティ =====
 
@@ -1447,15 +1447,18 @@ function bumpSelectionFontSize(dir) {
 
 /**
  * 選択範囲のフォントサイズを em 値に設定する。
- * - 1.0em の場合は包む span を作らず、既存の size span のみ剥がす（リセット）。
- * - それ以外は extract → 既存 size span を unwrap → 新規 span で包んで insert。
+ * 重要: 選択範囲を囲む size span 祖先がある場合は、まず span を分割して
+ * 選択範囲を span の外側に「持ち上げる」。これにより
+ *  - リセット(1.0em)時に外側の span が消えず残るバグを防ぐ
+ *  - 連続適用時に em がネスト累積して 1.25 * 1.5 = 1.875em のように
+ *    意図しないサイズになるのを防ぐ
  */
 function setSelectionFontSize(targetEm) {
   const editor = document.getElementById("bd-new-textarea");
   if (!editor) return;
   const sel = window.getSelection();
   if (!sel || sel.rangeCount === 0) return;
-  const range = sel.getRangeAt(0);
+  let range = sel.getRangeAt(0);
   if (!editor.contains(range.commonAncestorContainer)) return;
   if (range.collapsed) {
     showToast("文字を範囲選択してから操作してください");
@@ -1470,21 +1473,31 @@ function setSelectionFontSize(targetEm) {
 
   if (document.activeElement !== editor) editor.focus({ preventScroll: true });
 
-  const fragment = range.extractContents();
+  // ① 選択範囲を囲む size span 祖先を全て分割し、選択部分を「外側」に持ち上げる
+  //    （複数階層ネストしているケースに備え繰り返す）
+  for (let safety = 0; safety < 5; safety++) {
+    const enclosing = findEnclosingSizeSpan(editor, range);
+    if (!enclosing) break;
+    const lifted = splitSizeSpanAroundRange(enclosing, range);
+    if (!lifted) {
+      updateFloatingBoldToolbarPosition();
+      return;
+    }
+    range = lifted;
+  }
 
-  // fragment 内の既存 size span は中身を残してアンラップ
-  const existingSizeSpans = fragment.querySelectorAll("span");
-  existingSizeSpans.forEach((s) => {
+  // ② 選択範囲を抽出し、内部に残った size span もアンラップ
+  const fragment = range.extractContents();
+  fragment.querySelectorAll("span").forEach((s) => {
     if (s.style && s.style.fontSize && s.style.fontSize.endsWith("em")) {
       while (s.firstChild) s.parentNode.insertBefore(s.firstChild, s);
       s.remove();
     }
   });
 
-  // 選択を新しい挿入物の中身に再設定（連続操作しやすく）
+  // ③ 1.0em ならそのまま戻す。それ以外は新しい size span で包んで戻す。
   const newRange = document.createRange();
   if (Math.abs(targetEm - DEFAULT_SIZE) < 1e-3) {
-    // リセット: 包まずそのまま戻す。fragment の最初/最後の子を先に掴んでおく
     const firstChild = fragment.firstChild;
     const lastChild = fragment.lastChild;
     range.insertNode(fragment);
@@ -1492,7 +1505,6 @@ function setSelectionFontSize(targetEm) {
       newRange.setStartBefore(firstChild);
       newRange.setEndAfter(lastChild);
     } else {
-      // fragment が空（イレギュラー） → 元の collapse 位置に置く
       newRange.setStart(range.startContainer, range.startOffset);
       newRange.collapse(true);
     }
@@ -1508,6 +1520,71 @@ function setSelectionFontSize(targetEm) {
 
   editor.dispatchEvent(new Event("input", { bubbles: true }));
   requestAnimationFrame(updateFloatingBoldToolbarPosition);
+}
+
+/** 選択範囲を完全に内包する最も内側の size span (font-size 指定の span) を返す。無ければ null */
+function findEnclosingSizeSpan(editor, range) {
+  let node = range.commonAncestorContainer;
+  if (node.nodeType === Node.TEXT_NODE) node = node.parentElement;
+  while (node && node !== editor) {
+    if (node.tagName === "SPAN" && node.style && node.style.fontSize && node.style.fontSize.endsWith("em")) {
+      return node;
+    }
+    node = node.parentElement;
+  }
+  return null;
+}
+
+/**
+ * span に完全に内包される range について、span を
+ *   [before-span (same fontSize)] [middle (unwrapped)] [after-span (same fontSize)]
+ * の3つに分解する。中央のアンラップ済みコンテンツを選択する新しい range を返す。
+ */
+function splitSizeSpanAroundRange(span, range) {
+  const fontSize = span.style.fontSize;
+  const parent = span.parentNode;
+  if (!parent) return null;
+
+  // 末尾側を先に切り出す: 先頭側を切ると range の参照オフセットがずれる可能性があるため
+  const afterRange = document.createRange();
+  afterRange.selectNodeContents(span);
+  afterRange.setStart(range.endContainer, range.endOffset);
+  const afterFrag = afterRange.extractContents();
+
+  const beforeRange = document.createRange();
+  beforeRange.selectNodeContents(span);
+  beforeRange.setEnd(range.startContainer, range.startOffset);
+  const beforeFrag = beforeRange.extractContents();
+
+  // span 前に before 用 size span を挿入
+  if (beforeFrag.firstChild) {
+    const bs = document.createElement("span");
+    bs.style.fontSize = fontSize;
+    bs.appendChild(beforeFrag);
+    parent.insertBefore(bs, span);
+  }
+  // span 後ろに after 用 size span を挿入
+  if (afterFrag.firstChild) {
+    const as_ = document.createElement("span");
+    as_.style.fontSize = fontSize;
+    as_.appendChild(afterFrag);
+    parent.insertBefore(as_, span.nextSibling);
+  }
+
+  // span の中身を持ち上げ、span 自体は削除
+  const middleFrag = document.createDocumentFragment();
+  while (span.firstChild) middleFrag.appendChild(span.firstChild);
+  const firstMid = middleFrag.firstChild;
+  const lastMid = middleFrag.lastChild;
+  parent.insertBefore(middleFrag, span);
+  span.remove();
+
+  if (!firstMid || !lastMid) return null;
+
+  const newRange = document.createRange();
+  newRange.setStartBefore(firstMid);
+  newRange.setEndAfter(lastMid);
+  return newRange;
 }
 
 function updateFloatingBoldToolbarPosition() {
