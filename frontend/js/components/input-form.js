@@ -5,14 +5,14 @@
  * 朝のタスク整理（ソクラテス式問答）統合
  */
 
-import { recordsApi, analysisApi, morningDialogueApi, remindersApi, categoriesApi } from "../api.js?v=20260529e";
-import { showToast } from "../app.js?v=20260529e";
-import { showTaskCompleteAnimation } from "./task-stats.js?v=20260529e";
+import { recordsApi, analysisApi, morningDialogueApi, remindersApi, categoriesApi } from "../api.js?v=20260530a";
+import { showToast } from "../app.js?v=20260530a";
+import { showTaskCompleteAnimation } from "./task-stats.js?v=20260530a";
 import {
   attachFloatingToolbar,
   appendMarkdownToEditor,
   serializeEditorMarkdown,
-} from "../floating-toolbar.js?v=20260529e";
+} from "../floating-toolbar.js?v=20260530a";
 
 /** contenteditable div / textarea いずれでも markdown を読み書きするヘルパ */
 function readEditableMarkdown(el) {

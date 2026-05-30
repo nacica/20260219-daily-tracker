@@ -24,7 +24,6 @@ export const DEFAULT_SIZE = 1.0;
 export const SIZE_SPAN_STRIP = /<span\s+style="font-size:[^"]*"\s*>|<\/span>/gi;
 
 const BOLD_MATCH = /\*\*([^\n*][^\n]*?)\*\*/g;
-const SIZE_SPAN_MATCH = /<span\s+style="font-size:\s*([0-9.]+)em\s*">([\s\S]*?)<\/span>/g;
 
 // ========== エディタ登録 ==========
 
@@ -330,25 +329,52 @@ function appendTextWithBold(parent, text) {
   if (lastIdx < text.length) appendTextLines(parent, text.slice(lastIdx));
 }
 
+// 過去のバグで <span size=1.5><span size=1.25>X</span></span> のような入れ子が
+// 保存データに混入することがあった。非貪欲な単発正規表現マッチでは入れ子に対応できず、
+// 最初の </span> で止まってしまい残りがリテラル <span> 文字として描画される。
+// open/close をスタックで追跡し、最も内側の size を有効として平坦化する。
 function appendTextWithSizeAndBold(parent, text) {
-  const re = new RegExp(SIZE_SPAN_MATCH.source, "g");
-  let lastIdx = 0;
+  const openRe = /<span\s+style="font-size:\s*([0-9.]+)em\s*">/g;
+  const closeRe = /<\/span>/g;
+  const tokens = [];
   let m;
-  while ((m = re.exec(text)) !== null) {
-    if (m.index > lastIdx) appendTextWithBold(parent, text.slice(lastIdx, m.index));
-    const em = parseFloat(m[1]);
-    const inner = m[2];
-    if (!isNaN(em) && em > 0 && em !== DEFAULT_SIZE) {
-      const span = document.createElement("span");
-      span.style.fontSize = `${em}em`;
-      appendTextWithBold(span, inner);
-      if (span.childNodes.length > 0) parent.appendChild(span);
-    } else {
-      appendTextWithBold(parent, inner);
-    }
-    lastIdx = m.index + m[0].length;
+  while ((m = openRe.exec(text)) !== null) {
+    tokens.push({ type: "open", em: parseFloat(m[1]), start: m.index, end: m.index + m[0].length });
   }
-  if (lastIdx < text.length) appendTextWithBold(parent, text.slice(lastIdx));
+  while ((m = closeRe.exec(text)) !== null) {
+    tokens.push({ type: "close", start: m.index, end: m.index + m[0].length });
+  }
+  tokens.sort((a, b) => a.start - b.start);
+
+  const sizeStack = [];
+  const emitText = (txt) => {
+    if (!txt) return;
+    let effectiveSize = null;
+    for (let i = sizeStack.length - 1; i >= 0; i--) {
+      const em = sizeStack[i];
+      if (!isNaN(em) && em > 0 && em !== DEFAULT_SIZE) { effectiveSize = em; break; }
+    }
+    if (effectiveSize == null) {
+      appendTextWithBold(parent, txt);
+    } else {
+      const span = document.createElement("span");
+      span.style.fontSize = `${effectiveSize}em`;
+      appendTextWithBold(span, txt);
+      if (span.childNodes.length > 0) parent.appendChild(span);
+    }
+  };
+
+  let pos = 0;
+  for (const tok of tokens) {
+    if (tok.start > pos) emitText(text.slice(pos, tok.start));
+    if (tok.type === "open") {
+      sizeStack.push(tok.em);
+    } else if (sizeStack.length > 0) {
+      sizeStack.pop();
+    }
+    pos = tok.end;
+  }
+  if (pos < text.length) emitText(text.slice(pos));
 }
 
 /**
