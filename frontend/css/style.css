@@ -7763,7 +7763,8 @@ div.journal-textarea.is-empty::before {
   white-space: normal;
 }
 
-.reminder-modal-textarea {
+.reminder-modal-textarea,
+.reminder-modal-editor {
   width: 100%;
   flex: 1 1 auto;
   min-height: 0;
@@ -7782,7 +7783,15 @@ div.journal-textarea.is-empty::before {
   -webkit-overflow-scrolling: touch;
 }
 
-.reminder-modal-textarea:focus {
+.reminder-modal-editor {
+  outline: none;
+  cursor: text;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.reminder-modal-textarea:focus,
+.reminder-modal-editor:focus {
   outline: none;
   border-color: var(--cyan, var(--cyan-dim));
 }
@@ -7860,7 +7869,8 @@ div.journal-textarea.is-empty::before {
     min-height: 100px;
   }
   .reminder-modal-text,
-  .reminder-modal-textarea {
+  .reminder-modal-textarea,
+  .reminder-modal-editor {
     /* font-size はユーザー設定（--reminder-modal-text-size）を優先 */
   }
 }

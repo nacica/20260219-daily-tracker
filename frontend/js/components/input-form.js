@@ -5,14 +5,14 @@
  * 朝のタスク整理（ソクラテス式問答）統合
  */
 
-import { recordsApi, analysisApi, morningDialogueApi, remindersApi, categoriesApi } from "../api.js?v=20260530a";
-import { showToast } from "../app.js?v=20260530a";
-import { showTaskCompleteAnimation } from "./task-stats.js?v=20260530a";
+import { recordsApi, analysisApi, morningDialogueApi, remindersApi, categoriesApi } from "../api.js?v=20260603a";
+import { showToast } from "../app.js?v=20260603a";
+import { showTaskCompleteAnimation } from "./task-stats.js?v=20260603a";
 import {
   attachFloatingToolbar,
   appendMarkdownToEditor,
   serializeEditorMarkdown,
-} from "../floating-toolbar.js?v=20260530a";
+} from "../floating-toolbar.js?v=20260603a";
 
 /** contenteditable div / textarea いずれでも markdown を読み書きするヘルパ */
 function readEditableMarkdown(el) {
@@ -1317,18 +1317,23 @@ function renderReminderModalContent() {
   const body = document.getElementById("reminder-modal-body");
   if (body) {
     if (reminderModalEditing) {
-      body.innerHTML = `<textarea class="reminder-modal-textarea" id="reminder-modal-textarea" rows="8"></textarea>`;
-      const ta = document.getElementById("reminder-modal-textarea");
-      if (ta) {
-        ta.value = target.text;
-        ta.dataset.id = target.id;
-        ta.dataset.original = target.text;
-        // モーダル側ではCSSのflex伸縮(flex:1 1 auto + overflow-y:auto)に任せる。
-        // autoResizeTextarea で scrollHeight に高さを伸ばすと、textarea が
-        // モーダルを突き抜けて内部スクロールできなくなるため呼ばない。
+      body.innerHTML = `<div class="reminder-modal-editor" id="reminder-modal-editor" contenteditable="true" spellcheck="false"></div>`;
+      const ed = document.getElementById("reminder-modal-editor");
+      if (ed) {
+        ed.dataset.id = target.id;
+        appendMarkdownToEditor(ed, target.text);
+        // ロード直後のシリアライズ結果を「変更なし」基準にする
+        // (target.text と serialize 結果は等価でも文字列としては微差が出るため)
+        ed.dataset.original = serializeEditorMarkdown(ed);
+        attachFloatingToolbar(ed);
         setTimeout(() => {
-          ta.focus();
-          ta.setSelectionRange(ta.value.length, ta.value.length);
+          ed.focus();
+          const range = document.createRange();
+          range.selectNodeContents(ed);
+          range.collapse(false);
+          const sel = window.getSelection();
+          sel.removeAllRanges();
+          sel.addRange(range);
         }, 30);
       }
     } else {
@@ -1455,18 +1460,18 @@ function renderReminderModalButtons() {
 }
 
 function saveReminderModalEdit() {
-  const textarea = document.getElementById("reminder-modal-textarea");
-  if (!textarea) return;
-  const id = textarea.dataset.id;
-  const original = textarea.dataset.original ?? "";
-  const newText = textarea.value.trim();
+  const ed = document.getElementById("reminder-modal-editor");
+  if (!ed) return;
+  const id = ed.dataset.id;
+  const original = ed.dataset.original ?? "";
+  const newText = serializeEditorMarkdown(ed).trim();
   if (!id || !newText || newText === original) return;
   const reminders = getReminders();
   const target = reminders.find((r) => r.id === id);
   if (!target) return;
   target.text = newText;
   saveReminders(reminders);
-  textarea.dataset.original = newText;
+  ed.dataset.original = newText;
   refreshStickyNotes();
 }
 
