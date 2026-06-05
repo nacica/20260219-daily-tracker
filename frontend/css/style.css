@@ -398,6 +398,11 @@ body {
   padding: env(safe-area-inset-top, 48px) var(--gap) 0;
 }
 
+/* リサイズハンドルはデスクトップ専用（min-width:1024px の中で再定義） */
+.nav-resize-handle {
+  display: none;
+}
+
 /* Cyan accent line at the very top */
 .nav::before {
   content: '';
@@ -3501,6 +3506,47 @@ textarea {
     z-index: 200;
     overflow-y: auto;
     overflow-x: hidden;
+  }
+
+  /* ── Sidebar resize handle ── */
+  .nav-resize-handle {
+    display: block;
+    position: fixed;
+    top: 0;
+    left: var(--sidebar-w);
+    width: 10px;
+    height: 100vh;
+    margin-left: -5px;
+    cursor: col-resize;
+    z-index: 250;
+    background: transparent;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  .nav-resize-handle::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 50%;
+    width: 1px;
+    background: transparent;
+    transform: translateX(-50%);
+    transition: background 0.15s ease, width 0.15s ease, box-shadow 0.15s ease;
+    pointer-events: none;
+  }
+  .nav-resize-handle:hover::after,
+  .nav-resize-handle.dragging::after {
+    width: 3px;
+    background: var(--cyan);
+    box-shadow: 0 0 8px rgba(0, 212, 255, 0.6);
+  }
+  body.nav-resizing,
+  body.nav-resizing * {
+    cursor: col-resize !important;
+    user-select: none !important;
+    -webkit-user-select: none !important;
   }
 
   /* Accent line on right edge */
