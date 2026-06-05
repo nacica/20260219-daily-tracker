@@ -5,14 +5,14 @@
  * 朝のタスク整理（ソクラテス式問答）統合
  */
 
-import { recordsApi, analysisApi, morningDialogueApi, remindersApi, categoriesApi } from "../api.js?v=20260603a";
-import { showToast } from "../app.js?v=20260603a";
-import { showTaskCompleteAnimation } from "./task-stats.js?v=20260603a";
+import { recordsApi, analysisApi, morningDialogueApi, remindersApi, categoriesApi } from "../api.js?v=20260605a";
+import { showToast } from "../app.js?v=20260605a";
+import { showTaskCompleteAnimation } from "./task-stats.js?v=20260605a";
 import {
   attachFloatingToolbar,
   appendMarkdownToEditor,
   serializeEditorMarkdown,
-} from "../floating-toolbar.js?v=20260603a";
+} from "../floating-toolbar.js?v=20260605a";
 
 /** contenteditable div / textarea いずれでも markdown を読み書きするヘルパ */
 function readEditableMarkdown(el) {
@@ -93,21 +93,41 @@ function preserveBlankLines(text) {
   }).join("");
 }
 
+// 行頭の半角スペース／タブを NBSP(U+00A0) に変換し、Markdown の
+// "indented code block"(行頭 4 スペース以上で <pre><code> 化) を抑止する。
+// ユーザは文頭インデント用に行頭スペース/タブを使うため、視覚的な
+// インデント幅は保持する必要がある。NBSP は通常スペースと同幅で描画され、
+// かつ Markdown のインデント判定対象外なので、両方を満たせる。
+// タブは 4 NBSP 相当に展開。フェンスコードブロック内は対象外。
+function escapeLeadingIndent(text) {
+  const NBSP = " ";
+  const parts = text.split(/(^```[\s\S]*?^```)/m);
+  return parts.map((part, i) => {
+    if (i % 2 === 1) return part;
+    return part.replace(/^[ \t]+/gm, (ws) => {
+      let out = "";
+      for (const c of ws) out += (c === "\t") ? NBSP + NBSP + NBSP + NBSP : NBSP;
+      return out;
+    });
+  }).join("");
+}
+
 /** Markdown を sanitize 済み HTML へ変換。未ロード時はエスケープ + 改行のみで応急描画。 */
 function renderStickyMd(text) {
   if (!text) return "";
   const m = window.marked;
   const p = window.DOMPurify;
+  const safeText = escapeLeadingIndent(text);
   if (m && p) {
     try {
-      const raw = mdParseToHtml(m, preserveBlankLines(text));
+      const raw = mdParseToHtml(m, preserveBlankLines(safeText));
       return p.sanitize(raw, { USE_PROFILES: { html: true } });
     } catch {
-      return escapeHTML(text).replace(/\n/g, "<br>");
+      return escapeHTML(safeText).replace(/\n/g, "<br>");
     }
   }
   ensureMdLibsForRefresh();
-  return escapeHTML(text).replace(/\n/g, "<br>");
+  return escapeHTML(safeText).replace(/\n/g, "<br>");
 }
 
 /** ライブラリ未ロード時にバックグラウンドでロードし、完了後に描画を差し替える。 */
