@@ -5,14 +5,14 @@
  * 朝のタスク整理（ソクラテス式問答）統合
  */
 
-import { recordsApi, analysisApi, morningDialogueApi, remindersApi, categoriesApi } from "../api.js?v=20260605c";
-import { showToast } from "../app.js?v=20260605c";
-import { showTaskCompleteAnimation } from "./task-stats.js?v=20260605c";
+import { recordsApi, analysisApi, morningDialogueApi, remindersApi, categoriesApi } from "../api.js?v=20260605d";
+import { showToast } from "../app.js?v=20260605d";
+import { showTaskCompleteAnimation } from "./task-stats.js?v=20260605d";
 import {
   attachFloatingToolbar,
   appendMarkdownToEditor,
   serializeEditorMarkdown,
-} from "../floating-toolbar.js?v=20260605c";
+} from "../floating-toolbar.js?v=20260605d";
 
 /** contenteditable div / textarea いずれでも markdown を読み書きするヘルパ */
 function readEditableMarkdown(el) {
@@ -2006,7 +2006,8 @@ function buildTaskItem(taskText, isCompleted) {
     <li class="task-item${isCompleted ? " completed" : ""}">
       ${!isCompleted ? `<span class="task-drag-handle" title="ドラッグで並べ替え">⠿</span>` : ""}
       <input type="checkbox" ${isCompleted ? "checked" : ""} data-task="${escapeHTML(taskText)}" />
-      ${buildCategoryBadge(category)}<span>${escapeHTML(text)}</span>
+      ${buildCategoryBadge(category)}<span class="task-text">${escapeHTML(text)}</span>
+      <button class="task-edit" data-edit="${escapeHTML(taskText)}" title="編集">✎</button>
       ${!isCompleted ? `<button class="task-move-backlog" data-to-backlog="${escapeHTML(taskText)}" title="近日中へ移動">▼</button>` : ""}
       <button class="task-remove" data-remove="${escapeHTML(taskText)}" title="削除">✕</button>
     </li>`;
@@ -2017,10 +2018,72 @@ function buildBacklogItem(taskText) {
   return `
     <li class="task-item backlog-item">
       <span class="task-drag-handle" title="ドラッグで並べ替え">⠿</span>
-      ${buildCategoryBadge(category)}<span>${escapeHTML(text)}</span>
+      ${buildCategoryBadge(category)}<span class="task-text">${escapeHTML(text)}</span>
+      <button class="task-edit" data-edit="${escapeHTML(taskText)}" title="編集">✎</button>
       <button class="task-move-today" data-to-today="${escapeHTML(taskText)}" title="今日やるへ昇格">▲</button>
       <button class="task-remove" data-remove="${escapeHTML(taskText)}" title="削除">✕</button>
     </li>`;
+}
+
+/**
+ * タスクをインライン編集モードに切り替える。
+ * 編集対象はテキスト部分のみ（カテゴリは維持）。Enter / blur で保存、Esc でキャンセル。
+ * 保存時は li 内の data-* 属性（data-task / data-remove / data-edit / data-to-backlog or data-to-today）も
+ * 新しいテキストに揃える。これらは saveDataQuietly() と submitForm() がタスク収集に使うため、
+ * 1 つでも古いままだと保存値が壊れる。
+ * onSave は attachFormEvents 内の saveDataQuietly を呼び出すための注入。
+ */
+function startTaskEdit(editBtn, onSave) {
+  const li = editBtn.closest("li");
+  if (!li || li.querySelector(".task-edit-input")) return;
+
+  const oldFullText = editBtn.dataset.edit;
+  const { category, text: oldText } = parseTaskCategory(oldFullText);
+  const textSpan = li.querySelector(".task-text");
+  if (!textSpan) return;
+
+  const input = document.createElement("input");
+  input.type = "text";
+  input.className = "task-edit-input";
+  input.value = oldText;
+  textSpan.replaceWith(input);
+  input.focus();
+  input.select();
+
+  let done = false;
+
+  function finish(save) {
+    if (done) return;
+    done = true;
+    const newText = save ? input.value.trim() : "";
+    const finalText = newText || oldText;
+    const newFullText = formatTaskWithCategory(finalText, category);
+
+    const newSpan = document.createElement("span");
+    newSpan.className = "task-text";
+    newSpan.textContent = finalText;
+    input.replaceWith(newSpan);
+
+    // li 内の data-* 属性を新しいテキストに揃える（保存時の収集元）
+    const cb = li.querySelector('input[type="checkbox"]');
+    if (cb) cb.dataset.task = newFullText;
+    const eBtn = li.querySelector(".task-edit");
+    if (eBtn) eBtn.dataset.edit = newFullText;
+    const rBtn = li.querySelector(".task-remove");
+    if (rBtn) rBtn.dataset.remove = newFullText;
+    const bBtn = li.querySelector(".task-move-backlog");
+    if (bBtn) bBtn.dataset.toBacklog = newFullText;
+    const tBtn = li.querySelector(".task-move-today");
+    if (tBtn) tBtn.dataset.toToday = newFullText;
+
+    if (newFullText !== oldFullText && typeof onSave === "function") onSave();
+  }
+
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); finish(true); }
+    else if (e.key === "Escape") { e.preventDefault(); finish(false); }
+  });
+  input.addEventListener("blur", () => finish(true));
 }
 
 function syncCompletedCard() {
@@ -2657,6 +2720,11 @@ function attachFormEvents(date, isEdit) {
       syncCompletedCard();
       syncBacklogCount();
       saveDataQuietly();
+      return;
+    }
+    // 編集ボタン
+    if (e.target.dataset.edit !== undefined) {
+      startTaskEdit(e.target, saveDataQuietly);
       return;
     }
     // 「近日中へ移動」ボタン

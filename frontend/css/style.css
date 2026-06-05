@@ -961,6 +961,38 @@ textarea {
 
 .task-remove:hover { color: var(--neon-red); }
 
+/* タスク編集ボタン */
+.task-edit {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.95rem;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: color 0.2s, background 0.2s;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.task-edit:hover {
+  color: var(--cyan);
+  background: rgba(0, 212, 255, 0.1);
+}
+
+/* タスク編集中のインライン入力欄 */
+.task-edit-input {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.9rem;
+  padding: 4px 8px;
+  background: var(--bg-input);
+  color: var(--text-primary);
+  border: 1px solid var(--cyan);
+  border-radius: var(--radius-sm);
+  outline: none;
+  font-family: inherit;
+}
+
 /* 近日中タスク移動ボタン */
 .task-move-backlog,
 .task-move-today {
