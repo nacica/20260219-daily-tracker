@@ -5,14 +5,14 @@
  * 朝のタスク整理（ソクラテス式問答）統合
  */
 
-import { recordsApi, analysisApi, morningDialogueApi, remindersApi, categoriesApi } from "../api.js?v=20260605b";
-import { showToast } from "../app.js?v=20260605b";
-import { showTaskCompleteAnimation } from "./task-stats.js?v=20260605b";
+import { recordsApi, analysisApi, morningDialogueApi, remindersApi, categoriesApi } from "../api.js?v=20260605c";
+import { showToast } from "../app.js?v=20260605c";
+import { showTaskCompleteAnimation } from "./task-stats.js?v=20260605c";
 import {
   attachFloatingToolbar,
   appendMarkdownToEditor,
   serializeEditorMarkdown,
-} from "../floating-toolbar.js?v=20260605b";
+} from "../floating-toolbar.js?v=20260605c";
 
 /** contenteditable div / textarea いずれでも markdown を読み書きするヘルパ */
 function readEditableMarkdown(el) {
@@ -1985,7 +1985,7 @@ function buildFormHTML(date, record, tasks, isEdit, morningDialogue, isRestDay =
     </div>
 
     <div class="col-toggle-bar" id="col-toggle-bar">
-      ${[2, 3, 4].map((n) => `<button class="col-toggle-btn${n === getColumnCount() ? " active" : ""}" data-cols="${n}">${n}列</button>`).join("")}
+      ${[1, 2, 3, 4].map((n) => `<button class="col-toggle-btn${n === getColumnCount() ? " active" : ""}" data-cols="${n}">${n}列</button>`).join("")}
     </div>
 
     <div class="input-grid" id="input-grid" data-columns="${getColumnCount()}">
