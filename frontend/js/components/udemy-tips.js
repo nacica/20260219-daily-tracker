@@ -8,8 +8,8 @@
  *   - 編集モーダル内のみ自動保存タイマーが動く
  */
 
-import { udemyTipsApi } from "../api.js?v=20260606b";
-import { showToast } from "../app.js?v=20260606b";
+import { udemyTipsApi } from "../api.js?v=20260606c";
+import { showToast } from "../app.js?v=20260606c";
 
 // ===== ユーティリティ =====
 
@@ -48,7 +48,7 @@ function stripDateHeader(text) {
  *  を HTML に変換する（要：HTMLエスケープ済み文字列）。
  *  色/ハイライト span だけはエスケープを解除してそのまま描画する（任意 HTML は許可しない）。 */
 function renderInlineRich(escapedText) {
-  let html = escapedText.replace(/\*\*([^\n*][^\n]*?)\*\*/g, "<strong>$1</strong>");
+  let html = escapedText.replace(/\*\*([\s\S]+?)\*\*/g, "<strong>$1</strong>");
   html = html.replace(
     /&lt;span style=&quot;color:(.+?)&quot;&gt;([\s\S]*?)&lt;\/span&gt;/g,
     '<span style="color:$1">$2</span>'
@@ -63,7 +63,7 @@ function renderInlineRich(escapedText) {
 /** 書式マーカー (`**...**`、`<span style="...">...</span>`) を取り除き中身だけ残す */
 function stripRichMarkers(s) {
   return s
-    .replace(/\*\*([^\n*][^\n]*?)\*\*/g, "$1")
+    .replace(/\*\*([\s\S]+?)\*\*/g, "$1")
     .replace(/<span\s+style="[^"]*">([\s\S]*?)<\/span>/g, "$1");
 }
 
@@ -2079,7 +2079,7 @@ function flattenSpansInSelection(editor) {
 function loadTextIntoEditor(editor, text) {
   if (!editor) return;
   let html = escapeHTML(text || "");
-  html = html.replace(/\*\*([^\n*][^\n]*?)\*\*/g, "<strong>$1</strong>");
+  html = html.replace(/\*\*([\s\S]+?)\*\*/g, "<strong>$1</strong>");
   html = html.replace(
     /&lt;span style=&quot;color:(.+?)&quot;&gt;([\s\S]*?)&lt;\/span&gt;/g,
     '<span style="color:$1">$2</span>'
