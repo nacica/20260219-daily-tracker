@@ -8,8 +8,8 @@
  *   - 編集モーダル内のみ自動保存タイマーが動く
  */
 
-import { udemyTipsApi } from "../api.js?v=20260606a";
-import { showToast } from "../app.js?v=20260606a";
+import { udemyTipsApi } from "../api.js?v=20260606b";
+import { showToast } from "../app.js?v=20260606b";
 
 // ===== ユーティリティ =====
 
@@ -44,14 +44,27 @@ function stripDateHeader(text) {
   return lines.slice(i).join("\n");
 }
 
-/** Markdown 風 `**...**` を <strong> に変換（要：HTMLエスケープ済み文字列） */
-function renderInlineBold(escapedText) {
-  return escapedText.replace(/\*\*([^\n*]+?)\*\*/g, "<strong>$1</strong>");
+/** インライン書式 (`**bold**`、`<span style="color:...">`、`<span style="background-color:...">`)
+ *  を HTML に変換する（要：HTMLエスケープ済み文字列）。
+ *  色/ハイライト span だけはエスケープを解除してそのまま描画する（任意 HTML は許可しない）。 */
+function renderInlineRich(escapedText) {
+  let html = escapedText.replace(/\*\*([^\n*][^\n]*?)\*\*/g, "<strong>$1</strong>");
+  html = html.replace(
+    /&lt;span style=&quot;color:(.+?)&quot;&gt;([\s\S]*?)&lt;\/span&gt;/g,
+    '<span style="color:$1">$2</span>'
+  );
+  html = html.replace(
+    /&lt;span style=&quot;background-color:(.+?)&quot;&gt;([\s\S]*?)&lt;\/span&gt;/g,
+    '<span style="background-color:$1">$2</span>'
+  );
+  return html;
 }
 
-/** `**...**` マーカーを取り除いて中身だけ残す（カード/モーダルタイトル等で使用） */
-function stripBoldMarkers(s) {
-  return s.replace(/\*\*([^\n*]+?)\*\*/g, "$1");
+/** 書式マーカー (`**...**`、`<span style="...">...</span>`) を取り除き中身だけ残す */
+function stripRichMarkers(s) {
+  return s
+    .replace(/\*\*([^\n*][^\n]*?)\*\*/g, "$1")
+    .replace(/<span\s+style="[^"]*">([\s\S]*?)<\/span>/g, "$1");
 }
 
 function labelColor(name) {
@@ -77,7 +90,7 @@ function labelChipStyle(name) {
 function entryTitle(entry) {
   const body = stripDateHeader(entry.content || "").trim();
   if (!body) return "(無題)";
-  const firstLine = stripBoldMarkers(body.split("\n")[0]);
+  const firstLine = stripRichMarkers(body.split("\n")[0]);
   return firstLine.slice(0, 60);
 }
 
@@ -593,6 +606,8 @@ function injectStyles() {
       gap: 4px;
       margin-bottom: 6px;
       flex-shrink: 0;
+      flex-wrap: wrap;
+      align-items: center;
     }
     .ut-modal[data-mode="view"] .ut-modal-toolbar { display: none; }
     .ut-toolbar-btn {
@@ -614,9 +629,47 @@ function injectStyles() {
     .ut-toolbar-btn:hover { background: rgba(0,0,0,0.05); }
     [data-theme="dark"] .ut-toolbar-btn:hover { background: rgba(255,255,255,0.08); }
     .ut-toolbar-btn:active { transform: translateY(1px); }
+    .ut-toolbar-clear {
+      font-size: 0.72rem;
+      font-weight: 500;
+      padding: 0 6px;
+    }
+    .ut-toolbar-sep {
+      display: inline-block;
+      width: 1px;
+      height: 18px;
+      background: var(--border, #d1d5db);
+      margin: 0 2px;
+    }
+    .ut-toolbar-label {
+      font-size: 0.7rem;
+      opacity: 0.6;
+      padding: 0 2px;
+      align-self: center;
+    }
+    .ut-tb-color, .ut-tb-hl {
+      width: 22px;
+      height: 22px;
+      border: 1px solid var(--border, #d1d5db);
+      border-radius: 4px;
+      cursor: pointer;
+      padding: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: transparent;
+    }
+    .ut-tb-color { background: var(--card-bg, #fff); }
+    [data-theme="dark"] .ut-tb-color { background: #2a2f37; }
+    .ut-tb-color:hover, .ut-tb-hl:hover { transform: scale(1.08); }
+    .ut-tb-color-dot {
+      font-weight: 800;
+      font-size: 0.85rem;
+      line-height: 1;
+    }
     .ut-modal-view strong { font-weight: 700; }
     .ut-card-preview strong { font-weight: 700; }
-    .ut-modal-textarea {
+    .ut-modal-editor {
       flex: 1;
       min-height: 280px;
       width: 100%;
@@ -626,15 +679,20 @@ function injectStyles() {
       font-family: inherit;
       font-size: 0.92rem;
       line-height: 1.55;
-      resize: vertical;
       background: transparent;
       color: inherit;
+      outline: none;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+      tab-size: 4;
     }
-    .ut-modal-textarea:focus {
+    .ut-modal-editor:focus {
       outline: 2px solid var(--accent, #2563eb);
       outline-offset: -2px;
       border-color: transparent;
     }
+    .ut-modal-editor strong { font-weight: 700; }
     .ut-modal-view {
       flex: 1;
       min-height: 280px;
@@ -666,7 +724,7 @@ function injectStyles() {
     }
 
     /* ----- 閲覧/編集モード切替 ----- */
-    .ut-modal[data-mode="view"] .ut-modal-textarea { display: none; }
+    .ut-modal[data-mode="view"] .ut-modal-editor { display: none; }
     .ut-modal[data-mode="view"] .ut-modal-add-label { display: none; }
     .ut-modal[data-mode="view"] .bd-label-chip-remove { display: none; }
     .ut-modal[data-mode="view"] #ut-modal-save-btn { display: none; }
@@ -714,7 +772,7 @@ function injectStyles() {
       .ut-page { padding: 8px; }
       .ut-grid { grid-template-columns: 1fr; }
       .ut-modal { max-height: 92vh; }
-      .ut-modal-textarea { min-height: 220px; }
+      .ut-modal-editor { min-height: 220px; }
     }
   `;
   document.head.appendChild(style);
@@ -876,7 +934,7 @@ function renderCard(entry) {
     `<span class="bd-label-chip" style="${labelChipStyle(l)}">${escapeHTML(l)}</span>`
   ).join("");
   const previewHTML = preview
-    ? `<div class="ut-card-preview">${renderInlineBold(escapeHTML(preview))}</div>`
+    ? `<div class="ut-card-preview">${renderInlineRich(escapeHTML(preview))}</div>`
     : `<div class="ut-card-preview" style="opacity:0.3;">（本文なし）</div>`;
   return `
     <div class="ut-card" data-id="${entry.id}" tabindex="0">
@@ -1171,7 +1229,7 @@ function openTipModal(entry) {
   modalMode = isNew ? "edit" : "view";
 
   const contentForView = isNew ? "" : (entry.content || "");
-  const viewHTML = contentForView ? renderInlineBold(escapeHTML(contentForView)) : "";
+  const viewHTML = contentForView ? renderInlineRich(escapeHTML(contentForView)) : "";
 
   modalEl = document.createElement("div");
   modalEl.className = "ut-modal-overlay";
@@ -1191,8 +1249,9 @@ function openTipModal(entry) {
         ${renderModalLabels()}
       </div>
       <div class="ut-modal-body">
+        ${buildEditorToolbarHTML()}
         <pre class="ut-modal-view" id="ut-modal-view">${viewHTML}</pre>
-        <textarea class="ut-modal-textarea" id="ut-modal-textarea">${escapeHTML(isNew ? "" : (entry.content || ""))}</textarea>
+        <div class="ut-modal-editor" id="ut-modal-editor" contenteditable="true" spellcheck="false"></div>
       </div>
       <div class="ut-modal-footer">
         <button class="btn btn-danger btn-sm" id="ut-modal-delete-btn" title="長押しで削除"${isNew ? ' style="display:none;"' : ""}>🗑 削除</button>
@@ -1205,33 +1264,28 @@ function openTipModal(entry) {
   `;
   document.body.appendChild(modalEl);
 
-  // 新規モードの場合は日時ヘッダーを初期挿入
-  const textarea = document.getElementById("ut-modal-textarea");
-  if (isNew && textarea) {
-    textarea.value = `${formatDateTimeHeader()}\n\n`;
-    const pos = textarea.value.length;
+  // editor へ初期内容を投入。新規モードは日時ヘッダーをプレフィックスに。
+  const editor = document.getElementById("ut-modal-editor");
+  if (editor) {
+    const initialText = isNew ? `${formatDateTimeHeader()}\n\n` : (entry.content || "");
+    loadTextIntoEditor(editor, initialText);
     setTimeout(() => {
-      textarea.setSelectionRange(pos, pos);
-      textarea.focus();
+      editor.focus();
+      placeCaretAtEnd(editor);
     }, 30);
-  } else if (textarea) {
-    setTimeout(() => textarea.focus(), 30);
   }
-
-  if (textarea) attachTextareaFloatingBold(textarea);
 
   attachModalEvents();
 }
 
-/** 閲覧 → 編集モードへ切替。textarea にフォーカスし、カーソルを末尾へ */
+/** 閲覧 → 編集モードへ切替。editor にフォーカスしてカーソルを末尾へ */
 function switchToEditMode() {
   setModalMode("edit");
-  const textarea = document.getElementById("ut-modal-textarea");
-  if (textarea) {
-    textarea.focus();
-    const len = textarea.value.length;
-    textarea.setSelectionRange(len, len);
-    textarea.scrollTop = textarea.scrollHeight;
+  const editor = document.getElementById("ut-modal-editor");
+  if (editor) {
+    editor.focus();
+    placeCaretAtEnd(editor);
+    editor.scrollTop = editor.scrollHeight;
   }
 }
 
@@ -1266,11 +1320,13 @@ function attachModalEvents() {
   // 閲覧 → 編集モード切替
   document.getElementById("ut-modal-edit-btn")?.addEventListener("click", switchToEditMode);
 
-  // テキストエリア入力で自動保存
-  const textarea = document.getElementById("ut-modal-textarea");
-  textarea?.addEventListener("input", handleTextareaInput);
-  textarea?.addEventListener("keydown", handleTabInsert);
-  textarea?.addEventListener("keydown", handleBoldShortcut);
+  // contenteditable 入力で自動保存
+  const editor = document.getElementById("ut-modal-editor");
+  editor?.addEventListener("input", handleEditorInput);
+  editor?.addEventListener("keydown", handleEditorBoldShortcut);
+
+  // ツールバー（B / 色 / ハイライト / クリア）
+  attachToolbarEvents();
 
   // 削除（長押し）
   const deleteBtn = document.getElementById("ut-modal-delete-btn");
@@ -1326,8 +1382,8 @@ async function navigateTip(direction) {
 
   // 進行中の自動保存タイマーを止め、現在の内容を確実に保存
   if (newAutoSaveTimer) { clearTimeout(newAutoSaveTimer); newAutoSaveTimer = null; }
-  const textarea = document.getElementById("ut-modal-textarea");
-  const text = textarea ? textarea.value : "";
+  const editor = document.getElementById("ut-modal-editor");
+  const text = editor ? saveEditorToText(editor) : "";
   const hasText = text.trim().length > 0 && !isHeaderOnly(text);
   if (hasText) {
     if (editingEntryId) {
@@ -1379,17 +1435,16 @@ function loadTipIntoModal(entry, idx, total) {
   const navBtn = document.getElementById("ut-modal-nav-prev");
   if (navBtn) navBtn.disabled = total <= 1;
 
-  // 本文（textarea + 閲覧用 pre 両方を更新）
-  const textarea = document.getElementById("ut-modal-textarea");
-  if (textarea) {
-    textarea.value = entry.content || "";
-    textarea.scrollTop = 0;
-    textarea.setSelectionRange(0, 0);
+  // 本文（editor + 閲覧用 pre 両方を更新）
+  const editor = document.getElementById("ut-modal-editor");
+  if (editor) {
+    loadTextIntoEditor(editor, entry.content || "");
+    editor.scrollTop = 0;
   }
   const viewEl = document.getElementById("ut-modal-view");
   if (viewEl) {
     const c = entry.content || "";
-    viewEl.innerHTML = c ? renderInlineBold(escapeHTML(c)) : "";
+    viewEl.innerHTML = c ? renderInlineRich(escapeHTML(c)) : "";
     viewEl.scrollTop = 0;
   }
 
@@ -1430,8 +1485,8 @@ async function closeTipModal({ save = true } = {}) {
   if (!modalEl) return;
   if (save) {
     // 閉じる前に内容を保存（新規で空メモは作らない）
-    const textarea = document.getElementById("ut-modal-textarea");
-    const text = textarea ? textarea.value : "";
+    const editor = document.getElementById("ut-modal-editor");
+    const text = editor ? saveEditorToText(editor) : "";
     const hasText = text.trim().length > 0 && !isHeaderOnly(text);
     if (hasText) {
       if (editingEntryId) {
@@ -1445,7 +1500,6 @@ async function closeTipModal({ save = true } = {}) {
   }
   if (newAutoSaveTimer) { clearTimeout(newAutoSaveTimer); newAutoSaveTimer = null; }
   document.removeEventListener("keydown", onModalKeydown);
-  hideFloatingBoldBar();
   modalEl.remove();
   modalEl = null;
   editingEntryId = null;
@@ -1455,7 +1509,7 @@ async function closeTipModal({ save = true } = {}) {
   await refreshEntries();
 }
 
-function handleTextareaInput() {
+function handleEditorInput() {
   setDirty(true);
   if (newAutoSaveTimer) clearTimeout(newAutoSaveTimer);
   newAutoSaveTimer = setTimeout(() => {
@@ -1468,9 +1522,9 @@ function handleTextareaInput() {
 }
 
 async function autoSaveCreate() {
-  const textarea = document.getElementById("ut-modal-textarea");
-  if (!textarea) return;
-  const text = textarea.value;
+  const editor = document.getElementById("ut-modal-editor");
+  if (!editor) return;
+  const text = saveEditorToText(editor);
   if (text.trim() === "" || isHeaderOnly(text)) {
     setDirty(false);
     return;
@@ -1495,9 +1549,9 @@ async function autoSaveCreate() {
 
 async function autoSaveExisting(entryId) {
   if (!entryId) return;
-  const textarea = document.getElementById("ut-modal-textarea");
-  if (!textarea) return;
-  const content = textarea.value.trim();
+  const editor = document.getElementById("ut-modal-editor");
+  if (!editor) return;
+  const content = saveEditorToText(editor).trim();
   if (!content) return;
   try {
     const updated = await udemyTipsApi.update(entryId, content, currentLabels);
@@ -1523,8 +1577,8 @@ async function createNewEntry(content) {
 }
 
 async function saveCurrentEntry() {
-  const textarea = document.getElementById("ut-modal-textarea");
-  const content = textarea?.value.trim() || "";
+  const editor = document.getElementById("ut-modal-editor");
+  const content = editor ? saveEditorToText(editor).trim() : "";
   if (!content) {
     setDirty(false);
     await closeTipModal({ save: false });
@@ -1846,213 +1900,241 @@ async function openLabelsManager() {
   });
 }
 
-// ===== Tab キー処理 =====
+// ===== contenteditable 用エディタ補助 =====
 
-function handleTabInsert(e) {
-  if (e.key !== "Tab" || e.shiftKey || e.ctrlKey || e.metaKey || e.altKey) return;
-  e.preventDefault();
-  const ta = e.target;
-  const start = ta.selectionStart;
-  const end = ta.selectionEnd;
-  ta.value = ta.value.slice(0, start) + "\t" + ta.value.slice(end);
-  ta.selectionStart = ta.selectionEnd = start + 1;
-  ta.dispatchEvent(new Event("input", { bubbles: true }));
-}
-
-/** Ctrl/Cmd+B で選択テキストを **...** で囲む */
-function handleBoldShortcut(e) {
+/** Ctrl/Cmd+B でエディタ内の選択範囲を太字トグルする */
+function handleEditorBoldShortcut(e) {
   if (e.key !== "b" && e.key !== "B") return;
   if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
   e.preventDefault();
-  wrapSelectionWithBold(e.target);
+  applyBoldToSelection();
 }
 
-/**
- * textarea の選択範囲を `**...**` で囲む（トグル動作）。
- * 既に **...** で囲まれていれば外す。選択が空ならカーソル位置に挿入してカーソルを中に置く。
- */
-function wrapSelectionWithBold(ta) {
-  if (!ta) return;
-  const start = ta.selectionStart;
-  const end = ta.selectionEnd;
-  const value = ta.value;
-  const selected = value.slice(start, end);
-
-  // 既に **...** で囲まれている → トグルで外す
-  if (selected.length >= 4 && selected.startsWith("**") && selected.endsWith("**")) {
-    const inner = selected.slice(2, -2);
-    ta.value = value.slice(0, start) + inner + value.slice(end);
-    ta.selectionStart = start;
-    ta.selectionEnd = start + inner.length;
-    ta.focus();
-    ta.dispatchEvent(new Event("input", { bubbles: true }));
-    return;
-  }
-  // 選択の外側が **...** に挟まれているケースもトグル対象に
-  if (
-    start >= 2 && end <= value.length - 2 &&
-    value.slice(start - 2, start) === "**" && value.slice(end, end + 2) === "**"
-  ) {
-    ta.value = value.slice(0, start - 2) + selected + value.slice(end + 2);
-    ta.selectionStart = start - 2;
-    ta.selectionEnd = end - 2;
-    ta.focus();
-    ta.dispatchEvent(new Event("input", { bubbles: true }));
-    return;
-  }
-
-  // 通常: **...** で囲む
-  ta.value = value.slice(0, start) + "**" + selected + "**" + value.slice(end);
-  if (selected.length === 0) {
-    // 空選択 → カーソルを中央に
-    const caret = start + 2;
-    ta.selectionStart = ta.selectionEnd = caret;
-  } else {
-    ta.selectionStart = start + 2;
-    ta.selectionEnd = end + 2;
-  }
-  ta.focus();
-  ta.dispatchEvent(new Event("input", { bubbles: true }));
+/** カーソルを contenteditable 要素の末尾に置く */
+function placeCaretAtEnd(el) {
+  if (!el) return;
+  const range = document.createRange();
+  range.selectNodeContents(el);
+  range.collapse(false);
+  const sel = window.getSelection();
+  if (!sel) return;
+  sel.removeAllRanges();
+  sel.addRange(range);
 }
 
-// ===== textarea 用フローティング太字ツールバー =====
-// 既存の floating-toolbar.js は contenteditable 専用なので、
-// textarea 上で範囲選択した時用に独立した実装を用意する。
-// 共有要素を 1 個だけ body 直下に作り、CSS は .ft-floating-toolbar を流用する。
-
-let _ftBar = null;
-let _ftActiveTa = null;
-let _ftLocked = false;
-
-function ensureFloatingBoldBar() {
-  if (_ftBar) return _ftBar;
-  const bar = document.createElement("div");
-  bar.className = "ft-floating-toolbar";
-  bar.id = "ut-textarea-ft";
-  bar.setAttribute("role", "toolbar");
-  bar.setAttribute("aria-label", "テキスト書式");
-  bar.style.display = "none";
-  bar.innerHTML = `<button type="button" class="ft-btn ft-btn-bold" title="太字 (Ctrl+B)" aria-label="太字"><b>B</b></button>`;
-  document.body.appendChild(bar);
-
-  const btn = bar.querySelector(".ft-btn-bold");
-  // mousedown/touchstart で preventDefault してフォーカス・選択を維持
-  const trigger = (e) => {
-    e.preventDefault();
-    if (_ftActiveTa) wrapSelectionWithBold(_ftActiveTa);
-  };
-  btn.addEventListener("mousedown", trigger);
-  btn.addEventListener("touchstart", trigger, { passive: false });
-
-  window.addEventListener("scroll", repositionFloatingBoldBar, true);
-  window.addEventListener("resize", repositionFloatingBoldBar);
-  _ftBar = bar;
-  return bar;
-}
-
-function hideFloatingBoldBar() {
-  if (_ftBar) _ftBar.style.display = "none";
-  _ftLocked = false;
-}
-
-const _FT_MIRROR_PROPS = [
-  "direction", "boxSizing", "width", "height",
-  "overflowX", "overflowY",
-  "borderTopWidth", "borderRightWidth", "borderBottomWidth", "borderLeftWidth",
-  "borderStyle",
-  "paddingTop", "paddingRight", "paddingBottom", "paddingLeft",
-  "fontStyle", "fontVariant", "fontWeight", "fontStretch", "fontSize",
-  "fontSizeAdjust", "lineHeight", "fontFamily",
-  "textAlign", "textTransform", "textIndent", "textDecoration",
-  "letterSpacing", "wordSpacing", "tabSize",
+/** プリセット文字色 / ハイライト色（保存時もこの hex がそのまま入る） */
+const UT_TEXT_COLORS = [
+  { hex: "#e53e3e", name: "赤" },
+  { hex: "#ed8936", name: "橙" },
+  { hex: "#d69e2e", name: "黄" },
+  { hex: "#38a169", name: "緑" },
+  { hex: "#3182ce", name: "青" },
+  { hex: "#805ad5", name: "紫" },
+];
+const UT_HIGHLIGHT_COLORS = [
+  { hex: "#fed7d7", name: "赤ハイライト" },
+  { hex: "#feebc8", name: "橙ハイライト" },
+  { hex: "#fefcbf", name: "黄ハイライト" },
+  { hex: "#c6f6d5", name: "緑ハイライト" },
+  { hex: "#bee3f8", name: "青ハイライト" },
+  { hex: "#e9d8fd", name: "紫ハイライト" },
 ];
 
-/** textarea の指定 char 位置の (top, left, lineHeight) を画面座標で返す。
- *  ミラー div を一時的に DOM に追加し span の offsetTop/Left を計測する古典手法。 */
-function getTextareaCoords(ta, position) {
-  const mirror = document.createElement("div");
-  mirror.style.position = "absolute";
-  mirror.style.visibility = "hidden";
-  mirror.style.whiteSpace = "pre-wrap";
-  mirror.style.wordWrap = "break-word";
-  mirror.style.top = "0";
-  mirror.style.left = "-9999px";
-  const cs = window.getComputedStyle(ta);
-  for (const p of _FT_MIRROR_PROPS) mirror.style[p] = cs[p];
-
-  mirror.textContent = ta.value.substring(0, position);
-  const marker = document.createElement("span");
-  marker.textContent = ta.value.substring(position) || ".";
-  mirror.appendChild(marker);
-  document.body.appendChild(mirror);
-
-  const top = marker.offsetTop + parseInt(cs.borderTopWidth || "0", 10);
-  const left = marker.offsetLeft + parseInt(cs.borderLeftWidth || "0", 10);
-  const lh = parseFloat(cs.lineHeight) || parseFloat(cs.fontSize) * 1.2;
-  document.body.removeChild(mirror);
-
-  const r = ta.getBoundingClientRect();
-  return {
-    top: r.top + top - ta.scrollTop,
-    left: r.left + left - ta.scrollLeft,
-    lineHeight: lh,
-    taTop: r.top,
-    taBottom: r.bottom,
-  };
+function buildEditorToolbarHTML() {
+  const colorBtns = UT_TEXT_COLORS.map((c) =>
+    `<button type="button" class="ut-tb-color" data-color="${c.hex}" title="文字色: ${c.name}" aria-label="文字色 ${c.name}"><span class="ut-tb-color-dot" style="color:${c.hex}">A</span></button>`
+  ).join("");
+  const hlBtns = UT_HIGHLIGHT_COLORS.map((c) =>
+    `<button type="button" class="ut-tb-hl" data-color="${c.hex}" title="ハイライト: ${c.name}" aria-label="ハイライト ${c.name}" style="background:${c.hex}"></button>`
+  ).join("");
+  return `
+    <div class="ut-modal-toolbar" id="ut-modal-toolbar">
+      <button class="ut-toolbar-btn" id="ut-toolbar-bold" type="button" title="太字 (Ctrl+B)" aria-label="太字"><b>B</b></button>
+      <span class="ut-toolbar-sep" aria-hidden="true"></span>
+      <span class="ut-toolbar-label" aria-hidden="true">A</span>
+      ${colorBtns}
+      <span class="ut-toolbar-sep" aria-hidden="true"></span>
+      <span class="ut-toolbar-label" aria-hidden="true">▮</span>
+      ${hlBtns}
+      <span class="ut-toolbar-sep" aria-hidden="true"></span>
+      <button class="ut-toolbar-btn ut-toolbar-clear" id="ut-toolbar-clear" type="button" title="書式をクリア" aria-label="書式をクリア">×書式</button>
+    </div>
+  `;
 }
 
-function repositionFloatingBoldBar() {
-  const bar = _ftBar;
-  if (!bar) return;
-  const ta = _ftActiveTa;
-  if (!ta || !document.body.contains(ta)) { hideFloatingBoldBar(); return; }
-  const start = ta.selectionStart;
-  const end = ta.selectionEnd;
-  if (start === end) { hideFloatingBoldBar(); return; }
-  // 表示中は位置をロック（B 操作で文字数が変わってもバーが飛ばない）
-  if (_ftLocked && bar.style.display !== "none") return;
+function attachToolbarEvents() {
+  // mousedown で preventDefault → エディタのフォーカス/選択を奪わない
+  const onTbDown = (handler) => (e) => { e.preventDefault(); handler(e); };
 
-  const c = getTextareaCoords(ta, start);
-  // 選択行が textarea の可視範囲外なら隠す
-  if (c.top < c.taTop - 4 || c.top > c.taBottom + 4) { hideFloatingBoldBar(); return; }
+  document.getElementById("ut-toolbar-bold")?.addEventListener("mousedown", onTbDown(() => applyBoldToSelection()));
+  document.getElementById("ut-toolbar-clear")?.addEventListener("mousedown", onTbDown(() => clearInlineFormatting()));
 
-  bar.style.visibility = "hidden";
-  bar.style.display = "";
-  const w = bar.offsetWidth;
-  const h = bar.offsetHeight;
-  let top = window.scrollY + c.top - h - 8;
-  let left = window.scrollX + c.left - w / 2;
-  const minL = window.scrollX + 4;
-  const maxL = window.scrollX + document.documentElement.clientWidth - w - 4;
-  if (left < minL) left = minL;
-  if (left > maxL) left = maxL;
-  // 上に出せない時は選択行の下に
-  if (top < window.scrollY + 4) top = window.scrollY + c.top + c.lineHeight + 8;
-  bar.style.top = top + "px";
-  bar.style.left = left + "px";
-  bar.style.visibility = "";
-  _ftLocked = true;
-}
-
-function attachTextareaFloatingBold(ta) {
-  if (!ta || ta.dataset.ftAttached === "1") return;
-  ta.dataset.ftAttached = "1";
-  ensureFloatingBoldBar();
-
-  const onSel = () => {
-    _ftActiveTa = ta;
-    _ftLocked = false;
-    repositionFloatingBoldBar();
-  };
-  ta.addEventListener("select", onSel);
-  ta.addEventListener("mouseup", onSel);
-  ta.addEventListener("keyup", onSel);
-  ta.addEventListener("focus", onSel);
-  // blur ではすぐ消さない（ツールバーボタン click は blur 後に発火するので少し遅延）
-  ta.addEventListener("blur", () => {
-    setTimeout(() => {
-      const ae = document.activeElement;
-      if (ae !== ta && !(_ftBar && _ftBar.contains(ae))) hideFloatingBoldBar();
-    }, 120);
+  document.querySelectorAll(".ut-tb-color").forEach((btn) => {
+    btn.addEventListener("mousedown", onTbDown(() => applyColorToSelection(btn.dataset.color)));
   });
+  document.querySelectorAll(".ut-tb-hl").forEach((btn) => {
+    btn.addEventListener("mousedown", onTbDown(() => applyHighlightToSelection(btn.dataset.color)));
+  });
+}
+
+/** 選択範囲がエディタ内にあれば true */
+function selectionIsInEditor() {
+  const editor = document.getElementById("ut-modal-editor");
+  if (!editor) return false;
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0) return false;
+  const range = sel.getRangeAt(0);
+  if (range.collapsed) return false;
+  let node = range.commonAncestorContainer;
+  if (node.nodeType === Node.TEXT_NODE) node = node.parentElement;
+  while (node) {
+    if (node === editor) return true;
+    node = node.parentElement;
+  }
+  return false;
+}
+
+function applyBoldToSelection() {
+  if (!selectionIsInEditor()) return;
+  const editor = document.getElementById("ut-modal-editor");
+  if (document.activeElement !== editor) editor.focus({ preventScroll: true });
+  try { document.execCommand("bold", false, null); } catch {}
+  editor.dispatchEvent(new Event("input", { bubbles: true }));
+}
+
+function applyColorToSelection(color) {
+  if (!selectionIsInEditor()) return;
+  const editor = document.getElementById("ut-modal-editor");
+  if (document.activeElement !== editor) editor.focus({ preventScroll: true });
+  try {
+    document.execCommand("styleWithCSS", false, true);
+    document.execCommand("foreColor", false, color);
+  } catch {}
+  editor.dispatchEvent(new Event("input", { bubbles: true }));
+}
+
+function applyHighlightToSelection(color) {
+  if (!selectionIsInEditor()) return;
+  const editor = document.getElementById("ut-modal-editor");
+  if (document.activeElement !== editor) editor.focus({ preventScroll: true });
+  try {
+    document.execCommand("styleWithCSS", false, true);
+    // hiliteColor が無いブラウザは backColor にフォールバック
+    if (!document.execCommand("hiliteColor", false, color)) {
+      document.execCommand("backColor", false, color);
+    }
+  } catch {}
+  editor.dispatchEvent(new Event("input", { bubbles: true }));
+}
+
+/** 選択範囲の太字 / 色 / ハイライトを剥がす */
+function clearInlineFormatting() {
+  if (!selectionIsInEditor()) return;
+  const editor = document.getElementById("ut-modal-editor");
+  if (document.activeElement !== editor) editor.focus({ preventScroll: true });
+  try {
+    document.execCommand("removeFormat", false, null);
+    // removeFormat は span 内の background-color を残すブラウザがあるので追加処理
+    document.execCommand("styleWithCSS", false, true);
+    document.execCommand("foreColor", false, "inherit");
+  } catch {}
+  // 念のため: 選択範囲内の span 装飾を平坦化
+  flattenSpansInSelection(editor);
+  editor.dispatchEvent(new Event("input", { bubbles: true }));
+}
+
+/** 選択範囲内の color / background-color span を中身だけ残して剥がす */
+function flattenSpansInSelection(editor) {
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0) return;
+  const range = sel.getRangeAt(0);
+  const targets = [];
+  const walk = (node) => {
+    if (node.nodeType === Node.ELEMENT_NODE && node.tagName === "SPAN") {
+      const s = node.style;
+      if (s && (s.color || s.backgroundColor)) targets.push(node);
+    }
+    for (const c of [...node.childNodes]) walk(c);
+  };
+  const frag = range.cloneRange();
+  // 選択範囲だけでなく祖先 span も対象にする（部分選択でも剥がす）
+  let anc = range.commonAncestorContainer;
+  if (anc.nodeType === Node.TEXT_NODE) anc = anc.parentElement;
+  while (anc && anc !== editor) {
+    if (anc.tagName === "SPAN" && (anc.style.color || anc.style.backgroundColor)) {
+      targets.push(anc);
+    }
+    anc = anc.parentElement;
+  }
+  walk(range.commonAncestorContainer);
+  for (const span of targets) {
+    while (span.firstChild) span.parentNode.insertBefore(span.firstChild, span);
+    span.remove();
+  }
+}
+
+// ===== Markdown ⇔ DOM 変換（contenteditable 用） =====
+
+/** プレーンテキスト（`**bold**` + インライン color/highlight span）を editor に DOM として展開 */
+function loadTextIntoEditor(editor, text) {
+  if (!editor) return;
+  let html = escapeHTML(text || "");
+  html = html.replace(/\*\*([^\n*][^\n]*?)\*\*/g, "<strong>$1</strong>");
+  html = html.replace(
+    /&lt;span style=&quot;color:(.+?)&quot;&gt;([\s\S]*?)&lt;\/span&gt;/g,
+    '<span style="color:$1">$2</span>'
+  );
+  html = html.replace(
+    /&lt;span style=&quot;background-color:(.+?)&quot;&gt;([\s\S]*?)&lt;\/span&gt;/g,
+    '<span style="background-color:$1">$2</span>'
+  );
+  html = html.replace(/\n/g, "<br>");
+  editor.innerHTML = html;
+  if (editor.childNodes.length === 0) editor.appendChild(document.createElement("br"));
+}
+
+/** editor の DOM を `**bold**` + インライン color/highlight span 形式の文字列に戻す */
+function saveEditorToText(editor) {
+  if (!editor) return "";
+  let out = "";
+  const walk = (node) => {
+    if (node.nodeType === Node.TEXT_NODE) { out += node.nodeValue; return; }
+    if (node.nodeType !== Node.ELEMENT_NODE) return;
+    const tag = node.tagName;
+    if (tag === "BR") { out += "\n"; return; }
+    if (tag === "STRONG" || tag === "B") {
+      const before = out.length;
+      for (const c of node.childNodes) walk(c);
+      const inner = out.slice(before);
+      if (inner.trim() === "") return;
+      out = out.slice(0, before) + "**" + inner + "**";
+      return;
+    }
+    if (tag === "SPAN" || tag === "FONT") {
+      // <font color=> 形式（古い execCommand 出力）にも対応
+      let color = node.style?.color || "";
+      let bg = node.style?.backgroundColor || "";
+      if (!color && tag === "FONT") color = node.getAttribute("color") || "";
+      const before = out.length;
+      for (const c of node.childNodes) walk(c);
+      const inner = out.slice(before);
+      if (inner === "") return;
+      let prefix = "";
+      let suffix = "";
+      // 入れ子順: highlight が外側、color が内側 (描画順は重ならないので問題なし)
+      if (bg) { prefix += `<span style="background-color:${bg}">`; suffix = "</span>" + suffix; }
+      if (color) { prefix += `<span style="color:${color}">`; suffix = "</span>" + suffix; }
+      out = out.slice(0, before) + prefix + inner + suffix;
+      return;
+    }
+    if (tag === "DIV" || tag === "P") {
+      if (out.length > 0 && !out.endsWith("\n")) out += "\n";
+      for (const c of node.childNodes) walk(c);
+      return;
+    }
+    // その他: 子だけ辿る
+    for (const c of node.childNodes) walk(c);
+  };
+  for (const c of editor.childNodes) walk(c);
+  return out;
 }
