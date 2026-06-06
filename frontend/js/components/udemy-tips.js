@@ -8,8 +8,8 @@
  *   - 編集モーダル内のみ自動保存タイマーが動く
  */
 
-import { udemyTipsApi } from "../api.js?v=20260605a";
-import { showToast } from "../app.js?v=20260605a";
+import { udemyTipsApi } from "../api.js?v=20260606a";
+import { showToast } from "../app.js?v=20260606a";
 
 // ===== ユーティリティ =====
 
@@ -1191,10 +1191,6 @@ function openTipModal(entry) {
         ${renderModalLabels()}
       </div>
       <div class="ut-modal-body">
-        <div class="ut-modal-toolbar">
-          <button class="ut-toolbar-btn" id="ut-toolbar-bold" type="button"
-                  title="太字 (Ctrl+B / Cmd+B)" aria-label="太字"><b>B</b></button>
-        </div>
         <pre class="ut-modal-view" id="ut-modal-view">${viewHTML}</pre>
         <textarea class="ut-modal-textarea" id="ut-modal-textarea">${escapeHTML(isNew ? "" : (entry.content || ""))}</textarea>
       </div>
@@ -1221,6 +1217,8 @@ function openTipModal(entry) {
   } else if (textarea) {
     setTimeout(() => textarea.focus(), 30);
   }
+
+  if (textarea) attachTextareaFloatingBold(textarea);
 
   attachModalEvents();
 }
@@ -1273,13 +1271,6 @@ function attachModalEvents() {
   textarea?.addEventListener("input", handleTextareaInput);
   textarea?.addEventListener("keydown", handleTabInsert);
   textarea?.addEventListener("keydown", handleBoldShortcut);
-
-  // 太字ツールバーボタン
-  document.getElementById("ut-toolbar-bold")?.addEventListener("click", () => {
-    const ta = document.getElementById("ut-modal-textarea");
-    if (!ta) return;
-    wrapSelectionWithBold(ta);
-  });
 
   // 削除（長押し）
   const deleteBtn = document.getElementById("ut-modal-delete-btn");
@@ -1454,6 +1445,7 @@ async function closeTipModal({ save = true } = {}) {
   }
   if (newAutoSaveTimer) { clearTimeout(newAutoSaveTimer); newAutoSaveTimer = null; }
   document.removeEventListener("keydown", onModalKeydown);
+  hideFloatingBoldBar();
   modalEl.remove();
   modalEl = null;
   editingEntryId = null;
@@ -1921,4 +1913,146 @@ function wrapSelectionWithBold(ta) {
   }
   ta.focus();
   ta.dispatchEvent(new Event("input", { bubbles: true }));
+}
+
+// ===== textarea 用フローティング太字ツールバー =====
+// 既存の floating-toolbar.js は contenteditable 専用なので、
+// textarea 上で範囲選択した時用に独立した実装を用意する。
+// 共有要素を 1 個だけ body 直下に作り、CSS は .ft-floating-toolbar を流用する。
+
+let _ftBar = null;
+let _ftActiveTa = null;
+let _ftLocked = false;
+
+function ensureFloatingBoldBar() {
+  if (_ftBar) return _ftBar;
+  const bar = document.createElement("div");
+  bar.className = "ft-floating-toolbar";
+  bar.id = "ut-textarea-ft";
+  bar.setAttribute("role", "toolbar");
+  bar.setAttribute("aria-label", "テキスト書式");
+  bar.style.display = "none";
+  bar.innerHTML = `<button type="button" class="ft-btn ft-btn-bold" title="太字 (Ctrl+B)" aria-label="太字"><b>B</b></button>`;
+  document.body.appendChild(bar);
+
+  const btn = bar.querySelector(".ft-btn-bold");
+  // mousedown/touchstart で preventDefault してフォーカス・選択を維持
+  const trigger = (e) => {
+    e.preventDefault();
+    if (_ftActiveTa) wrapSelectionWithBold(_ftActiveTa);
+  };
+  btn.addEventListener("mousedown", trigger);
+  btn.addEventListener("touchstart", trigger, { passive: false });
+
+  window.addEventListener("scroll", repositionFloatingBoldBar, true);
+  window.addEventListener("resize", repositionFloatingBoldBar);
+  _ftBar = bar;
+  return bar;
+}
+
+function hideFloatingBoldBar() {
+  if (_ftBar) _ftBar.style.display = "none";
+  _ftLocked = false;
+}
+
+const _FT_MIRROR_PROPS = [
+  "direction", "boxSizing", "width", "height",
+  "overflowX", "overflowY",
+  "borderTopWidth", "borderRightWidth", "borderBottomWidth", "borderLeftWidth",
+  "borderStyle",
+  "paddingTop", "paddingRight", "paddingBottom", "paddingLeft",
+  "fontStyle", "fontVariant", "fontWeight", "fontStretch", "fontSize",
+  "fontSizeAdjust", "lineHeight", "fontFamily",
+  "textAlign", "textTransform", "textIndent", "textDecoration",
+  "letterSpacing", "wordSpacing", "tabSize",
+];
+
+/** textarea の指定 char 位置の (top, left, lineHeight) を画面座標で返す。
+ *  ミラー div を一時的に DOM に追加し span の offsetTop/Left を計測する古典手法。 */
+function getTextareaCoords(ta, position) {
+  const mirror = document.createElement("div");
+  mirror.style.position = "absolute";
+  mirror.style.visibility = "hidden";
+  mirror.style.whiteSpace = "pre-wrap";
+  mirror.style.wordWrap = "break-word";
+  mirror.style.top = "0";
+  mirror.style.left = "-9999px";
+  const cs = window.getComputedStyle(ta);
+  for (const p of _FT_MIRROR_PROPS) mirror.style[p] = cs[p];
+
+  mirror.textContent = ta.value.substring(0, position);
+  const marker = document.createElement("span");
+  marker.textContent = ta.value.substring(position) || ".";
+  mirror.appendChild(marker);
+  document.body.appendChild(mirror);
+
+  const top = marker.offsetTop + parseInt(cs.borderTopWidth || "0", 10);
+  const left = marker.offsetLeft + parseInt(cs.borderLeftWidth || "0", 10);
+  const lh = parseFloat(cs.lineHeight) || parseFloat(cs.fontSize) * 1.2;
+  document.body.removeChild(mirror);
+
+  const r = ta.getBoundingClientRect();
+  return {
+    top: r.top + top - ta.scrollTop,
+    left: r.left + left - ta.scrollLeft,
+    lineHeight: lh,
+    taTop: r.top,
+    taBottom: r.bottom,
+  };
+}
+
+function repositionFloatingBoldBar() {
+  const bar = _ftBar;
+  if (!bar) return;
+  const ta = _ftActiveTa;
+  if (!ta || !document.body.contains(ta)) { hideFloatingBoldBar(); return; }
+  const start = ta.selectionStart;
+  const end = ta.selectionEnd;
+  if (start === end) { hideFloatingBoldBar(); return; }
+  // 表示中は位置をロック（B 操作で文字数が変わってもバーが飛ばない）
+  if (_ftLocked && bar.style.display !== "none") return;
+
+  const c = getTextareaCoords(ta, start);
+  // 選択行が textarea の可視範囲外なら隠す
+  if (c.top < c.taTop - 4 || c.top > c.taBottom + 4) { hideFloatingBoldBar(); return; }
+
+  bar.style.visibility = "hidden";
+  bar.style.display = "";
+  const w = bar.offsetWidth;
+  const h = bar.offsetHeight;
+  let top = window.scrollY + c.top - h - 8;
+  let left = window.scrollX + c.left - w / 2;
+  const minL = window.scrollX + 4;
+  const maxL = window.scrollX + document.documentElement.clientWidth - w - 4;
+  if (left < minL) left = minL;
+  if (left > maxL) left = maxL;
+  // 上に出せない時は選択行の下に
+  if (top < window.scrollY + 4) top = window.scrollY + c.top + c.lineHeight + 8;
+  bar.style.top = top + "px";
+  bar.style.left = left + "px";
+  bar.style.visibility = "";
+  _ftLocked = true;
+}
+
+function attachTextareaFloatingBold(ta) {
+  if (!ta || ta.dataset.ftAttached === "1") return;
+  ta.dataset.ftAttached = "1";
+  ensureFloatingBoldBar();
+
+  const onSel = () => {
+    _ftActiveTa = ta;
+    _ftLocked = false;
+    repositionFloatingBoldBar();
+  };
+  ta.addEventListener("select", onSel);
+  ta.addEventListener("mouseup", onSel);
+  ta.addEventListener("keyup", onSel);
+  ta.addEventListener("focus", onSel);
+  // blur ではすぐ消さない（ツールバーボタン click は blur 後に発火するので少し遅延）
+  ta.addEventListener("blur", () => {
+    setTimeout(() => {
+      const ae = document.activeElement;
+      if (ae !== ta && !(_ftBar && _ftBar.contains(ae))) hideFloatingBoldBar();
+    }, 120);
+  });
 }
