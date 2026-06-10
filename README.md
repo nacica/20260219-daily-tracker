@@ -26,8 +26,8 @@
 ### 1. リポジトリの準備
 
 ```bash
-git clone <your-repo>
-cd daily-tracker
+git clone https://github.com/nacica/20260219-daily-tracker.git
+cd 20260219-daily-tracker
 ```
 
 ### 2. バックエンドのセットアップ
@@ -176,4 +176,97 @@ daily-tracker/
 - [ ] **Phase 2** - スクショ OCR + 履歴画面
 - [ ] **Phase 3** - 週次分析 + 改善追跡
 - [ ] **Phase 4** - Firebase Hosting + Cloud Run デプロイ
+
+---
+
+## 複数台 PC で開発する
+
+このリポジトリは GitHub (`nacica/20260219-daily-tracker`) で同期しているため、
+コードは git で共有し、**秘密情報・ローカル設定だけは各 PC で個別に作成** する運用にする。
+
+### git で同期されるもの / されないもの
+
+| 対象 | git で同期 | 備考 |
+|------|:--------:|------|
+| `frontend/` `backend/` のソース | ✅ | コードは常に push/pull で同期 |
+| `README.md` `CLAUDE.md` `firebase.json` 等 | ✅ | プロジェクト全体の設定 |
+| `backend/.env.example` | ✅ | テンプレートのみ。実値は含めない |
+| `backend/.env` | ❌ | API キー等を含むため `.gitignore` で除外 |
+| `__pycache__/` `venv/` | ❌ | Python のキャッシュ・仮想環境 |
+| `.claude/settings.local.json` | ❌ | Claude Code のローカル許可設定 |
+| `.vscode/` `.idea/` | ❌ | エディタごとの個人設定 |
+| GCP/Firebase 認証ファイル (`*-key.json`) | ❌ | 漏洩防止のため絶対にコミットしない |
+
+### 新しい PC で開発を始める手順
+
+```bash
+# 1. リポジトリを clone
+git clone https://github.com/nacica/20260219-daily-tracker.git
+cd 20260219-daily-tracker
+
+# 2. git の名前を設定（未設定の場合）
+git config user.name  "nacica"
+git config user.email "mikio.yokohama@gmail.com"
+
+# 3. backend の環境変数を作成（テンプレートからコピーして実値を埋める）
+cp backend/.env.example backend/.env
+#    → backend/.env を開いて ANTHROPIC_API_KEY, GOOGLE_CLOUD_PROJECT などを設定
+
+# 4. Python 依存をインストール
+cd backend
+python -m venv .venv
+# Windows
+.venv\Scripts\activate
+# macOS/Linux
+# source .venv/bin/activate
+pip install -r requirements.txt
+
+# 5. Google Cloud 認証（ローカル開発で Firestore を触る場合）
+gcloud auth application-default login
+
+# 6. フロント / バックを起動して動作確認
+uvicorn main:app --reload --port 8000     # backend で実行
+python -m http.server 3000                # frontend ディレクトリで実行
+```
+
+### 日々の開発フロー（複数台運用の基本）
+
+```bash
+# ★ 作業を始める前に必ず pull
+git pull origin main
+
+# ... コードを編集 ...
+
+# 作業が一段落したら add → commit → push
+git add <変更ファイル>
+git commit -m "feat: ..."
+git push origin main
+```
+
+**ポイント:**
+- 作業開始時の `git pull origin main` を絶対忘れない（忘れるとコンフリクトの原因）
+- 別 PC で作業を続ける前に、前の PC で `git push` を済ませる
+- PC を切り替えたら、まず `git pull` → そのあとコード編集を始める
+
+### コンフリクトが起きたら
+
+```bash
+# 1. 現在の差分を確認
+git status
+
+# 2. コンフリクトしたファイルを開いて <<<<<<< ======= >>>>>>> を解決
+
+# 3. 解決したら add → commit
+git add <解決したファイル>
+git commit
+git push origin main
+```
+
+判断に迷ったら、片方の PC を「正」とみなして他方を上書きするのが安全。
+
+### 秘密情報の取り扱い（重要）
+
+- **`backend/.env` は絶対にコミットしない** — `.gitignore` で除外済みだが、`git status` で見えていないか毎回確認すること
+- **GCP のサービスアカウントキー** (`*-key.json` 等) は git に入れず、`gcloud auth application-default login` でローカル認証する
+- 万一 push してしまったら、即座に Anthropic / GCP コンソールでキーをローテーションする
 

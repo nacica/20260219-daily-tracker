@@ -1,1 +1,57 @@
+# ===== Claude Code =====
 .claude/settings.local.json
+
+# ===== Python =====
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+venv/
+.venv/
+env/
+ENV/
+
+# ===== 環境変数（PCごとに作るのでコミット禁止）=====
+.env
+.env.local
+.env.*.local
+backend/.env
+
+# ===== Google Cloud / Firebase 認証情報（絶対にコミットしない）=====
+*-key.json
+*-credentials.json
+service-account*.json
+.gcloud/
+.firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+
+# ===== OS =====
+.DS_Store
+Thumbs.db
+desktop.ini
+ehthumbs.db
+$RECYCLE.BIN/
+
+# ===== エディタ / IDE =====
+.vscode/
+.idea/
+*.swp
+*.swo
+*.sublime-project
+*.sublime-workspace
+
+# ===== ログ・一時ファイル =====
+*.log
+*.tmp
+*.bak
+
+# ===== Node（必要になった時に備えて）=====
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
