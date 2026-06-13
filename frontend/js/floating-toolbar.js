@@ -1,12 +1,13 @@
 /**
  * 共有フローティング書式ツールバー
  *
- * 単一の B / A− / A / A+ ツールバーを body 直下に1つだけ生成し、
+ * 単一の B / 赤A / A− / A / A+ ツールバーを body 直下に1つだけ生成し、
  * 登録済みエディタ内でテキストを範囲選択した時に、選択範囲の上にフロート表示する。
  *
  * 仕様:
  *   - エディタは contenteditable な要素を想定
  *   - 太字: <strong> ⇔ **bold** マークダウンで往復
+ *   - 文字色（赤）: <span style="color:#e53e3e"> ⇔ 同形式のインライン HTML で往復（トグル）
  *   - サイズ: <span style="font-size:Xem"> ⇔ 同形式のインライン HTML で往復
  *   - サイズは 0.8x / 1.0x / 1.25x / 1.5x / 2.0x の 5 段階を順送り、中央 A でリセット
  *   - 表示中は位置を固定（選択範囲の rect が変わってもツールバーは動かない）
@@ -21,7 +22,11 @@
 
 export const SIZE_LEVELS = [0.8, 1.0, 1.25, 1.5, 2.0];
 export const DEFAULT_SIZE = 1.0;
-export const SIZE_SPAN_STRIP = /<span\s+style="font-size:[^"]*"\s*>|<\/span>/gi;
+// 表示用プレビューから size / color span タグを剥がす（中身は残す）
+export const SIZE_SPAN_STRIP = /<span\s+style="(?:font-size|color):[^"]*"\s*>|<\/span>/gi;
+
+// 文字色トグルで使う色（赤）。保存データにもこの hex がそのまま入る。
+export const TEXT_COLOR = "#e53e3e";
 
 const BOLD_MATCH = /\*\*([^\n*][^\n]*?)\*\*/g;
 
@@ -76,6 +81,7 @@ function ensureToolbar() {
   toolbarEl.style.display = "none";
   toolbarEl.innerHTML = [
     `<button type="button" class="ft-btn ft-btn-bold" title="太字 (Ctrl+B)" aria-label="太字"><b>B</b></button>`,
+    `<button type="button" class="ft-btn ft-btn-color" title="文字を赤色に" aria-label="文字を赤色に"><b style="color:${TEXT_COLOR}">A</b></button>`,
     `<span class="ft-sep" aria-hidden="true"></span>`,
     `<button type="button" class="ft-btn ft-btn-size-down" title="文字を小さく" aria-label="文字を小さく">A<span class="ft-sub">−</span></button>`,
     `<button type="button" class="ft-btn ft-btn-size-reset" title="文字サイズをデフォルトに戻す" aria-label="文字サイズをデフォルトに戻す">A</button>`,
@@ -90,6 +96,7 @@ function ensureToolbar() {
     b.addEventListener("touchstart", (e) => { e.preventDefault(); fn(); }, { passive: false });
   };
   bindBtn(".ft-btn-bold", () => toggleBoldOnSelection());
+  bindBtn(".ft-btn-color", () => toggleColorOnSelection());
   bindBtn(".ft-btn-size-down", () => bumpSelectionFontSize(-1));
   bindBtn(".ft-btn-size-reset", () => setSelectionFontSize(DEFAULT_SIZE));
   bindBtn(".ft-btn-size-up", () => bumpSelectionFontSize(+1));
@@ -153,6 +160,77 @@ function toggleBoldOnSelection() {
   if (document.activeElement !== editor) editor.focus({ preventScroll: true });
   try {
     document.execCommand("bold", false, null);
+  } catch {
+    return;
+  }
+  editor.dispatchEvent(new Event("input", { bubbles: true }));
+}
+
+// ========== 文字色トグル（赤） ==========
+
+/** 色文字列を computed な rgb(...) 形式に正規化して比較できるようにする */
+function normalizeColor(c) {
+  if (!c) return "";
+  const probe = document.createElement("span");
+  probe.style.color = c;
+  document.body.appendChild(probe);
+  const rgb = getComputedStyle(probe).color;
+  probe.remove();
+  return rgb;
+}
+
+/** 選択開始位置がすでに赤色 span 内にあるか */
+function selectionIsColored() {
+  const editor = getActiveEditor();
+  if (!editor) return false;
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0) return false;
+  let node = sel.getRangeAt(0).startContainer;
+  if (node.nodeType === Node.TEXT_NODE) node = node.parentElement;
+  const target = normalizeColor(TEXT_COLOR);
+  while (node && node !== editor) {
+    if (node.style && node.style.color) {
+      return normalizeColor(node.style.color) === target;
+    }
+    if (node.tagName === "FONT" && node.getAttribute("color")) {
+      return normalizeColor(node.getAttribute("color")) === target;
+    }
+    node = node.parentElement;
+  }
+  return false;
+}
+
+/** 選択範囲に交差する color span / <font color> を中身だけ残して剥がす */
+function stripColorSpansInSelection(editor) {
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0) return;
+  const range = sel.getRangeAt(0);
+  const nodes = editor.querySelectorAll('span[style*="color"], font[color]');
+  nodes.forEach((node) => {
+    if (!range.intersectsNode(node)) return;
+    // 背景色やサイズ span はそのまま残し、文字色専用 span / font のみ剥がす
+    const isColorOnly =
+      node.tagName === "FONT" ||
+      (node.style && node.style.color && !node.style.backgroundColor && !node.style.fontSize);
+    if (!isColorOnly) return;
+    while (node.firstChild) node.parentNode.insertBefore(node.firstChild, node);
+    node.remove();
+  });
+}
+
+function toggleColorOnSelection() {
+  const editor = getActiveEditor();
+  if (!editor) return;
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return;
+  if (document.activeElement !== editor) editor.focus({ preventScroll: true });
+  try {
+    if (selectionIsColored()) {
+      stripColorSpansInSelection(editor);
+    } else {
+      document.execCommand("styleWithCSS", false, true);
+      document.execCommand("foreColor", false, TEXT_COLOR);
+    }
   } catch {
     return;
   }
@@ -334,43 +412,68 @@ function appendTextWithBold(parent, text) {
 // 最初の </span> で止まってしまい残りがリテラル <span> 文字として描画される。
 // open/close をスタックで追跡し、最も内側の size を有効として平坦化する。
 function appendTextWithSizeAndBold(parent, text) {
-  const openRe = /<span\s+style="font-size:\s*([0-9.]+)em\s*">/g;
+  // size span と color span の開きタグを 1 つの正規表現で拾う（どちらか一方の style を想定）
+  const openRe = /<span\s+style="font-size:\s*([0-9.]+)em\s*">|<span\s+style="color:\s*([^";]+?)\s*">/gi;
   const closeRe = /<\/span>/g;
   const tokens = [];
   let m;
   while ((m = openRe.exec(text)) !== null) {
-    tokens.push({ type: "open", em: parseFloat(m[1]), start: m.index, end: m.index + m[0].length });
+    if (m[1] !== undefined) {
+      tokens.push({ type: "open", em: parseFloat(m[1]), start: m.index, end: m.index + m[0].length });
+    } else {
+      tokens.push({ type: "open", color: m[2], start: m.index, end: m.index + m[0].length });
+    }
   }
   while ((m = closeRe.exec(text)) !== null) {
     tokens.push({ type: "close", start: m.index, end: m.index + m[0].length });
   }
   tokens.sort((a, b) => a.start - b.start);
 
-  const sizeStack = [];
+  const styleStack = [];
   const emitText = (txt) => {
     if (!txt) return;
+    // スタックの内側から有効な size / color を探す
     let effectiveSize = null;
-    for (let i = sizeStack.length - 1; i >= 0; i--) {
-      const em = sizeStack[i];
-      if (!isNaN(em) && em > 0 && em !== DEFAULT_SIZE) { effectiveSize = em; break; }
+    let effectiveColor = null;
+    for (let i = styleStack.length - 1; i >= 0; i--) {
+      const s = styleStack[i];
+      if (effectiveSize == null && s.em != null && !isNaN(s.em) && s.em > 0 && s.em !== DEFAULT_SIZE) {
+        effectiveSize = s.em;
+      }
+      if (effectiveColor == null && s.color != null) {
+        effectiveColor = s.color;
+      }
     }
-    if (effectiveSize == null) {
+    if (effectiveSize == null && effectiveColor == null) {
       appendTextWithBold(parent, txt);
-    } else {
-      const span = document.createElement("span");
-      span.style.fontSize = `${effectiveSize}em`;
-      appendTextWithBold(span, txt);
-      if (span.childNodes.length > 0) parent.appendChild(span);
+      return;
     }
+    // 外側に size span、内側に color span をネスト（描画は同じ）
+    let outer = null;
+    let inner = null;
+    if (effectiveSize != null) {
+      outer = document.createElement("span");
+      outer.style.fontSize = `${effectiveSize}em`;
+      inner = outer;
+    }
+    if (effectiveColor != null) {
+      const cspan = document.createElement("span");
+      cspan.style.color = effectiveColor;
+      if (inner) inner.appendChild(cspan);
+      else outer = cspan;
+      inner = cspan;
+    }
+    appendTextWithBold(inner, txt);
+    if (inner.childNodes.length > 0) parent.appendChild(outer);
   };
 
   let pos = 0;
   for (const tok of tokens) {
     if (tok.start > pos) emitText(text.slice(pos, tok.start));
     if (tok.type === "open") {
-      sizeStack.push(tok.em);
-    } else if (sizeStack.length > 0) {
-      sizeStack.pop();
+      styleStack.push(tok);
+    } else if (styleStack.length > 0) {
+      styleStack.pop();
     }
     pos = tok.end;
   }
@@ -460,12 +563,30 @@ export function serializeEditorMarkdown(editor, options = {}) {
           return;
         }
       }
-      // font-size 以外の span: カスタムハンドラがあれば優先
+      const col = node.style && node.style.color;
+      if (col) {
+        const before = out.length;
+        for (const child of node.childNodes) walk(child);
+        const inner = out.slice(before);
+        if (inner === "") return;
+        out = out.slice(0, before) + `<span style="color:${col}">` + inner + `</span>`;
+        return;
+      }
+      // font-size / color 以外の span: カスタムハンドラがあれば優先
       if (serializeElement) {
         const custom = serializeElement(node);
         if (typeof custom === "string") { out += custom; return; }
       }
       for (const child of node.childNodes) walk(child);
+      return;
+    }
+    // <font color="..."> (古い execCommand 出力) も color span として保存
+    if (tag === "FONT" && node.getAttribute("color")) {
+      const before = out.length;
+      for (const child of node.childNodes) walk(child);
+      const inner = out.slice(before);
+      if (inner === "") return;
+      out = out.slice(0, before) + `<span style="color:${node.getAttribute("color")}">` + inner + `</span>`;
       return;
     }
     if (tag === "STRONG" || tag === "B") {

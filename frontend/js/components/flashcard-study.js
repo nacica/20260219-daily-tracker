@@ -4,13 +4,13 @@
  * 学習中のカード編集にも対応
  */
 
-import { flashcardsApi } from "../api.js?v=20260605a";
-import { showToast } from "../app.js?v=20260605a";
+import { flashcardsApi } from "../api.js?v=20260613a";
+import { showToast } from "../app.js?v=20260613a";
 import {
   attachFloatingToolbar,
   appendMarkdownToEditor,
   serializeEditorMarkdown,
-} from "../floating-toolbar.js?v=20260605a";
+} from "../floating-toolbar.js?v=20260613a";
 
 const ORDER_STORAGE_KEY = "flashcard-study-order";
 
