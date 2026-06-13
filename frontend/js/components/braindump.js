@@ -5,14 +5,14 @@
  * ラベル機能: メモごとに複数ラベル付与可、ラベルOR検索、専用管理モーダル。
  */
 
-import { braindumpApi } from "../api.js?v=20260613a";
-import { showToast } from "../app.js?v=20260613a";
+import { braindumpApi } from "../api.js?v=20260613b";
+import { showToast } from "../app.js?v=20260613b";
 import {
   attachFloatingToolbar,
   appendMarkdownToEditor,
   serializeEditorMarkdown,
   SIZE_SPAN_STRIP,
-} from "../floating-toolbar.js?v=20260613a";
+} from "../floating-toolbar.js?v=20260613b";
 
 // ===== ユーティリティ =====
 
@@ -110,6 +110,24 @@ function saveCurrentScroll() {
   if (!ed) return;
   const key = editingEntryId || newEntryId;
   if (key) scrollPositions.set(key, ed.scrollTop);
+}
+
+// 直前に開いていたノートIDを localStorage に保持し、リロード後も同じノートを復元する
+const LAST_ENTRY_STORAGE_KEY = "braindump:lastOpenEntryId";
+
+function rememberOpenEntry(id) {
+  try {
+    if (id) localStorage.setItem(LAST_ENTRY_STORAGE_KEY, id);
+    else localStorage.removeItem(LAST_ENTRY_STORAGE_KEY);
+  } catch {}
+}
+
+function getRememberedEntryId() {
+  try {
+    return localStorage.getItem(LAST_ENTRY_STORAGE_KEY);
+  } catch {
+    return null;
+  }
 }
 
 // ===== 画像マークダウン関連 =====
@@ -284,6 +302,18 @@ export async function renderBraindump() {
   `;
 
   attachEvents();
+
+  // 直前に開いていたノートを復元（リロード／再訪問時も同じノートを表示する）
+  const lastId = getRememberedEntryId();
+  if (lastId) {
+    const entry = recentEntries.find(e => e.id === lastId);
+    if (entry) {
+      loadEntryIntoEditor(entry);
+    } else {
+      // 既に存在しないノートなら記憶をクリア
+      rememberOpenEntry(null);
+    }
+  }
 }
 
 // ===== ラベル入力エリア（テキストエリア上部） =====
@@ -843,35 +873,42 @@ function attachEvents() {
     const entry = recentEntries.find(en => en.id === entryId);
     if (!entry) return;
 
-    // 左側エディタに内容を読み込み
-    const editorEl = document.getElementById("bd-new-textarea");
-    if (!editorEl) return;
-
-    // 切り替え前ノートのスクロール位置を保存
-    saveCurrentScroll();
-
-    setEditorContent(editorEl, entry.content || "");
-    updateEditorEmptyState(editorEl);
-    currentLabels = [...(entry.labels || [])];
-    editingEntryId = entryId;
-    newEntryId = null; // 新規メモのIDをリセット
-    refreshLabelsEditor();
-
-    // 右カラムの該当エントリにアクティブ表示
-    document.querySelectorAll(".braindump-entry").forEach(el => el.classList.remove("active"));
-    entryEl.classList.add("active");
-
-    // ヘッダーを編集モード表示に更新
-    updateHeaderForEditing(entry);
-
-    // 前回の表示位置を復元（未記録なら先頭）。focus/カーソル移動はしない
-    editorEl.scrollTop = scrollPositions.get(entryId) || 0;
-
-    // 自動保存を既存メモ更新に切り替え
-    if (newAutoSaveTimer) clearTimeout(newAutoSaveTimer);
-    editorEl.removeEventListener("input", handleNewTextareaInput);
-    editorEl.addEventListener("input", handleNewTextareaInput);
+    loadEntryIntoEditor(entry);
   });
+}
+
+/** 指定エントリを左側エディタに読み込んで編集モードにする（クリック / リロード復元の共通処理） */
+function loadEntryIntoEditor(entry) {
+  if (!entry) return;
+  const editorEl = document.getElementById("bd-new-textarea");
+  if (!editorEl) return;
+
+  // 切り替え前ノートのスクロール位置を保存
+  saveCurrentScroll();
+
+  setEditorContent(editorEl, entry.content || "");
+  updateEditorEmptyState(editorEl);
+  currentLabels = [...(entry.labels || [])];
+  editingEntryId = entry.id;
+  newEntryId = null; // 新規メモのIDをリセット
+  rememberOpenEntry(entry.id); // リロード後も同じノートを表示できるよう記憶
+  refreshLabelsEditor();
+
+  // 右カラムの該当エントリにアクティブ表示
+  document.querySelectorAll(".braindump-entry").forEach(el => el.classList.remove("active"));
+  const entryEl = document.querySelector(`.braindump-entry[data-id="${entry.id}"]`);
+  if (entryEl) entryEl.classList.add("active");
+
+  // ヘッダーを編集モード表示に更新
+  updateHeaderForEditing(entry);
+
+  // 前回の表示位置を復元（未記録なら先頭）。focus/カーソル移動はしない
+  editorEl.scrollTop = scrollPositions.get(entry.id) || 0;
+
+  // 自動保存を既存メモ更新に切り替え
+  if (newAutoSaveTimer) clearTimeout(newAutoSaveTimer);
+  editorEl.removeEventListener("input", handleNewTextareaInput);
+  editorEl.addEventListener("input", handleNewTextareaInput);
 }
 
 // ===== ヘッダーモード切替 =====
@@ -928,6 +965,7 @@ function resetToNewMode() {
   saveCurrentScroll();
   editingEntryId = null;
   newEntryId = null;
+  rememberOpenEntry(null); // 新規モードに戻ったので復元対象をクリア
   const editorEl = document.getElementById("bd-new-textarea");
   if (editorEl) {
     setEditorContent(editorEl, "");
@@ -1014,6 +1052,7 @@ async function autoSaveNewEntry() {
       const created = await braindumpApi.create(currentDate, content, currentLabels);
       if (created && created.id) {
         newEntryId = created.id;
+        rememberOpenEntry(newEntryId); // リロード後も書きかけメモを復元
       }
     }
     // 右カラムの一覧も更新
@@ -1028,6 +1067,7 @@ async function deleteEntry(entryId) {
   try {
     await braindumpApi.delete(entryId);
     editingEntryId = null;
+    if (getRememberedEntryId() === entryId) rememberOpenEntry(null);
     entries = entries.filter(e => e.id !== entryId);
     await refreshEntries();
   } catch (e) {

@@ -8,8 +8,8 @@
  *   - 編集モーダル内のみ自動保存タイマーが動く
  */
 
-import { udemyTipsApi } from "../api.js?v=20260613a";
-import { showToast } from "../app.js?v=20260613a";
+import { udemyTipsApi } from "../api.js?v=20260613b";
+import { showToast } from "../app.js?v=20260613b";
 
 // ===== ユーティリティ =====
 

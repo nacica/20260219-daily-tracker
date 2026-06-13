@@ -1,4 +1,27 @@
 {
+  "permissions": {
+    "defaultMode": "acceptEdits",
+    "allow": [
+      "Bash(git:*)",
+      "Bash(npm:*)",
+      "Bash(npx:*)",
+      "Bash(node:*)",
+      "Bash(python:*)",
+      "Bash(python3:*)",
+      "Bash(py:*)",
+      "Bash(pip:*)",
+      "Bash(pytest:*)",
+      "Bash(gh:*)",
+      "Bash(firebase:*)",
+      "Bash(gcloud:*)",
+      "Bash(gsutil:*)"
+    ],
+    "deny": [
+      "Bash(rm:*)",
+      "Bash(git push --force:*)",
+      "Bash(git reset --hard:*)"
+    ]
+  },
   "hooks": {
     "Stop": [
       {
