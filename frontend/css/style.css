@@ -5978,6 +5978,63 @@ div.journal-textarea.is-empty::before {
   color: rgba(0, 0, 0, 0.4);
 }
 
+/* 並び順トグル（作成日順 / 更新日順） */
+.braindump-sort-bar {
+  margin-bottom: 12px;
+}
+.bd-sort-bar-inner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.bd-sort-label {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.55);
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+[data-theme="light"] .bd-sort-label {
+  color: rgba(0, 0, 0, 0.5);
+}
+.bd-sort-toggle {
+  display: inline-flex;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.03);
+}
+[data-theme="light"] .bd-sort-toggle {
+  border-color: rgba(0, 0, 0, 0.12);
+  background: rgba(0, 0, 0, 0.02);
+}
+.bd-sort-btn {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.55);
+  padding: 4px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.bd-sort-btn:hover {
+  color: rgba(255, 255, 255, 0.85);
+}
+.bd-sort-btn.active {
+  background: var(--accent, #00d4ff);
+  color: #fff;
+}
+[data-theme="light"] .bd-sort-btn {
+  color: rgba(0, 0, 0, 0.5);
+}
+[data-theme="light"] .bd-sort-btn:hover {
+  color: rgba(0, 0, 0, 0.8);
+}
+[data-theme="light"] .bd-sort-btn.active {
+  color: #fff;
+}
+
 /* エントリカード内のラベル表示 */
 .bd-entry-labels {
   display: flex;

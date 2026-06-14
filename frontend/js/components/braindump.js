@@ -5,14 +5,14 @@
  * ラベル機能: メモごとに複数ラベル付与可、ラベルOR検索、専用管理モーダル。
  */
 
-import { braindumpApi } from "../api.js?v=20260614b";
-import { showToast } from "../app.js?v=20260614b";
+import { braindumpApi } from "../api.js?v=20260614c";
+import { showToast } from "../app.js?v=20260614c";
 import {
   attachFloatingToolbar,
   appendMarkdownToEditor,
   serializeEditorMarkdown,
   SIZE_SPAN_STRIP,
-} from "../floating-toolbar.js?v=20260614b";
+} from "../floating-toolbar.js?v=20260614c";
 
 // ===== ユーティリティ =====
 
@@ -125,6 +125,14 @@ let titleSaveTimer = null; // タイトル入力の自動保存デバウンス
 let currentLabels = []; // 編集中メモ / 新規メモのラベル配列
 let allLabels = []; // 全メモから集計したラベル一覧 [{name, count}]
 let filterLabels = []; // 一覧フィルタで選択中のラベル名（OR検索）
+
+// 一覧の並び順モード（"created" = 作成日順 / "updated" = 更新日順）。localStorage に保持
+const SORT_MODE_STORAGE_KEY = "braindump:sortMode";
+let sortMode = "created";
+try {
+  const saved = localStorage.getItem(SORT_MODE_STORAGE_KEY);
+  if (saved === "created" || saved === "updated") sortMode = saved;
+} catch {}
 // ノートID別の textarea スクロール位置を記憶（同ノートに戻ったとき前回位置を復元）
 const scrollPositions = new Map();
 
@@ -318,6 +326,9 @@ export async function renderBraindump() {
       <div class="braindump-right">
         <div class="braindump-filter-bar" id="bd-filter-bar">
           ${renderFilterBar()}
+        </div>
+        <div class="braindump-sort-bar" id="bd-sort-bar">
+          ${renderSortBar()}
         </div>
         <div class="braindump-entries" id="bd-entries">
           ${renderRecentEntries()}
@@ -546,6 +557,40 @@ function attachFilterBarEvents() {
   });
 }
 
+// ===== 並び順トグル（作成日順 / 更新日順） =====
+
+function renderSortBar() {
+  return `
+    <div class="bd-sort-bar-inner">
+      <span class="bd-sort-label">並び順:</span>
+      <div class="bd-sort-toggle">
+        <button class="bd-sort-btn${sortMode === "created" ? " active" : ""}" type="button" data-mode="created">作成日順</button>
+        <button class="bd-sort-btn${sortMode === "updated" ? " active" : ""}" type="button" data-mode="updated">更新日順</button>
+      </div>
+    </div>
+  `;
+}
+
+function refreshSortBar() {
+  const el = document.getElementById("bd-sort-bar");
+  if (!el) return;
+  el.innerHTML = renderSortBar();
+  attachSortBarEvents();
+}
+
+function attachSortBarEvents() {
+  document.querySelectorAll(".bd-sort-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const mode = btn.dataset.mode;
+      if (mode === sortMode) return;
+      sortMode = mode;
+      try { localStorage.setItem(SORT_MODE_STORAGE_KEY, mode); } catch {}
+      refreshSortBar();
+      refreshEntriesList();
+    });
+  });
+}
+
 // ===== エントリ一覧レンダリング =====
 
 function getFilteredEntries() {
@@ -555,6 +600,21 @@ function getFilteredEntries() {
     const labels = e.labels || [];
     return labels.some(l => filterLabels.includes(l));
   });
+}
+
+// 並び順モードに応じて、グルーピング/並び替えの基準となるタイムスタンプを返す
+// 更新日順: updated_at（なければ created_at / date）／作成日順: created_at（なければ date）
+function entryTimestamp(entry) {
+  if (sortMode === "updated") {
+    return entry.updated_at || entry.created_at || `${entry.date}T00:00:00`;
+  }
+  return entry.created_at || `${entry.date}T00:00:00`;
+}
+
+// グループ見出し（日付ピル）に使う日付。並び順モードのタイムスタンプの日付部分を採用
+function entryGroupDate(entry) {
+  const ts = entryTimestamp(entry);
+  return ts && ts.length >= 10 ? ts.slice(0, 10) : entry.date;
 }
 
 function renderRecentEntries() {
@@ -570,23 +630,28 @@ function renderRecentEntries() {
       </div>`;
   }
 
-  // 日付ごとにグループ化（新しい日付順）
+  // 日付ごとにグループ化（新しい日付順）。日付は並び順モードに応じて作成/更新日を使う
   const grouped = {};
   for (const entry of list) {
-    const date = entry.date;
+    const date = entryGroupDate(entry);
     if (!grouped[date]) grouped[date] = [];
     grouped[date].push(entry);
   }
   const sortedDates = Object.keys(grouped).sort().reverse();
 
-  // 各日付グループ内を sort_order 降順でソート（新しいメモが上、古いメモが下）
-  // 未設定は entry_number にフォールバック
+  // 各日付グループ内のソート
+  // - 作成日順: sort_order 降順（未設定は entry_number にフォールバック）
+  // - 更新日順: updated_at 降順
   const sortKey = (e) => {
     const so = e.sort_order;
     return so == null ? (e.entry_number || 1) : so;
   };
   for (const date of sortedDates) {
-    grouped[date].sort((a, b) => sortKey(b) - sortKey(a) || (b.entry_number || 0) - (a.entry_number || 0));
+    if (sortMode === "updated") {
+      grouped[date].sort((a, b) => entryTimestamp(b).localeCompare(entryTimestamp(a)));
+    } else {
+      grouped[date].sort((a, b) => sortKey(b) - sortKey(a) || (b.entry_number || 0) - (a.entry_number || 0));
+    }
   }
 
   return sortedDates.map(date => {
@@ -605,7 +670,8 @@ function renderRecentEntries() {
     `;
 
     const entriesHTML = dateEntries.map((entry) => {
-      const time = entry.created_at ? entry.created_at.slice(11, 16) : "";
+      const timeSource = entryTimestamp(entry);
+      const time = timeSource ? timeSource.slice(11, 16) : "";
       const cleanContent = entry.content.replace(IMG_REGEX, " ").replace(SIZE_SPAN_STRIP, "").trim();
       const bodyContent = stripDateHeader(cleanContent).trim();
       const title = entryTitle(entry);
@@ -845,6 +911,9 @@ function attachEvents() {
 
   // フィルタバーのイベント
   attachFilterBarEvents();
+
+  // 並び順トグルのイベント
+  attachSortBarEvents();
 
   // ピッカー外クリックで閉じる
   document.addEventListener("click", (e) => {
