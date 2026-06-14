@@ -5,14 +5,14 @@
  * ラベル機能: メモごとに複数ラベル付与可、ラベルOR検索、専用管理モーダル。
  */
 
-import { braindumpApi } from "../api.js?v=20260614a";
-import { showToast } from "../app.js?v=20260614a";
+import { braindumpApi } from "../api.js?v=20260614b";
+import { showToast } from "../app.js?v=20260614b";
 import {
   attachFloatingToolbar,
   appendMarkdownToEditor,
   serializeEditorMarkdown,
   SIZE_SPAN_STRIP,
-} from "../floating-toolbar.js?v=20260614a";
+} from "../floating-toolbar.js?v=20260614b";
 
 // ===== ユーティリティ =====
 
@@ -81,6 +81,13 @@ function deriveTitleFromContent(content) {
 function entryTitle(entry) {
   if (entry && entry.title_custom && entry.title) return entry.title;
   return deriveTitleFromContent(entry ? entry.content : "");
+}
+
+// タイトル入力欄に入れる文字列（現在表示されているタイトル。本文が空なら空文字）
+function fieldTitleFor(entry) {
+  if (entry && entry.title_custom && entry.title) return entry.title;
+  const d = deriveTitleFromContent(entry ? entry.content : "");
+  return d === "(無題)" ? "" : d;
 }
 
 /** タグ名から決定的に HSL 色を生成（薄め背景・濃いめ文字） */
@@ -927,8 +934,8 @@ function loadEntryIntoEditor(entry) {
   setEditorContent(editorEl, entry.content || "");
   updateEditorEmptyState(editorEl);
   currentLabels = [...(entry.labels || [])];
-  // 手動タイトルがあれば入力欄へ。自動タイトルのみのノートは空欄（プレースホルダー表示）
-  currentTitle = entry.title_custom ? (entry.title || "") : "";
+  // 現在表示されているタイトルを入力欄に入れる（自動タイトルのノートも表示する）
+  currentTitle = fieldTitleFor(entry);
   lastSavedTitle = currentTitle;
   const titleEl = document.getElementById("bd-title-input");
   if (titleEl) titleEl.value = currentTitle;
@@ -936,6 +943,9 @@ function loadEntryIntoEditor(entry) {
   newEntryId = null; // 新規メモのIDをリセット
   rememberOpenEntry(entry.id); // リロード後も同じノートを表示できるよう記憶
   refreshLabelsEditor();
+
+  // 開いた時点で、自動タイトルを手動タイトルとして固定する（以後AIは再生成しない）
+  fixAutoTitleOnOpen(entry);
 
   // 右カラムの該当エントリにアクティブ表示
   document.querySelectorAll(".braindump-entry").forEach(el => el.classList.remove("active"));
@@ -954,14 +964,34 @@ function loadEntryIntoEditor(entry) {
   editorEl.addEventListener("input", handleNewTextareaInput);
 }
 
+/** ノートを開いた時点で、現在のタイトルを手動タイトルとして固定する（AIの再生成を止める） */
+async function fixAutoTitleOnOpen(entry) {
+  if (!entry || entry.title_custom) return; // 既に手動タイトルなら何もしない
+  const title = fieldTitleFor(entry).trim();
+  if (!title) return; // タイトル未生成（本文も空）なら固定しない
+  try {
+    const updated = await braindumpApi.update(entry.id, null, null, title);
+    if (!updated) return;
+    const idx = recentEntries.findIndex(e => e.id === entry.id);
+    if (idx >= 0) recentEntries[idx] = updated;
+    entry.title_custom = true;
+    entry.title = updated.title;
+    // まだ同じノートを開いているなら、保存済みタイトルの基準値を更新
+    if ((editingEntryId || newEntryId) === entry.id) {
+      lastSavedTitle = updated.title_custom ? (updated.title || "") : "";
+    }
+    refreshEntriesList(entry.id);
+  } catch {}
+}
+
 // ===== ヘッダーモード切替 =====
 
 function updateHeaderForEditing(entry) {
-  const title = entryTitle(entry);
   const header = document.querySelector(".braindump-header");
   if (!header) return;
+  // 編集モードではタイトル文字は出さず、ボタンのみ（空の要素でボタンを右寄せ維持）
   header.innerHTML = `
-    <h2 class="braindump-title" style="font-size: 1rem;">編集中: ${escapeHTML(title)}</h2>
+    <span class="braindump-title" aria-hidden="true"></span>
     <div class="braindump-header-actions">
       <button class="btn btn-outline btn-sm" id="bd-back-to-new-btn">＋ 新しいメモ</button>
       <button class="btn btn-outline btn-sm" id="bd-manage-labels-btn" title="ラベルを管理">⚙ タグ管理</button>
@@ -1072,11 +1102,6 @@ async function saveTitle() {
       const idx = recentEntries.findIndex(e => e.id === id);
       if (idx >= 0 && updated) recentEntries[idx] = updated;
       refreshEntriesList(id);
-      // ヘッダーの「編集中: …」表示も更新
-      if (editingEntryId === id && updated) {
-        const titleSpan = document.querySelector(".braindump-header .braindump-title");
-        if (titleSpan) titleSpan.textContent = `編集中: ${entryTitle(updated)}`;
-      }
     } catch {}
   } else {
     // 未保存の新規メモ: 本文があれば作成（タイトルも同送）。本文がなければ currentTitle を保持
