@@ -49,6 +49,20 @@ app.include_router(gratitude.router,     prefix="/api/v1", tags=["gratitude"])
 app.include_router(udemy_tips.router,    prefix="/api/v1", tags=["udemy-tips"])
 
 
+@app.on_event("startup")
+async def _run_startup_migrations():
+    """起動時に一度きりの移行を実行する（ガードドキュメントで二重実行は防止済み）。"""
+    import logging
+    logger = logging.getLogger(__name__)
+    try:
+        from services import firestore_service
+        n = firestore_service.reset_braindump_updated_at_to_created()
+        if n:
+            logger.info("braindump updated_at リセット移行を実行: %d 件", n)
+    except Exception as e:
+        logger.warning("起動時移行に失敗（処理は継続）: %s", e)
+
+
 @app.get("/")
 async def root():
     return {"message": "日次行動分析AI API", "version": "1.0.0"}

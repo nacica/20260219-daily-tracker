@@ -153,7 +153,9 @@ async def update_braindump_entry(entry_id: str, body: BraindumpUpdate, backgroun
     if not existing:
         raise HTTPException(status_code=404, detail=f"{entry_id} のメモが見つかりません")
 
-    update_data: dict = {"updated_at": now_jst()}
+    # updated_at は「本文が実際に変わったとき」だけ進める。
+    # 閲覧時の自動タイトル固定・手動タイトル編集・ラベル変更では更新日時を動かさない。
+    update_data: dict = {}
 
     # 手動タイトル: 非空なら固定（title_custom=True）、空文字なら自動タイトルへ戻す
     title_custom = bool(existing.get("title_custom"))
@@ -177,8 +179,12 @@ async def update_braindump_entry(entry_id: str, body: BraindumpUpdate, backgroun
 
     if body.content is not None:
         update_data["content"] = body.content
+        content_changed = body.content != existing.get("content", "")
+        # 本文が実際に変わったときだけ更新日時を進める
+        if content_changed:
+            update_data["updated_at"] = now_jst()
         # コンテンツが変わったらタイトルを再生成（手動タイトル固定中は上書きしない）
-        if body.content != existing.get("content", "") and not title_custom:
+        if content_changed and not title_custom:
             temp_title = body.content[:30].replace("\n", " ")
             if len(body.content) > 30:
                 temp_title += "..."
@@ -187,6 +193,10 @@ async def update_braindump_entry(entry_id: str, body: BraindumpUpdate, backgroun
 
     if body.labels is not None:
         update_data["labels"] = _normalize_labels(body.labels)
+
+    # 変更点が無ければ何も書き込まない（更新日時も動かさない）
+    if not update_data:
+        return BraindumpEntry(**existing)
 
     updated = firestore_service.update_braindump(entry_id, update_data)
     return BraindumpEntry(**updated)
@@ -262,7 +272,8 @@ async def generate_braindump_title(entry_id: str):
             detail=f"タイトル生成でエラーが発生しました: {str(e)[:200]}",
         )
 
-    update_data = {"title": title, "updated_at": now_jst()}
+    # AIタイトル生成は本文の変更ではないため更新日時は動かさない
+    update_data = {"title": title}
     updated = firestore_service.update_braindump(entry_id, update_data)
     return BraindumpEntry(**updated)
 
@@ -309,9 +320,9 @@ def _generate_title_background(entry_id: str, content: str):
         if latest and latest.get("title_custom"):
             return
         title = claude_service.generate_braindump_title(content)
+        # AIタイトル生成は本文の変更ではないため更新日時は動かさない
         firestore_service.update_braindump(entry_id, {
             "title": title,
-            "updated_at": now_jst(),
         })
     except Exception as e:
         import logging

@@ -470,6 +470,33 @@ def update_braindump(entry_id: str, data: dict) -> Optional[dict]:
     return ref.get().to_dict()
 
 
+def reset_braindump_updated_at_to_created() -> int:
+    """既存ブレインダンプの updated_at を created_at に揃える一度きりの移行。
+
+    閲覧時の自動タイトル固定などで updated_at が実際の編集と無関係に進んでいたため、
+    過去分を created_at にリセットして「更新日順」の基準を仕切り直す。
+    migrations/braindump_updated_at_reset_v1 のガードドキュメントで二重実行を防ぐ。
+    実際に書き換えた件数を返す。
+    """
+    db = get_db()
+    guard = db.collection("migrations").document("braindump_updated_at_reset_v1")
+    if guard.get().exists:
+        return 0
+
+    affected = 0
+    for doc in db.collection("braindump_entries").stream():
+        data = doc.to_dict() or {}
+        created = data.get("created_at")
+        if not created:
+            continue
+        if data.get("updated_at") != created:
+            doc.reference.update({"updated_at": created})
+            affected += 1
+
+    guard.set({"done_at": now_jst(), "affected": affected})
+    return affected
+
+
 def delete_braindump(entry_id: str) -> bool:
     """ブレインダンプを削除"""
     db = get_db()
