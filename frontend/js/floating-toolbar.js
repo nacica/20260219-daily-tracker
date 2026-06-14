@@ -67,7 +67,9 @@ function getActiveEditor() {
 
 let toolbarEl = null;
 let toolbarInited = false;
-let toolbarPositionLocked = false;
+// 選択が確定したら位置を固定（ピン留め）し、B/A 操作の度に飛び跳ねないようにする。
+// ドラッグ中（選択を広げている最中）は false のままにして、選択範囲の上端に追従させる。
+let toolbarPinned = false;
 
 function ensureToolbar() {
   if (toolbarInited) return;
@@ -104,6 +106,28 @@ function ensureToolbar() {
   document.addEventListener("selectionchange", updateToolbarPosition);
   window.addEventListener("scroll", updateToolbarPosition, true);
   window.addEventListener("resize", updateToolbarPosition);
+  // ドラッグ開始（pointerdown）でピンを外して選択に追従させ、
+  // 離した（pointerup）時点で現在の選択範囲の真上に置き直してから固定する。
+  document.addEventListener("pointerdown", onSelectionPointerDown, true);
+  document.addEventListener("pointerup", onSelectionPointerUp, true);
+}
+
+/** ツールバー自身のボタン上で起きたイベントか */
+function isToolbarEvent(e) {
+  return !!(toolbarEl && e.target && toolbarEl.contains(e.target));
+}
+
+function onSelectionPointerDown(e) {
+  if (isToolbarEvent(e)) return; // ボタン操作では追従を再開しない
+  toolbarPinned = false; // 新しい選択を開始 → 追従モードへ
+}
+
+function onSelectionPointerUp(e) {
+  if (isToolbarEvent(e)) return;
+  // 選択確定: 現在の選択範囲を基準に一度だけ置き直してからピン留め
+  toolbarPinned = false;
+  updateToolbarPosition();
+  toolbarPinned = true;
 }
 
 function updateToolbarPosition() {
@@ -112,30 +136,31 @@ function updateToolbarPosition() {
   const editor = getActiveEditor();
   if (!editor) {
     tb.style.display = "none";
-    toolbarPositionLocked = false;
+    toolbarPinned = false;
     return;
   }
   const sel = window.getSelection();
   if (!sel || sel.rangeCount === 0 || sel.isCollapsed) {
     tb.style.display = "none";
-    toolbarPositionLocked = false;
+    toolbarPinned = false;
     return;
   }
   const range = sel.getRangeAt(0);
   const rect = range.getBoundingClientRect();
   if (rect.width === 0 && rect.height === 0) {
     tb.style.display = "none";
-    toolbarPositionLocked = false;
+    toolbarPinned = false;
     return;
   }
-  // 表示中は位置を固定（B/A 操作の度に飛び跳ねないように）
-  if (toolbarPositionLocked && tb.style.display !== "none") return;
+  // 選択確定後は位置を固定（B/A 操作の度に飛び跳ねないように）。
+  // ドラッグ中（未ピン）は選択範囲の上端へ追従し続ける。
+  if (toolbarPinned && tb.style.display !== "none") return;
 
   tb.style.visibility = "hidden";
   tb.style.display = "";
   const tbW = tb.offsetWidth;
   const tbH = tb.offsetHeight;
-  let top = window.scrollY + rect.top - tbH - 8;
+  let top = window.scrollY + rect.top - tbH - 10;
   let left = window.scrollX + rect.left + rect.width / 2 - tbW / 2;
   const minLeft = window.scrollX + 4;
   const maxLeft = window.scrollX + document.documentElement.clientWidth - tbW - 4;
@@ -147,7 +172,6 @@ function updateToolbarPosition() {
   tb.style.top = top + "px";
   tb.style.left = left + "px";
   tb.style.visibility = "";
-  toolbarPositionLocked = true;
 }
 
 // ========== 太字トグル ==========

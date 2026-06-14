@@ -5,14 +5,14 @@
  * ラベル機能: メモごとに複数ラベル付与可、ラベルOR検索、専用管理モーダル。
  */
 
-import { braindumpApi } from "../api.js?v=20260614c";
-import { showToast } from "../app.js?v=20260614c";
+import { braindumpApi } from "../api.js?v=20260614d";
+import { showToast } from "../app.js?v=20260614d";
 import {
   attachFloatingToolbar,
   appendMarkdownToEditor,
   serializeEditorMarkdown,
   SIZE_SPAN_STRIP,
-} from "../floating-toolbar.js?v=20260614c";
+} from "../floating-toolbar.js?v=20260614d";
 
 // ===== ユーティリティ =====
 
