@@ -56,10 +56,16 @@ async def create_braindump(body: BraindumpCreate, background_tasks: BackgroundTa
     entry_number = firestore_service.get_next_braindump_entry_number(date)
     entry_id = f"braindump#{date}#{entry_number}"
 
-    # 仮タイトル: 本文の先頭30文字
-    temp_title = body.content[:30].replace("\n", " ")
-    if len(body.content) > 30:
-        temp_title += "..."
+    # 手動タイトル指定があればそれを採用（AI 自動生成はスキップ）
+    manual_title = (body.title or "").strip()
+    title_custom = bool(manual_title)
+    if title_custom:
+        temp_title = manual_title[:200]
+    else:
+        # 仮タイトル: 本文の先頭30文字
+        temp_title = body.content[:30].replace("\n", " ")
+        if len(body.content) > 30:
+            temp_title += "..."
 
     # 同日内の既存 sort_order の最大値+1（手動並び替え済みでも末尾に追加されるように）
     existing_today = firestore_service.list_braindumps_for_date(date)
@@ -78,6 +84,7 @@ async def create_braindump(body: BraindumpCreate, background_tasks: BackgroundTa
         "entry_number": entry_number,
         "content": body.content,
         "title": temp_title,
+        "title_custom": title_custom,
         "labels": _normalize_labels(body.labels),
         "sort_order": sort_order,
         "created_at": now,
@@ -86,8 +93,9 @@ async def create_braindump(body: BraindumpCreate, background_tasks: BackgroundTa
 
     saved = firestore_service.create_braindump(entry_id, data)
 
-    # バックグラウンドでAIタイトル生成
-    background_tasks.add_task(_generate_title_background, entry_id, body.content)
+    # バックグラウンドでAIタイトル生成（手動タイトル指定時はスキップ）
+    if not title_custom:
+        background_tasks.add_task(_generate_title_background, entry_id, body.content)
 
     return BraindumpEntry(**saved)
 
@@ -147,10 +155,30 @@ async def update_braindump_entry(entry_id: str, body: BraindumpUpdate, backgroun
 
     update_data: dict = {"updated_at": now_jst()}
 
+    # 手動タイトル: 非空なら固定（title_custom=True）、空文字なら自動タイトルへ戻す
+    title_custom = bool(existing.get("title_custom"))
+    if body.title is not None:
+        manual = body.title.strip()
+        if manual:
+            update_data["title"] = manual[:200]
+            update_data["title_custom"] = True
+            title_custom = True
+        else:
+            # 空文字 → 自動タイトルに戻す（本文先頭から仮タイトル + AI再生成）
+            update_data["title_custom"] = False
+            title_custom = False
+            base = (body.content if body.content is not None else existing.get("content", "")) or ""
+            temp_title = base[:30].replace("\n", " ")
+            if len(base) > 30:
+                temp_title += "..."
+            update_data["title"] = temp_title
+            if base.strip():
+                background_tasks.add_task(_generate_title_background, entry_id, base)
+
     if body.content is not None:
         update_data["content"] = body.content
-        # コンテンツが変わったらタイトルを再生成
-        if body.content != existing.get("content", ""):
+        # コンテンツが変わったらタイトルを再生成（手動タイトル固定中は上書きしない）
+        if body.content != existing.get("content", "") and not title_custom:
             temp_title = body.content[:30].replace("\n", " ")
             if len(body.content) > 30:
                 temp_title += "..."
@@ -276,6 +304,10 @@ async def delete_braindump_label_endpoint(name: str):
 def _generate_title_background(entry_id: str, content: str):
     """バックグラウンドでAIタイトルを生成し保存する"""
     try:
+        # 生成中に手動タイトルが設定された場合は上書きしない
+        latest = firestore_service.get_braindump(entry_id)
+        if latest and latest.get("title_custom"):
+            return
         title = claude_service.generate_braindump_title(content)
         firestore_service.update_braindump(entry_id, {
             "title": title,

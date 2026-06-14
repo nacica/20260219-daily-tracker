@@ -4992,11 +4992,13 @@ div.journal-textarea.is-empty::before {
     max-width: 1307px;
   }
   .braindump-left {
-    flex: 7;
+    /* 右一覧を 1.3 倍に広げる分、中央(左)入力列を縮小（総幅は維持: 6.1 + 3.9 = 10） */
+    flex: 6.1;
     min-width: 0;
   }
   .braindump-right {
-    flex: 3;
+    /* 既定の 3 を 1.3 倍 = 3.9 にしてノート一覧カードを広げる */
+    flex: 3.9;
     min-width: 0;
     position: sticky;
     top: 80px;
@@ -5048,6 +5050,45 @@ div.journal-textarea.is-empty::before {
 
 .braindump-new-form {
   margin-bottom: 16px;
+}
+
+/* 手動タイトル入力欄（左エディタ上部） */
+.braindump-title-input {
+  width: 100%;
+  box-sizing: border-box;
+  margin-bottom: 10px;
+  padding: 10px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 1.05rem;
+  font-weight: 600;
+  line-height: 1.4;
+  transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+}
+
+.braindump-title-input::placeholder {
+  color: rgba(255, 255, 255, 0.32);
+  font-weight: 400;
+}
+
+.braindump-title-input:focus {
+  outline: none;
+  border-color: var(--accent, #00d4ff);
+  background: rgba(0, 212, 255, 0.05);
+  box-shadow: 0 0 0 2px rgba(0, 212, 255, 0.15);
+}
+
+[data-theme="light"] .braindump-title-input {
+  border-color: rgba(0, 0, 0, 0.15);
+  background: #ffffff;
+  color: #1a1a1a;
+}
+
+[data-theme="light"] .braindump-title-input::placeholder {
+  color: rgba(0, 0, 0, 0.4);
 }
 
 .braindump-textarea-wrap {

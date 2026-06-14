@@ -5,14 +5,14 @@
  * ラベル機能: メモごとに複数ラベル付与可、ラベルOR検索、専用管理モーダル。
  */
 
-import { braindumpApi } from "../api.js?v=20260613b";
-import { showToast } from "../app.js?v=20260613b";
+import { braindumpApi } from "../api.js?v=20260614a";
+import { showToast } from "../app.js?v=20260614a";
 import {
   attachFloatingToolbar,
   appendMarkdownToEditor,
   serializeEditorMarkdown,
   SIZE_SPAN_STRIP,
-} from "../floating-toolbar.js?v=20260613b";
+} from "../floating-toolbar.js?v=20260614a";
 
 // ===== ユーティリティ =====
 
@@ -70,6 +70,19 @@ function stripDateHeader(text) {
   return lines.slice(i).join("\n");
 }
 
+// 本文先頭からタイトルを算出（手動タイトル未設定時のフォールバック）
+function deriveTitleFromContent(content) {
+  const cleanContent = (content || "").replace(IMG_REGEX, " ").replace(SIZE_SPAN_STRIP, "").trim();
+  const bodyContent = stripDateHeader(cleanContent).trim();
+  return bodyContent.slice(0, 40).replace(/\n/g, " ") || "(無題)";
+}
+
+// 一覧/ヘッダー表示用のタイトル。手動タイトルがあればそれを優先、なければ本文先頭から算出
+function entryTitle(entry) {
+  if (entry && entry.title_custom && entry.title) return entry.title;
+  return deriveTitleFromContent(entry ? entry.content : "");
+}
+
 /** タグ名から決定的に HSL 色を生成（薄め背景・濃いめ文字） */
 function labelColor(name) {
   let h = 0;
@@ -99,6 +112,9 @@ let recentEntries = []; // 過去15日分のメモ
 let editingEntryId = null;
 let newAutoSaveTimer = null;
 let newEntryId = null; // 新規メモが自動保存された後のエントリID
+let currentTitle = ""; // 編集中メモ / 新規メモの手動タイトル（未設定なら空文字 = 自動タイトル）
+let lastSavedTitle = ""; // サーバに保存済みの手動タイトル（変更なし時の無駄な保存・AI再生成を避ける）
+let titleSaveTimer = null; // タイトル入力の自動保存デバウンス
 let currentLabels = []; // 編集中メモ / 新規メモのラベル配列
 let allLabels = []; // 全メモから集計したラベル一覧 [{name, count}]
 let filterLabels = []; // 一覧フィルタで選択中のラベル名（OR検索）
@@ -276,6 +292,8 @@ export async function renderBraindump() {
           </div>
         </div>
         <div class="braindump-new-form" id="bd-new-form">
+          <input type="text" class="braindump-title-input" id="bd-title-input" maxlength="200"
+                 placeholder="タイトル（空欄ならAIが自動生成）" autocomplete="off" />
           <div class="braindump-labels-editor" id="bd-labels-editor">
             ${renderLabelsEditor()}
           </div>
@@ -583,7 +601,7 @@ function renderRecentEntries() {
       const time = entry.created_at ? entry.created_at.slice(11, 16) : "";
       const cleanContent = entry.content.replace(IMG_REGEX, " ").replace(SIZE_SPAN_STRIP, "").trim();
       const bodyContent = stripDateHeader(cleanContent).trim();
-      const title = bodyContent ? bodyContent.slice(0, 40).replace(/\n/g, " ") : "(無題)";
+      const title = entryTitle(entry);
       const preview = bodyContent.slice(0, 80).replace(/\n/g, " ");
       const labels = entry.labels || [];
       const labelsHTML = labels.length > 0
@@ -634,10 +652,7 @@ let suppressNextClick = false; // 長押し発火後の click を抑止
 function getEntryDisplayInfo(entryId) {
   const entry = recentEntries.find(en => en.id === entryId);
   if (!entry) return { title: "(不明なメモ)", labels: [] };
-  const cleanContent = entry.content.replace(IMG_REGEX, " ").replace(SIZE_SPAN_STRIP, "").trim();
-  const bodyContent = stripDateHeader(cleanContent).trim();
-  const title = bodyContent.slice(0, 40).replace(/\n/g, " ") || "(無題)";
-  return { title, labels: entry.labels || [] };
+  return { title: entryTitle(entry), labels: entry.labels || [] };
 }
 
 function showDeleteConfirmModal({ title, labels, onConfirm }) {
@@ -789,6 +804,29 @@ function attachEvents() {
     window.open(img.src, "_blank");
   });
 
+  // タイトル入力（手動タイトル）の編集
+  const titleEl = document.getElementById("bd-title-input");
+  if (titleEl) {
+    titleEl.addEventListener("input", () => {
+      currentTitle = titleEl.value;
+      if (titleSaveTimer) clearTimeout(titleSaveTimer);
+      titleSaveTimer = setTimeout(saveTitle, 800);
+    });
+    // フォーカスを離れた／Enter で即保存
+    titleEl.addEventListener("blur", () => {
+      if (titleSaveTimer) { clearTimeout(titleSaveTimer); titleSaveTimer = null; }
+      saveTitle();
+    });
+    titleEl.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        if (titleSaveTimer) { clearTimeout(titleSaveTimer); titleSaveTimer = null; }
+        saveTitle();
+        document.getElementById("bd-new-textarea")?.focus();
+      }
+    });
+  }
+
   // 縦幅調整バーのドラッグ処理（デスクトップ専用）
   initResizeBar();
 
@@ -889,6 +927,11 @@ function loadEntryIntoEditor(entry) {
   setEditorContent(editorEl, entry.content || "");
   updateEditorEmptyState(editorEl);
   currentLabels = [...(entry.labels || [])];
+  // 手動タイトルがあれば入力欄へ。自動タイトルのみのノートは空欄（プレースホルダー表示）
+  currentTitle = entry.title_custom ? (entry.title || "") : "";
+  lastSavedTitle = currentTitle;
+  const titleEl = document.getElementById("bd-title-input");
+  if (titleEl) titleEl.value = currentTitle;
   editingEntryId = entry.id;
   newEntryId = null; // 新規メモのIDをリセット
   rememberOpenEntry(entry.id); // リロード後も同じノートを表示できるよう記憶
@@ -914,9 +957,7 @@ function loadEntryIntoEditor(entry) {
 // ===== ヘッダーモード切替 =====
 
 function updateHeaderForEditing(entry) {
-  const cleanContent = entry.content.replace(IMG_REGEX, " ").replace(SIZE_SPAN_STRIP, "").trim();
-  const bodyContent = stripDateHeader(cleanContent).trim();
-  const title = bodyContent.slice(0, 40).replace(/\n/g, " ") || "(無題)";
+  const title = entryTitle(entry);
   const header = document.querySelector(".braindump-header");
   if (!header) return;
   header.innerHTML = `
@@ -972,6 +1013,11 @@ function resetToNewMode() {
     updateEditorEmptyState(editorEl);
   }
   currentLabels = [];
+  currentTitle = "";
+  lastSavedTitle = "";
+  if (titleSaveTimer) { clearTimeout(titleSaveTimer); titleSaveTimer = null; }
+  const titleEl = document.getElementById("bd-title-input");
+  if (titleEl) titleEl.value = "";
   refreshLabelsEditor();
 
   // ヘッダーを元に戻す
@@ -1011,6 +1057,39 @@ function handleNewTextareaInput() {
   }, 2000);
 }
 
+/** 手動タイトルを保存（空文字なら自動タイトルに戻す）。未保存の新規メモは本文があれば作成時に同送 */
+async function saveTitle() {
+  const titleEl = document.getElementById("bd-title-input");
+  const value = titleEl ? titleEl.value : currentTitle;
+  currentTitle = value;
+  // 変更がなければ何もしない（無駄な保存・AIタイトル再生成を防ぐ）
+  if (value.trim() === lastSavedTitle.trim()) return;
+  const id = editingEntryId || newEntryId;
+  if (id) {
+    try {
+      const updated = await braindumpApi.update(id, null, null, value);
+      lastSavedTitle = updated && updated.title_custom ? (updated.title || "") : "";
+      const idx = recentEntries.findIndex(e => e.id === id);
+      if (idx >= 0 && updated) recentEntries[idx] = updated;
+      refreshEntriesList(id);
+      // ヘッダーの「編集中: …」表示も更新
+      if (editingEntryId === id && updated) {
+        const titleSpan = document.querySelector(".braindump-header .braindump-title");
+        if (titleSpan) titleSpan.textContent = `編集中: ${entryTitle(updated)}`;
+      }
+    } catch {}
+  } else {
+    // 未保存の新規メモ: 本文があれば作成（タイトルも同送）。本文がなければ currentTitle を保持
+    const ed = document.getElementById("bd-new-textarea");
+    const md = ed ? getEditorMarkdown(ed) : "";
+    const plainText = md.replace(IMG_REGEX, "").trim();
+    const hasImages = !!(ed && ed.querySelector("img.bd-inline-img"));
+    if ((plainText && !isHeaderOnly(plainText)) || hasImages) {
+      await autoSaveNewEntry();
+    }
+  }
+}
+
 async function autoSaveExistingEntry(entryId) {
   const editorEl = document.getElementById("bd-new-textarea");
   if (!editorEl) return;
@@ -1043,15 +1122,18 @@ async function autoSaveNewEntry() {
   if (!hasImages && (plainText === "" || isHeaderOnly(plainText))) return;
   if (!content) return;
 
+  // 未入力（空文字）のタイトルは送らない（content 自動保存で既存タイトルを上書きしないため）
+  const titleArg = currentTitle.trim() ? currentTitle : null;
   try {
     if (newEntryId) {
       // 既に作成済み → 更新
-      await braindumpApi.update(newEntryId, content, currentLabels);
+      await braindumpApi.update(newEntryId, content, currentLabels, titleArg);
     } else {
       // 初回 → 新規作成してIDを保持
-      const created = await braindumpApi.create(currentDate, content, currentLabels);
+      const created = await braindumpApi.create(currentDate, content, currentLabels, titleArg);
       if (created && created.id) {
         newEntryId = created.id;
+        if (titleArg) lastSavedTitle = currentTitle; // 作成時にタイトルも保存済み
         rememberOpenEntry(newEntryId); // リロード後も書きかけメモを復元
       }
     }

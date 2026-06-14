@@ -223,12 +223,13 @@ export const journalApi = {
 // ---- ブレインダンプ ----
 
 export const braindumpApi = {
-  /** メモ作成（1日に複数作成可能） */
-  create: (date, content, labels = null) =>
-    apiFetch("/braindump", {
-      method: "POST",
-      body: labels ? { date, content, labels } : { date, content },
-    }),
+  /** メモ作成（1日に複数作成可能。title 指定で手動タイトルを同時設定） */
+  create: (date, content, labels = null, title = null) => {
+    const body = { date, content };
+    if (labels) body.labels = labels;
+    if (title) body.title = title;
+    return apiFetch("/braindump", { method: "POST", body });
+  },
 
   /** メモ一覧（日付範囲） */
   list: (startDate, endDate) => {
@@ -259,11 +260,12 @@ export const braindumpApi = {
   /** 単一メモ取得 */
   getEntry: (entryId) => apiFetch(`/braindump/entry/${encodeURIComponent(entryId)}`),
 
-  /** メモ更新（content / labels いずれかまたは両方を指定可、null は省略扱い） */
-  update: (entryId, content, labels = null) => {
+  /** メモ更新（content / labels / title いずれかまたは複数を指定可、null は省略扱い。title は "" で自動タイトルに戻す） */
+  update: (entryId, content, labels = null, title = null) => {
     const body = {};
     if (content !== null && content !== undefined) body.content = content;
     if (labels !== null && labels !== undefined) body.labels = labels;
+    if (title !== null && title !== undefined) body.title = title;
     return apiFetch(`/braindump/entry/${encodeURIComponent(entryId)}`, { method: "PUT", body });
   },
 

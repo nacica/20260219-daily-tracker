@@ -14,12 +14,14 @@ class BraindumpCreate(BaseModel):
     date: str = Field(..., description="日付 (YYYY-MM-DD)")
     content: str = Field(..., min_length=1, max_length=50000, description="メモ本文")
     labels: Optional[list[str]] = Field(default=None, description="ラベル名リスト")
+    title: Optional[str] = Field(default=None, max_length=200, description="手動タイトル（指定時は AI 自動生成をスキップ）")
 
 
 class BraindumpUpdate(BaseModel):
     """ブレインダンプ更新リクエスト"""
     content: Optional[str] = Field(None, min_length=1, max_length=50000)
     labels: Optional[list[str]] = Field(default=None, description="ラベル名リスト（指定で全置換）")
+    title: Optional[str] = Field(default=None, max_length=200, description="手動タイトル（空文字で自動タイトルに戻す）")
 
 
 class LabelRenameRequest(BaseModel):
@@ -42,6 +44,7 @@ class BraindumpEntry(BaseModel):
     entry_number: int = 1
     content: str
     title: Optional[str] = None
+    title_custom: bool = False
     labels: list[str] = Field(default_factory=list)
     sort_order: Optional[float] = None
     created_at: Optional[str] = None
