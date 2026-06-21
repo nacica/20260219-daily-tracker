@@ -5,14 +5,14 @@
  * 朝のタスク整理（ソクラテス式問答）統合
  */
 
-import { recordsApi, analysisApi, morningDialogueApi, remindersApi, categoriesApi } from "../api.js?v=20260614d";
-import { showToast } from "../app.js?v=20260614d";
-import { showTaskCompleteAnimation } from "./task-stats.js?v=20260614d";
+import { recordsApi, analysisApi, morningDialogueApi, remindersApi, categoriesApi } from "../api.js?v=20260621a";
+import { showToast } from "../app.js?v=20260621a";
+import { showTaskCompleteAnimation } from "./task-stats.js?v=20260621a";
 import {
   attachFloatingToolbar,
   appendMarkdownToEditor,
   serializeEditorMarkdown,
-} from "../floating-toolbar.js?v=20260614d";
+} from "../floating-toolbar.js?v=20260621a";
 
 /** contenteditable div / textarea いずれでも markdown を読み書きするヘルパ */
 function readEditableMarkdown(el) {
@@ -2334,7 +2334,6 @@ function attachFormEvents(date, isEdit) {
         const btnSubmit = document.getElementById("btn-submit");
         if (btnSubmit) btnSubmit.textContent = "記録を更新する";
       }
-      showToast("自動保存しました", "success");
     } catch (err) {
       showToast("自動保存に失敗しました: " + err.message, "error");
     } finally {
