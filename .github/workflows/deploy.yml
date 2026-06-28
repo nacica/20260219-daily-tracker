@@ -133,8 +133,21 @@ jobs:
 
           # 5. Firebase CLI インストール & デプロイ
           npm install -g firebase-tools
-          firebase deploy \
+
+          # firebase-tools は新バージョンを live へ反映した後、冗長なリリース呼び出しで
+          # 「is the current active version」(HTTP 400) を返して exit 1 になることがある。
+          # 実ファイルは既に live へ反映済みのため、この良性エラーのみ成功扱いにする。
+          # それ以外の失敗は従来どおり exit 1 でデプロイを失敗させる。
+          DEPLOY_LOG="$(mktemp)"
+          if firebase deploy \
             --only hosting \
             --project ${{ env.PROJECT_ID }} \
             --non-interactive \
-            --token "$FIREBASE_TOKEN"
+            --token "$FIREBASE_TOKEN" 2>&1 | tee "$DEPLOY_LOG"; then
+            echo "Firebase デプロイ成功。"
+          elif grep -q "is the current active version" "$DEPLOY_LOG"; then
+            echo "::warning::Firebase が『is the current active version』を返しましたが、新バージョンは既に live へ反映済みのため成功として扱います。"
+          else
+            echo "::error::Firebase デプロイが失敗しました。"
+            exit 1
+          fi
