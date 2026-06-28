@@ -10,28 +10,28 @@
  *     リダイレクトのみ提供する。
  */
 
-import { addRoute, navigate, updateNavActive } from "./router.js?v=20260621a";
-import { recordsApi } from "./api.js?v=20260621a";
-import { initSwipeNav } from "./swipe-nav.js?v=20260621a";
-import { initBedtimeTimer } from "./bedtime-timer.js?v=20260621a";
-import { initSidebarResize } from "./sidebar-resize.js?v=20260621a";
+import { addRoute, navigate, updateNavActive } from "./router.js?v=20260621b";
+import { recordsApi } from "./api.js?v=20260621b";
+import { initSwipeNav } from "./swipe-nav.js?v=20260621b";
+import { initBedtimeTimer } from "./bedtime-timer.js?v=20260621b";
+import { initSidebarResize } from "./sidebar-resize.js?v=20260621b";
 
 // ===== 動的 import ヘルパー =====
 // 各コンポーネントは初回訪問時に初めてネットワーク取得（以降は SW キャッシュから即応答）
-const loadInputForm       = () => import("./components/input-form.js?v=20260621a");
-const loadAnalysisView    = () => import("./components/analysis-view.js?v=20260621a");
-const loadHistoryList     = () => import("./components/history-list.js?v=20260621a");
-const loadWeeklyReport    = () => import("./components/weekly-report.js?v=20260621a");
-const loadSuggestions     = () => import("./components/suggestions.js?v=20260621a");
-const loadMonthlyReport   = () => import("./components/monthly-report.js?v=20260621a");
-const loadJournal         = () => import("./components/journal.js?v=20260621a");
-const loadBraindump       = () => import("./components/braindump.js?v=20260621a");
-const loadTaskStats       = () => import("./components/task-stats.js?v=20260621a");
-const loadFlashcardList   = () => import("./components/flashcard-list.js?v=20260621a");
-const loadFlashcardStudy  = () => import("./components/flashcard-study.js?v=20260621a");
-const loadWishlist        = () => import("./components/wishlist.js?v=20260621a");
-const loadGratitude       = () => import("./components/gratitude.js?v=20260621a");
-const loadUdemyTips       = () => import("./components/udemy-tips.js?v=20260621a");
+const loadInputForm       = () => import("./components/input-form.js?v=20260621b");
+const loadAnalysisView    = () => import("./components/analysis-view.js?v=20260621b");
+const loadHistoryList     = () => import("./components/history-list.js?v=20260621b");
+const loadWeeklyReport    = () => import("./components/weekly-report.js?v=20260621b");
+const loadSuggestions     = () => import("./components/suggestions.js?v=20260621b");
+const loadMonthlyReport   = () => import("./components/monthly-report.js?v=20260621b");
+const loadJournal         = () => import("./components/journal.js?v=20260621b");
+const loadBraindump       = () => import("./components/braindump.js?v=20260621b");
+const loadTaskStats       = () => import("./components/task-stats.js?v=20260621b");
+const loadFlashcardList   = () => import("./components/flashcard-list.js?v=20260621b");
+const loadFlashcardStudy  = () => import("./components/flashcard-study.js?v=20260621b");
+const loadWishlist        = () => import("./components/wishlist.js?v=20260621b");
+const loadGratitude       = () => import("./components/gratitude.js?v=20260621b");
+const loadUdemyTips       = () => import("./components/udemy-tips.js?v=20260621b");
 
 // ===== ユーティリティ =====
 
@@ -356,6 +356,65 @@ document.addEventListener("paste", (e) => {
 
   e.preventDefault();
   _insertTextAtCursor(target, transformed);
+});
+
+// ===== 日時挿入ショートカット（Alt+Shift+D） =====
+// フォーカス中の textarea / input / contenteditable のカーソル位置に
+// 「2026年6月27日（土）11:22」形式の現在日時を挿入する。
+
+const _WEEKDAYS_JA = ["日", "月", "火", "水", "木", "金", "土"];
+
+/** Date を「YYYY年M月D日（曜）HH:mm」形式の文字列にする */
+function formatDateTimeJa(d) {
+  const pad = (n) => String(n).padStart(2, "0");
+  return (
+    `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日` +
+    `（${_WEEKDAYS_JA[d.getDay()]}）${pad(d.getHours())}:${pad(d.getMinutes())}`
+  );
+}
+
+/** フォーカス中の編集可能要素に日時を挿入。挿入できたら true */
+function insertDateTimeAtFocus() {
+  const el = document.activeElement;
+  if (!el) return false;
+  const text = formatDateTimeJa(new Date());
+
+  // textarea / テキスト系 input
+  if (
+    el instanceof HTMLTextAreaElement ||
+    (el instanceof HTMLInputElement && typeof el.selectionStart === "number")
+  ) {
+    _insertTextAtCursor(el, text);
+    return true;
+  }
+
+  // contenteditable（sticky-input など）
+  if (el.isContentEditable) {
+    const ok = document.execCommand("insertText", false, text);
+    if (!ok) {
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount) {
+        const range = sel.getRangeAt(0);
+        range.deleteContents();
+        const node = document.createTextNode(text);
+        range.insertNode(node);
+        range.setStartAfter(node);
+        range.setEndAfter(node);
+        sel.removeAllRanges();
+        sel.addRange(range);
+      }
+    }
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+    return true;
+  }
+
+  return false;
+}
+
+document.addEventListener("keydown", (e) => {
+  if (e.altKey && e.shiftKey && !e.ctrlKey && !e.metaKey && e.code === "KeyD") {
+    if (insertDateTimeAtFocus()) e.preventDefault();
+  }
 });
 
 // ===== ルーティング設定 =====
