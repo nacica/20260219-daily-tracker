@@ -5,13 +5,13 @@
  * カードの追加・編集・削除 + 学習画面への遷移
  */
 
-import { flashcardsApi } from "../api.js?v=20260614d";
-import { showToast } from "../app.js?v=20260614d";
+import { flashcardsApi } from "../api.js?v=20260701a";
+import { showToast } from "../app.js?v=20260701a";
 import {
   attachFloatingToolbar,
   appendMarkdownToEditor,
   serializeEditorMarkdown,
-} from "../floating-toolbar.js?v=20260614d";
+} from "../floating-toolbar.js?v=20260701a";
 
 // モジュールロード時に読み込み確認ログを出す（キャッシュ診断用）
 const FLASHCARD_LIST_VERSION = "20260424b";
