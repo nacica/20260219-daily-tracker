@@ -10,28 +10,44 @@
  *     リダイレクトのみ提供する。
  */
 
-import { addRoute, navigate, updateNavActive } from "./router.js?v=20260701a";
-import { recordsApi } from "./api.js?v=20260701a";
-import { initSwipeNav } from "./swipe-nav.js?v=20260701a";
-import { initBedtimeTimer } from "./bedtime-timer.js?v=20260701a";
-import { initSidebarResize } from "./sidebar-resize.js?v=20260701a";
+import { addRoute, navigate, updateNavActive } from "./router.js?v=20260703a";
+import { recordsApi } from "./api.js?v=20260703a";
+import { initSwipeNav } from "./swipe-nav.js?v=20260703a";
+import { initBedtimeTimer } from "./bedtime-timer.js?v=20260703a";
+import { initSidebarResize } from "./sidebar-resize.js?v=20260703a";
+
+// ===== バックエンドのウォームアップ（コールドスタート対策） =====
+// Cloud Run は min-instances 0 で運用しているため、久しぶりのアクセスでは
+// コンテナのコールドスタート（数秒）が発生し「起動が遅い」体感の主因になる。
+// app.js 評価直後（各コンポーネントの動的 import・パースより前）に軽量な
+// /health を先行で叩き、コンテナ起動をフロントの読み込みと並行させることで、
+// 最初のデータ取得（input-form の 5 本並列 API）までの待ち時間を短縮する。
+(function warmUpBackend() {
+  try {
+    const base = window.API_BASE_URL || "";
+    // API_BASE_URL は ".../api/v1" 形式。/health はオリジン直下にあるため api/v1 を除去。
+    const origin = base.replace(/\/api\/v1\/?$/, "");
+    if (!origin) return;
+    fetch(`${origin}/health`, { method: "GET", cache: "no-store", keepalive: true }).catch(() => {});
+  } catch {}
+})();
 
 // ===== 動的 import ヘルパー =====
 // 各コンポーネントは初回訪問時に初めてネットワーク取得（以降は SW キャッシュから即応答）
-const loadInputForm       = () => import("./components/input-form.js?v=20260701a");
-const loadAnalysisView    = () => import("./components/analysis-view.js?v=20260701a");
-const loadHistoryList     = () => import("./components/history-list.js?v=20260701a");
-const loadWeeklyReport    = () => import("./components/weekly-report.js?v=20260701a");
-const loadSuggestions     = () => import("./components/suggestions.js?v=20260701a");
-const loadMonthlyReport   = () => import("./components/monthly-report.js?v=20260701a");
-const loadJournal         = () => import("./components/journal.js?v=20260701a");
-const loadBraindump       = () => import("./components/braindump.js?v=20260701a");
-const loadTaskStats       = () => import("./components/task-stats.js?v=20260701a");
-const loadFlashcardList   = () => import("./components/flashcard-list.js?v=20260701a");
-const loadFlashcardStudy  = () => import("./components/flashcard-study.js?v=20260701a");
-const loadWishlist        = () => import("./components/wishlist.js?v=20260701a");
-const loadGratitude       = () => import("./components/gratitude.js?v=20260701a");
-const loadUdemyTips       = () => import("./components/udemy-tips.js?v=20260701a");
+const loadInputForm       = () => import("./components/input-form.js?v=20260703a");
+const loadAnalysisView    = () => import("./components/analysis-view.js?v=20260703a");
+const loadHistoryList     = () => import("./components/history-list.js?v=20260703a");
+const loadWeeklyReport    = () => import("./components/weekly-report.js?v=20260703a");
+const loadSuggestions     = () => import("./components/suggestions.js?v=20260703a");
+const loadMonthlyReport   = () => import("./components/monthly-report.js?v=20260703a");
+const loadJournal         = () => import("./components/journal.js?v=20260703a");
+const loadBraindump       = () => import("./components/braindump.js?v=20260703a");
+const loadTaskStats       = () => import("./components/task-stats.js?v=20260703a");
+const loadFlashcardList   = () => import("./components/flashcard-list.js?v=20260703a");
+const loadFlashcardStudy  = () => import("./components/flashcard-study.js?v=20260703a");
+const loadWishlist        = () => import("./components/wishlist.js?v=20260703a");
+const loadGratitude       = () => import("./components/gratitude.js?v=20260703a");
+const loadUdemyTips       = () => import("./components/udemy-tips.js?v=20260703a");
 
 // ===== ユーティリティ =====
 

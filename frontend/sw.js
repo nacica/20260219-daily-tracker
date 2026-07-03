@@ -9,7 +9,7 @@
  * SWR でも古いコードが出続けることはない（新バージョンは新 URL として取得される）。
  */
 
-const CACHE_NAME = "daily-tracker-v321";
+const CACHE_NAME = "daily-tracker-v322";
 const STATIC_ASSETS = [
   "/",
   "/index.html",
@@ -52,6 +52,10 @@ self.addEventListener("fetch", (event) => {
   if (request.method !== "GET") return;
 
   const url = new URL(request.url);
+
+  // ウォームアップ用ヘルスチェックはキャッシュせず常にネットワーク直行
+  // （キャッシュすると 2 回目以降バックエンドを起こせず、コールドスタート対策が無効化する）
+  if (url.pathname === "/health") return;
 
   // API リクエストは Network First
   if (url.pathname.startsWith("/api/")) {
