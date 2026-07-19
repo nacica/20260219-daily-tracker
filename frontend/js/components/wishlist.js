@@ -8,13 +8,13 @@
  * - 編集・削除メニュー(各項目)
  */
 
-import { wishlistApi } from "../api.js?v=20260703a";
-import { showToast } from "../app.js?v=20260703a";
+import { wishlistApi } from "../api.js?v=20260719a";
+import { showToast } from "../app.js?v=20260719a";
 import {
   attachFloatingToolbar,
   appendMarkdownToEditor,
   serializeEditorMarkdown,
-} from "../floating-toolbar.js?v=20260703a";
+} from "../floating-toolbar.js?v=20260719a";
 
 /** **bold** + <span style="font-size:Xem"> を保ったまま、テキスト部分はエスケープ + 改行→<br> */
 function renderWishlistNotes(text) {

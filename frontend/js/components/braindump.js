@@ -5,14 +5,14 @@
  * ラベル機能: メモごとに複数ラベル付与可、ラベルOR検索、専用管理モーダル。
  */
 
-import { braindumpApi } from "../api.js?v=20260703a";
-import { showToast } from "../app.js?v=20260703a";
+import { braindumpApi } from "../api.js?v=20260719a";
+import { showToast } from "../app.js?v=20260719a";
 import {
   attachFloatingToolbar,
   appendMarkdownToEditor,
   serializeEditorMarkdown,
   SIZE_SPAN_STRIP,
-} from "../floating-toolbar.js?v=20260703a";
+} from "../floating-toolbar.js?v=20260719a";
 
 // ===== ユーティリティ =====
 
@@ -617,20 +617,10 @@ function entryGroupDate(entry) {
   return ts && ts.length >= 10 ? ts.slice(0, 10) : entry.date;
 }
 
-function renderRecentEntries() {
+// 日付ごとにグループ化（新しい日付順）。日付は並び順モードに応じて作成/更新日を使う
+// 一覧レンダリングと ↑↓ ノートナビゲーションで同じ順序を共有する
+function buildGroupedEntries() {
   const list = getFilteredEntries();
-  if (list.length === 0) {
-    const msg = filterLabels.length > 0
-      ? `選択中のラベルに該当するメモはありません`
-      : `過去15日間のメモはありません`;
-    return `
-      <div class="empty-state" style="padding: 32px 0;">
-        <div class="icon">📝</div>
-        <p>${msg}</p>
-      </div>`;
-  }
-
-  // 日付ごとにグループ化（新しい日付順）。日付は並び順モードに応じて作成/更新日を使う
   const grouped = {};
   for (const entry of list) {
     const date = entryGroupDate(entry);
@@ -653,6 +643,29 @@ function renderRecentEntries() {
       grouped[date].sort((a, b) => sortKey(b) - sortKey(a) || (b.entry_number || 0) - (a.entry_number || 0));
     }
   }
+  return { grouped, sortedDates };
+}
+
+// 一覧の表示順（フィルタ + 並び順モード適用後）どおりに平坦化した配列
+function getOrderedEntries() {
+  const { grouped, sortedDates } = buildGroupedEntries();
+  return sortedDates.flatMap(d => grouped[d]);
+}
+
+function renderRecentEntries() {
+  const list = getFilteredEntries();
+  if (list.length === 0) {
+    const msg = filterLabels.length > 0
+      ? `選択中のラベルに該当するメモはありません`
+      : `過去15日間のメモはありません`;
+    return `
+      <div class="empty-state" style="padding: 32px 0;">
+        <div class="icon">📝</div>
+        <p>${msg}</p>
+      </div>`;
+  }
+
+  const { grouped, sortedDates } = buildGroupedEntries();
 
   return sortedDates.map(date => {
     const dateEntries = grouped[date];
@@ -684,7 +697,7 @@ function renderRecentEntries() {
         : "";
 
       return `
-        <div class="braindump-entry" data-id="${entry.id}" data-date="${entry.date}" style="cursor: pointer;">
+        <div class="braindump-entry" data-id="${entry.id}" data-date="${entry.date}" style="cursor: pointer;" tabindex="0">
           <div class="braindump-entry-header">
             <span class="braindump-entry-title">${escapeHTML(title)}</span>
             <div class="braindump-entry-actions">
@@ -708,11 +721,19 @@ function renderRecentEntries() {
 function refreshEntriesList(activeId) {
   const container = document.getElementById("bd-entries");
   if (container) {
+    // 再描画でフォーカス中のカードが破棄されると ↑↓ ナビゲーションが途切れるため、退避して復元する
+    const focused = document.activeElement;
+    const focusedId = focused && focused.classList && focused.classList.contains("braindump-entry")
+      ? focused.dataset.id
+      : null;
     container.innerHTML = renderRecentEntries();
     const targetId = activeId || editingEntryId;
     if (targetId) {
       const activeEl = container.querySelector(`.braindump-entry[data-id="${targetId}"]`);
       if (activeEl) activeEl.classList.add("active");
+    }
+    if (focusedId) {
+      container.querySelector(`.braindump-entry[data-id="${focusedId}"]`)?.focus({ preventScroll: true });
     }
   }
 }
@@ -989,6 +1010,63 @@ function attachEvents() {
 
     loadEntryIntoEditor(entry);
   });
+
+  // カード選択（フォーカス）状態でのキーボード操作
+  // ↑↓: 表示順どおりに前後のノートへ移動（自動保存 → 即読込）／Enter・Space: そのノートを開く
+  document.getElementById("bd-entries")?.addEventListener("keydown", (e) => {
+    const entryEl = e.target.closest(".braindump-entry");
+    if (!entryEl || !entryEl.dataset.id) return;
+
+    if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+      e.preventDefault();
+      navigateEntryBy(e.key === "ArrowDown" ? 1 : -1, entryEl.dataset.id);
+    } else if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      const entry = recentEntries.find(en => en.id === entryEl.dataset.id);
+      if (entry) loadEntryIntoEditor(entry);
+    }
+  });
+}
+
+// ===== ↑↓ ノートナビゲーション =====
+
+/** 保留中の自動保存タイマーを即時実行する（ノート切替時に書きかけ内容を失わないため） */
+async function flushPendingAutoSave() {
+  if (!newAutoSaveTimer) return;
+  clearTimeout(newAutoSaveTimer);
+  newAutoSaveTimer = null;
+  if (editingEntryId) {
+    await autoSaveExistingEntry(editingEntryId);
+  } else {
+    await autoSaveNewEntry();
+  }
+}
+
+/**
+ * 一覧の表示順で delta（-1 = 上 / +1 = 下）隣のノートへ移動する。
+ * fromId を渡すとそのカード基準（キーボード操作）、省略時は編集中ノート基準（ヘッダーボタン）。
+ * 端に達したら何もしない。
+ */
+async function navigateEntryBy(delta, fromId) {
+  const ordered = getOrderedEntries();
+  if (ordered.length === 0) return;
+  const baseId = fromId || editingEntryId || newEntryId;
+  const idx = ordered.findIndex(e => e.id === baseId);
+  if (idx < 0) return;
+  const next = ordered[idx + delta];
+  if (!next) return;
+
+  await flushPendingAutoSave();
+  loadEntryIntoEditor(next);
+  // キーボード操作時のみ移動先カードへフォーカスを移し、連続 ↑↓ を可能にする
+  if (fromId) focusEntryCard(next.id);
+}
+
+function focusEntryCard(id) {
+  const el = document.querySelector(`.braindump-entry[data-id="${id}"]`);
+  if (!el) return;
+  el.focus({ preventScroll: true });
+  el.scrollIntoView({ block: "nearest" });
 }
 
 /** 指定エントリを左側エディタに読み込んで編集モードにする（クリック / リロード復元の共通処理） */
@@ -1058,14 +1136,25 @@ async function fixAutoTitleOnOpen(entry) {
 function updateHeaderForEditing(entry) {
   const header = document.querySelector(".braindump-header");
   if (!header) return;
+  // ↑↓ ボタンの有効/無効判定（一覧の表示順で前後が存在するか）
+  const ordered = getOrderedEntries();
+  const navIdx = ordered.findIndex(e => e.id === entry.id);
+  const hasPrev = navIdx > 0;
+  const hasNext = navIdx >= 0 && navIdx < ordered.length - 1;
   // 編集モードではタイトル文字は出さず、ボタンのみ（空の要素でボタンを右寄せ維持）
   header.innerHTML = `
     <span class="braindump-title" aria-hidden="true"></span>
     <div class="braindump-header-actions">
+      <div class="bd-nav-btns" role="group" aria-label="前後のノートへ移動">
+        <button class="btn btn-outline btn-sm bd-nav-btn" id="bd-nav-prev-btn" title="上のノートへ"${hasPrev ? "" : " disabled"}>↑</button>
+        <button class="btn btn-outline btn-sm bd-nav-btn" id="bd-nav-next-btn" title="下のノートへ"${hasNext ? "" : " disabled"}>↓</button>
+      </div>
       <button class="btn btn-outline btn-sm" id="bd-back-to-new-btn">＋ 新しいメモ</button>
       <button class="btn btn-outline btn-sm" id="bd-manage-labels-btn" title="ラベルを管理">⚙ タグ管理</button>
     </div>
   `;
+  document.getElementById("bd-nav-prev-btn")?.addEventListener("click", () => navigateEntryBy(-1));
+  document.getElementById("bd-nav-next-btn")?.addEventListener("click", () => navigateEntryBy(1));
   document.getElementById("bd-back-to-new-btn")?.addEventListener("click", () => {
     resetToNewMode();
     insertDateTimeHeader();
