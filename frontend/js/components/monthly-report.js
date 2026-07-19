@@ -3,8 +3,8 @@
  * coaching_summaries の内容を表示する
  */
 
-import { summariesApi } from "../api.js?v=20260719a";
-import { showToast } from "../app.js?v=20260719a";
+import { summariesApi } from "../api.js?v=20260719b";
+import { showToast } from "../app.js?v=20260719b";
 
 /** メインコンテンツエリアを返す */
 function getMain() {

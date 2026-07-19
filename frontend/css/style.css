@@ -5913,6 +5913,53 @@ div.journal-textarea.is-empty::before {
 }
 
 /* フィルタバー（右カラム上部） */
+/* 表示期間セレクタ（最近30日 / 月別） */
+.braindump-period-bar {
+  margin-bottom: 12px;
+}
+.bd-period-bar-inner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.bd-period-label {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.55);
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+[data-theme="light"] .bd-period-label {
+  color: rgba(0, 0, 0, 0.5);
+}
+.bd-period-select {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 12px;
+  cursor: pointer;
+}
+.bd-period-select:focus {
+  outline: none;
+  border-color: var(--accent, #00d4ff);
+}
+.bd-period-select option {
+  background: #1a1d24;
+  color: #eee;
+}
+[data-theme="light"] .bd-period-select {
+  background: #fff;
+  border-color: rgba(0, 0, 0, 0.15);
+  color: rgba(0, 0, 0, 0.8);
+}
+[data-theme="light"] .bd-period-select option {
+  background: #fff;
+  color: #333;
+}
+
 .braindump-filter-bar {
   margin-bottom: 12px;
   padding: 8px 10px;

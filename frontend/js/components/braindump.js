@@ -5,14 +5,14 @@
  * ラベル機能: メモごとに複数ラベル付与可、ラベルOR検索、専用管理モーダル。
  */
 
-import { braindumpApi } from "../api.js?v=20260719a";
-import { showToast } from "../app.js?v=20260719a";
+import { braindumpApi } from "../api.js?v=20260719b";
+import { showToast } from "../app.js?v=20260719b";
 import {
   attachFloatingToolbar,
   appendMarkdownToEditor,
   serializeEditorMarkdown,
   SIZE_SPAN_STRIP,
-} from "../floating-toolbar.js?v=20260719a";
+} from "../floating-toolbar.js?v=20260719b";
 
 // ===== ユーティリティ =====
 
@@ -115,7 +115,7 @@ function labelChipStyle(name) {
 
 let currentDate = today();
 let entries = [];
-let recentEntries = []; // 過去15日分のメモ
+let recentEntries = []; // 一覧に表示中のメモ（表示期間 or 全期間フィルタの結果）
 let editingEntryId = null;
 let newAutoSaveTimer = null;
 let newEntryId = null; // 新規メモが自動保存された後のエントリID
@@ -125,6 +125,12 @@ let titleSaveTimer = null; // タイトル入力の自動保存デバウンス
 let currentLabels = []; // 編集中メモ / 新規メモのラベル配列
 let allLabels = []; // 全メモから集計したラベル一覧 [{name, count}]
 let filterLabels = []; // 一覧フィルタで選択中のラベル名（OR検索）
+
+// 一覧の表示期間（"recent" = 最近30日 / "YYYY-MM" = 月単位）
+const RECENT_DAYS = 30;
+let periodMode = "recent";
+let availableMonths = []; // メモが存在する月 ["2026-07", ...]（新しい順）
+let allEntriesCache = null; // ラベルフィルタ（全期間検索）用キャッシュ
 
 // 一覧の並び順モード（"created" = 作成日順 / "updated" = 更新日順）。localStorage に保持
 const SORT_MODE_STORAGE_KEY = "braindump:sortMode";
@@ -280,11 +286,19 @@ export async function renderBraindump() {
     entries = [];
   }
 
-  // 過去15日分のメモを取得
+  periodMode = "recent";
+  allEntriesCache = null;
+
+  // 表示期間分のメモを取得（初期は最近30日）
+  recentEntries = [];
+  await loadEntriesForCurrentPeriod();
+
+  // メモが存在する月の一覧（月別表示のプルダウン用）
   try {
-    recentEntries = await braindumpApi.list(daysAgo(14), today()) || [];
+    const res = await braindumpApi.datesWithEntries();
+    availableMonths = buildAvailableMonths((res && res.dates) || []);
   } catch {
-    recentEntries = [];
+    availableMonths = [];
   }
 
   // ラベル一覧（全メモから集計）
@@ -324,6 +338,9 @@ export async function renderBraindump() {
 
       <!-- 右カラム: メモ一覧 (3) -->
       <div class="braindump-right">
+        <div class="braindump-period-bar" id="bd-period-bar">
+          ${renderPeriodBar()}
+        </div>
         <div class="braindump-filter-bar" id="bd-filter-bar">
           ${renderFilterBar()}
         </div>
@@ -346,9 +363,79 @@ export async function renderBraindump() {
     if (entry) {
       loadEntryIntoEditor(entry);
     } else {
-      // 既に存在しないノートなら記憶をクリア
-      rememberOpenEntry(null);
+      // 表示期間外のノートの可能性があるため単体取得を試す
+      try {
+        const fetched = await braindumpApi.getEntry(lastId);
+        if (fetched && fetched.id) {
+          loadEntryIntoEditor(fetched);
+        } else {
+          // 既に存在しないノートなら記憶をクリア
+          rememberOpenEntry(null);
+        }
+      } catch {
+        rememberOpenEntry(null);
+      }
     }
+  }
+}
+
+// ===== 表示期間（最近30日 / 月別） =====
+
+function buildAvailableMonths(dates) {
+  const set = new Set();
+  for (const d of dates) {
+    if (d && d.length >= 7) set.add(d.slice(0, 7));
+  }
+  return [...set].sort().reverse();
+}
+
+function monthLabel(ym) {
+  const [y, m] = ym.split("-");
+  return `${y}年${parseInt(m, 10)}月`;
+}
+
+function renderPeriodBar() {
+  const options = [
+    `<option value="recent"${periodMode === "recent" ? " selected" : ""}>最近${RECENT_DAYS}日</option>`,
+    ...availableMonths.map(ym =>
+      `<option value="${ym}"${periodMode === ym ? " selected" : ""}>${monthLabel(ym)}</option>`
+    ),
+  ].join("");
+  return `
+    <div class="bd-period-bar-inner">
+      <span class="bd-period-label">期間:</span>
+      <select class="bd-period-select" id="bd-period-select" title="一覧に表示する期間を選択">${options}</select>
+    </div>
+  `;
+}
+
+function attachPeriodBarEvents() {
+  document.getElementById("bd-period-select")?.addEventListener("change", async (e) => {
+    periodMode = e.target.value;
+    await loadEntriesForCurrentPeriod();
+    refreshEntriesList();
+  });
+}
+
+/**
+ * 現在の表示状態に応じて一覧データを取得する。
+ * - ラベルフィルタ中: 全期間から検索（キャッシュ利用）
+ * - 通常: 最近30日 or 選択中の月の範囲
+ * 取得失敗時は既存の一覧を維持する。
+ */
+async function loadEntriesForCurrentPeriod() {
+  try {
+    if (filterLabels.length > 0) {
+      if (!allEntriesCache) allEntriesCache = await braindumpApi.list() || [];
+      recentEntries = allEntriesCache;
+    } else if (periodMode === "recent") {
+      recentEntries = await braindumpApi.list(daysAgo(RECENT_DAYS - 1), today()) || [];
+    } else {
+      // 月末日は文字列比較のため "-31" 固定で全月に対応できる
+      recentEntries = await braindumpApi.list(`${periodMode}-01`, `${periodMode}-31`) || [];
+    }
+  } catch {
+    // 取得失敗時は既存データを維持
   }
 }
 
@@ -539,7 +626,7 @@ function refreshFilterBar() {
 
 function attachFilterBarEvents() {
   document.querySelectorAll(".bd-filter-chip").forEach(btn => {
-    btn.addEventListener("click", () => {
+    btn.addEventListener("click", async () => {
       const name = btn.dataset.name;
       if (filterLabels.includes(name)) {
         filterLabels = filterLabels.filter(n => n !== name);
@@ -547,12 +634,15 @@ function attachFilterBarEvents() {
         filterLabels.push(name);
       }
       refreshFilterBar();
+      // フィルタON中は全期間から検索、OFFに戻ったら表示期間の一覧に戻す
+      await loadEntriesForCurrentPeriod();
       refreshEntriesList();
     });
   });
-  document.getElementById("bd-filter-clear-btn")?.addEventListener("click", () => {
+  document.getElementById("bd-filter-clear-btn")?.addEventListener("click", async () => {
     filterLabels = [];
     refreshFilterBar();
+    await loadEntriesForCurrentPeriod();
     refreshEntriesList();
   });
 }
@@ -657,7 +747,9 @@ function renderRecentEntries() {
   if (list.length === 0) {
     const msg = filterLabels.length > 0
       ? `選択中のラベルに該当するメモはありません`
-      : `過去15日間のメモはありません`;
+      : periodMode === "recent"
+        ? `最近${RECENT_DAYS}日間のメモはありません`
+        : `${monthLabel(periodMode)}のメモはありません`;
     return `
       <div class="empty-state" style="padding: 32px 0;">
         <div class="icon">📝</div>
@@ -929,6 +1021,9 @@ function attachEvents() {
 
   // ラベル編集UIのイベント
   attachLabelsEditorEvents();
+
+  // 表示期間セレクタのイベント
+  attachPeriodBarEvents();
 
   // フィルタバーのイベント
   attachFilterBarEvents();
@@ -1341,12 +1436,9 @@ async function deleteEntry(entryId) {
 }
 
 async function refreshEntries() {
-  // 過去15日分も再取得
-  try {
-    recentEntries = await braindumpApi.list(daysAgo(14), today()) || [];
-  } catch {
-    // 失敗時は既存データを維持
-  }
+  // 内容が変わったので全期間キャッシュは無効化し、表示期間分を再取得
+  allEntriesCache = null;
+  await loadEntriesForCurrentPeriod();
   // ラベル一覧も再集計
   try {
     const res = await braindumpApi.listLabels();
