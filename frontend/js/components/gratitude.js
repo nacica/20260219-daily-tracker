@@ -6,13 +6,13 @@
  * 各エントリは編集・削除可能。
  */
 
-import { gratitudeApi } from "../api.js?v=20260725a";
-import { showToast } from "../app.js?v=20260725a";
+import { gratitudeApi } from "../api.js?v=20260725b";
+import { showToast } from "../app.js?v=20260725b";
 import {
   attachFloatingToolbar,
   appendMarkdownToEditor,
   serializeEditorMarkdown,
-} from "../floating-toolbar.js?v=20260725a";
+} from "../floating-toolbar.js?v=20260725b";
 
 /** contenteditable から markdown を読む（textarea にも対応） */
 function readEditorMd(el) {

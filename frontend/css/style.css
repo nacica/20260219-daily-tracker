@@ -8765,3 +8765,164 @@ div.gr-add-input.is-empty::before {
   }
 }
 
+
+/* ===== 道しるべ（付箋一覧ページ + トップのコンパクトカード） ===== */
+
+/* ── 一覧ページ ── */
+
+.mich-page {
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.mich-board-card {
+  margin-bottom: 0;
+}
+
+.mich-page-desc {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  margin: -4px 0 12px;
+}
+
+.mich-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.mich-search {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-input);
+  color: var(--text-primary);
+  font-size: 0.9rem;
+}
+
+.mich-search:focus {
+  outline: none;
+  border-color: var(--cyan-dim);
+}
+
+.mich-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.mich-note {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: border-color 0.15s, transform 0.15s;
+  min-width: 0;
+}
+
+.mich-note:hover {
+  border-color: var(--cyan-dim);
+  transform: translateY(-1px);
+}
+
+.mich-note-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.mich-note-head .sticky-note-date {
+  margin-bottom: 0;
+  font-size: 0.78rem;
+}
+
+.mich-note-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+/* 一覧カードの本文: ユーザー設定サイズをやや縮小して密度を上げる */
+.mich-note-text {
+  font-family: var(--reminder-font);
+  font-size: clamp(13px, calc(var(--reminder-text-size) * 0.8), 24px);
+  font-weight: var(--reminder-text-weight);
+  line-height: 1.5;
+  color: var(--text-primary);
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  max-height: 190px;
+  overflow: hidden;
+  position: relative;
+}
+
+/* はみ出しているカードは下端をフェードさせて「続きがある」ことを示す */
+.mich-note-text.clamped::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 40px;
+  background: linear-gradient(transparent, var(--bg-input));
+  pointer-events: none;
+}
+
+/* ── トップページのコンパクトカード ── */
+
+.mich-compact-card {
+  cursor: pointer;
+}
+
+.mich-compact-note {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  margin-bottom: 10px;
+  max-height: 260px;
+  overflow: hidden;
+}
+
+.mich-compact-text {
+  font-family: var(--reminder-font);
+  font-size: var(--reminder-text-size);
+  font-weight: var(--reminder-text-weight);
+  line-height: 1.4;
+  color: var(--text-primary);
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.mich-compact-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.mich-compact-link {
+  color: var(--cyan, #22d3ee);
+  font-size: 0.85rem;
+  text-decoration: none;
+}
+
+.mich-compact-link:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 640px) {
+  .mich-grid {
+    grid-template-columns: 1fr;
+  }
+}

@@ -5,142 +5,18 @@
  * 朝のタスク整理（ソクラテス式問答）統合
  */
 
-import { recordsApi, analysisApi, morningDialogueApi, remindersApi, categoriesApi } from "../api.js?v=20260725a";
-import { showToast } from "../app.js?v=20260725a";
-import { showTaskCompleteAnimation } from "./task-stats.js?v=20260725a";
+import { recordsApi, analysisApi, morningDialogueApi, categoriesApi } from "../api.js?v=20260725b";
+import { showToast } from "../app.js?v=20260725b";
+import { showTaskCompleteAnimation } from "./task-stats.js?v=20260725b";
 import {
-  attachFloatingToolbar,
-  appendMarkdownToEditor,
-  serializeEditorMarkdown,
-} from "../floating-toolbar.js?v=20260725a";
-
-/** contenteditable div / textarea いずれでも markdown を読み書きするヘルパ */
-function readEditableMarkdown(el) {
-  if (!el) return "";
-  if (el.tagName === "TEXTAREA") return (el.value || "").trim();
-  return serializeEditorMarkdown(el).trim();
-}
-function writeEditableMarkdown(el, text) {
-  if (!el) return;
-  if (el.tagName === "TEXTAREA") { el.value = text || ""; return; }
-  appendMarkdownToEditor(el, text || "");
-}
-
-// ===== 付箋(今日意識すること) の Markdown レンダリング =====
-// Claude などからコピペした表/箇条書き/見出し/太字を整形表示する。
-// 保存値はプレーンテキスト(Markdown)のままで、表示時のみ HTML に変換する。
-
-let _markedLoadPromise = null;
-let _purifyLoadPromise = null;
-let _mdLibsRefreshPending = false;
-
-function loadMarked() {
-  if (window.marked) return Promise.resolve(window.marked);
-  if (_markedLoadPromise) return _markedLoadPromise;
-  _markedLoadPromise = new Promise((resolve, reject) => {
-    const s = document.createElement("script");
-    s.src = "https://cdn.jsdelivr.net/npm/marked/marked.min.js";
-    s.async = true;
-    s.onload = () => {
-      try {
-        const m = window.marked;
-        if (m && typeof m.setOptions === "function") {
-          // breaks:true → 単一改行も <br> に。プレーンメモが従来通り改行表示される。
-          m.setOptions({ breaks: true, gfm: true });
-        }
-      } catch {}
-      resolve(window.marked);
-    };
-    s.onerror = () => { _markedLoadPromise = null; reject(new Error("marked.js の読込に失敗")); };
-    document.head.appendChild(s);
-  });
-  return _markedLoadPromise;
-}
-
-function loadDomPurify() {
-  if (window.DOMPurify) return Promise.resolve(window.DOMPurify);
-  if (_purifyLoadPromise) return _purifyLoadPromise;
-  _purifyLoadPromise = new Promise((resolve, reject) => {
-    const s = document.createElement("script");
-    s.src = "https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js";
-    s.async = true;
-    s.onload = () => resolve(window.DOMPurify);
-    s.onerror = () => { _purifyLoadPromise = null; reject(new Error("DOMPurify の読込に失敗")); };
-    document.head.appendChild(s);
-  });
-  return _purifyLoadPromise;
-}
-
-function mdParseToHtml(m, text) {
-  if (typeof m.parse === "function") return m.parse(text);
-  if (m.marked && typeof m.marked.parse === "function") return m.marked.parse(text);
-  if (typeof m === "function") return m(text);
-  return "";
-}
-
-// Markdown は連続する空行を 1 つの段落区切りに丸めるため、ユーザーが Enter を
-// 複数回押して入れた空行が 1 行分しか反映されない。余分な改行を NBSP のみの
-// 空段落に置換し、入力どおりの空行数を見た目に保持する。
-// フェンスコードブロック (``` ... ```) 内は対象外。
-function preserveBlankLines(text) {
-  const parts = text.split(/(^```[\s\S]*?^```)/m);
-  return parts.map((part, i) => {
-    if (i % 2 === 1) return part;
-    return part.replace(/\n{3,}/g, (run) => {
-      const extra = run.length - 2;
-      return "\n\n" + " \n\n".repeat(extra);
-    });
-  }).join("");
-}
-
-// 行頭の半角スペース／タブを NBSP(U+00A0) に変換し、Markdown の
-// "indented code block"(行頭 4 スペース以上で <pre><code> 化) を抑止する。
-// ユーザは文頭インデント用に行頭スペース/タブを使うため、視覚的な
-// インデント幅は保持する必要がある。NBSP は通常スペースと同幅で描画され、
-// かつ Markdown のインデント判定対象外なので、両方を満たせる。
-// タブは 4 NBSP 相当に展開。フェンスコードブロック内は対象外。
-function escapeLeadingIndent(text) {
-  const NBSP = " ";
-  const parts = text.split(/(^```[\s\S]*?^```)/m);
-  return parts.map((part, i) => {
-    if (i % 2 === 1) return part;
-    return part.replace(/^[ \t]+/gm, (ws) => {
-      let out = "";
-      for (const c of ws) out += (c === "\t") ? NBSP + NBSP + NBSP + NBSP : NBSP;
-      return out;
-    });
-  }).join("");
-}
-
-/** Markdown を sanitize 済み HTML へ変換。未ロード時はエスケープ + 改行のみで応急描画。 */
-function renderStickyMd(text) {
-  if (!text) return "";
-  const m = window.marked;
-  const p = window.DOMPurify;
-  const safeText = escapeLeadingIndent(text);
-  if (m && p) {
-    try {
-      const raw = mdParseToHtml(m, preserveBlankLines(safeText));
-      return p.sanitize(raw, { USE_PROFILES: { html: true } });
-    } catch {
-      return escapeHTML(safeText).replace(/\n/g, "<br>");
-    }
-  }
-  ensureMdLibsForRefresh();
-  return escapeHTML(safeText).replace(/\n/g, "<br>");
-}
-
-/** ライブラリ未ロード時にバックグラウンドでロードし、完了後に描画を差し替える。 */
-function ensureMdLibsForRefresh() {
-  if (_mdLibsRefreshPending) return;
-  _mdLibsRefreshPending = true;
-  Promise.all([loadMarked(), loadDomPurify()]).then(() => {
-    if (document.getElementById("sticky-notes")) refreshStickyNotes();
-    if (document.getElementById("reminder-modal-body")) renderReminderModalContent();
-  }).catch(() => {
-    _mdLibsRefreshPending = false; // 失敗時は次回再試行
-  });
-}
+  renderStickyMd,
+  formatReminderDate,
+  syncRemindersWithCache,
+  getActiveReminders,
+  getRemindersSnapshot,
+  setRemindersSnapshot,
+  addMdRefreshHook,
+} from "./michishirube.js?v=20260725b";
 
 /* ── カテゴリ管理 ── */
 
@@ -433,18 +309,12 @@ function saveInputCache(date, snapshot) {
 }
 
 /**
- * セッション内の categories / reminders 同期に短い TTL を設けて、
+ * セッション内の categories 同期に短い TTL を設けて、
  * 同じセッションで /input を複数回開いた時の重複 API 呼び出しを避ける
+ * （reminders の同期は michishirube.js 側で同様の TTL 管理をしている）
  */
 const SESSION_SYNC_TTL_MS = 5 * 60 * 1000; // 5分
-let _lastRemindersSyncAt = 0;
 let _lastCategoriesSyncAt = 0;
-
-async function syncRemindersWithCache() {
-  if (Date.now() - _lastRemindersSyncAt < SESSION_SYNC_TTL_MS && _remindersCache.length > 0) return;
-  await syncRemindersFromServer();
-  _lastRemindersSyncAt = Date.now();
-}
 
 async function syncCategoriesWithCache() {
   if (Date.now() - _lastCategoriesSyncAt < SESSION_SYNC_TTL_MS) return;
@@ -510,7 +380,7 @@ function _paintForm(main, date, existingRecord, morningDialogue, tasks, isRestDa
   main.innerHTML = buildFormHTML(date, existingRecord, tasks, isEdit, morningDialogue, isRestDay, restReason);
   attachFormEvents(date, isEdit);
   attachMorningDialogueEvents(date, morningDialogue);
-  attachReminderEvents();
+  attachMichishirubeCardEvents();
   attachRestDayEvents(date, isRestDay);
 }
 
@@ -550,11 +420,15 @@ function focusFirstActivityInput() {
 export async function renderInputForm(date) {
   const main = document.querySelector("main");
 
+  // 道しるべカードの表示メモは訪問ごとにランダムに選び直す
+  _michTopPick = null;
+
   // ── 1. 楽観描画: 前回のキャッシュから即描画 ──
   const cached = loadInputCache(date);
   let didAutofocus = false;
   if (cached) {
-    if (Array.isArray(cached.reminders)) _remindersCache = cached.reminders;
+    // メモリ上に既にフレッシュな reminders があれば localStorage 側で上書きしない
+    if (getRemindersSnapshot().length === 0) setRemindersSnapshot(cached.reminders);
     // キャッシュ内容から tasks を合成（prevRecords はキャッシュ済みのものを使う）
     const cachedTasks = cached.tasks || _mergeTasks(cached.existingRecord, cached.morningDialogue, cached.prevRecords || []);
     _paintForm(main, date, cached.existingRecord || null, cached.morningDialogue || null, cachedTasks,
@@ -602,907 +476,85 @@ export async function renderInputForm(date) {
     isRestDay,
     restReason,
     prevRecords,
-    reminders: _remindersCache,
+    reminders: getRemindersSnapshot(),
   });
 }
 
-/* ── 付箋リマインダー ── */
+/* ── 道しるべ コンパクトカード ──
+ * 付箋ボード本体は #/michishirube ページ（michishirube.js）へ移設。
+ * トップにはランダムに選んだアクティブな付箋を 1 件だけ表示し、
+ * クリックで一覧ページへ遷移する。
+ */
 
-// メモリキャッシュ（サーバーが唯一のデータソース）
-let _remindersCache = [];
+// ページ訪問ごとにランダムに選び直す。楽観描画→フレッシュ描画の 2 回の
+// repaint で表示が入れ替わらないよう、選んだ付箋は訪問中は固定する。
+let _michTopPick = null;
 
-function getReminders() {
-  return _remindersCache;
-}
-
-async function saveReminders(list) {
-  _remindersCache = list;
-  await remindersApi.save(list).catch(() => {});
-}
-
-/** サーバーからリマインダーを取得 */
-async function syncRemindersFromServer() {
-  try {
-    const res = await remindersApi.get();
-    _remindersCache = res.items || [];
-  } catch {
-    // オフライン時はキャッシュのまま
+function pickMichTopReminder() {
+  const list = getActiveReminders();
+  if (list.length === 0) { _michTopPick = null; return null; }
+  if (!_michTopPick || !list.some((r) => r.id === _michTopPick.id)) {
+    _michTopPick = list[Math.floor(Math.random() * list.length)];
   }
+  return _michTopPick;
 }
 
-/* ── 文字スタイル設定（サイズ・太さ）── */
-const REMINDER_STYLE_KEY = "reminder-text-style";
-const REMINDER_STYLE_DEFAULT = { size: 18, weight: 700 };
-const REMINDER_STYLE_LIMITS = { sizeMin: 12, sizeMax: 32, weightMin: 300, weightMax: 900 };
-let stickyStylePanelOpen = false;
-
-/* ── モーダル本文サイズ（カード側とは独立、A-/A+ で調整） ── */
-const REMINDER_MODAL_SIZE_KEY = "reminder-modal-text-size";
-const REMINDER_MODAL_SIZE_DEFAULT = 23;
-const REMINDER_MODAL_SIZE_LIMITS = { min: 12, max: 48, step: 2 };
-
-function clampNum(v, min, max) {
-  v = Number(v);
-  if (!Number.isFinite(v)) return min;
-  return Math.min(max, Math.max(min, v));
-}
-
-function getReminderStyle() {
-  try {
-    const raw = localStorage.getItem(REMINDER_STYLE_KEY);
-    if (!raw) return { ...REMINDER_STYLE_DEFAULT };
-    const obj = JSON.parse(raw) || {};
-    return {
-      size: clampNum(obj.size ?? REMINDER_STYLE_DEFAULT.size, REMINDER_STYLE_LIMITS.sizeMin, REMINDER_STYLE_LIMITS.sizeMax),
-      weight: clampNum(obj.weight ?? REMINDER_STYLE_DEFAULT.weight, REMINDER_STYLE_LIMITS.weightMin, REMINDER_STYLE_LIMITS.weightMax),
-    };
-  } catch {
-    return { ...REMINDER_STYLE_DEFAULT };
-  }
-}
-
-function applyReminderStyle(style) {
-  const s = style || getReminderStyle();
-  const root = document.documentElement;
-  root.style.setProperty("--reminder-text-size", `${s.size}px`);
-  root.style.setProperty("--reminder-text-weight", String(s.weight));
-  // --reminder-modal-text-size はモーダル側で独立管理（applyModalTextSize）
-}
-
-function getModalTextSize() {
-  try {
-    const raw = localStorage.getItem(REMINDER_MODAL_SIZE_KEY);
-    if (raw === null || raw === "") return REMINDER_MODAL_SIZE_DEFAULT;
-    return clampNum(parseInt(raw, 10), REMINDER_MODAL_SIZE_LIMITS.min, REMINDER_MODAL_SIZE_LIMITS.max);
-  } catch {
-    return REMINDER_MODAL_SIZE_DEFAULT;
-  }
-}
-
-function applyModalTextSize(size) {
-  document.documentElement.style.setProperty("--reminder-modal-text-size", `${size}px`);
-}
-
-function setModalTextSize(size) {
-  const next = clampNum(size, REMINDER_MODAL_SIZE_LIMITS.min, REMINDER_MODAL_SIZE_LIMITS.max);
-  try { localStorage.setItem(REMINDER_MODAL_SIZE_KEY, String(next)); } catch {}
-  applyModalTextSize(next);
-  return next;
-}
-
-function saveReminderStyle(style) {
-  try {
-    localStorage.setItem(REMINDER_STYLE_KEY, JSON.stringify(style));
-  } catch {
-    // localStorage が使えなくても表示反映は行う
-  }
-  applyReminderStyle(style);
-}
-
-// モジュール読み込み時に保存済みスタイルを反映
-applyReminderStyle();
-applyModalTextSize(getModalTextSize());
-
-/** textarea を内容に合わせて自動リサイズする（max-height は CSS 側で制御）。 */
-function autoResizeTextarea(ta) {
-  if (!ta) return;
-  ta.style.height = "auto";
-  ta.style.height = ta.scrollHeight + "px";
-}
-
-
-function formatReminderDate(timestamp) {
-  if (!timestamp) return "";
-  const d = new Date(timestamp);
-  const weekdays = ["日", "月", "火", "水", "木", "金", "土"];
-  const m = d.getMonth() + 1;
-  const day = d.getDate();
-  const w = weekdays[d.getDay()];
-  const h = d.getHours().toString().padStart(2, "0");
-  const min = d.getMinutes().toString().padStart(2, "0");
-  return `${m}/${day}(${w}) ${h}:${min}`;
-}
-
-function buildStyleSettingsPanelHTML() {
-  const s = getReminderStyle();
-  const { sizeMin, sizeMax, weightMin, weightMax } = REMINDER_STYLE_LIMITS;
-  const hidden = stickyStylePanelOpen ? "" : " hidden";
-  return `<div class="sticky-style-panel" id="sticky-style-panel"${hidden}>
-    <div class="sticky-style-row">
-      <label class="sticky-style-label" for="sticky-style-size-range">サイズ</label>
-      <div class="sticky-style-controls">
-        <input type="range" id="sticky-style-size-range" min="${sizeMin}" max="${sizeMax}" step="1" value="${s.size}">
-        <button class="sticky-style-stepper" data-target="size" data-step="-1" type="button">&minus;</button>
-        <input type="number" id="sticky-style-size-number" min="${sizeMin}" max="${sizeMax}" step="1" value="${s.size}">
-        <button class="sticky-style-stepper" data-target="size" data-step="1" type="button">&plus;</button>
-      </div>
-    </div>
-    <div class="sticky-style-row">
-      <label class="sticky-style-label" for="sticky-style-weight-range">太さ</label>
-      <div class="sticky-style-controls">
-        <input type="range" id="sticky-style-weight-range" min="${weightMin}" max="${weightMax}" step="100" value="${s.weight}">
-        <button class="sticky-style-stepper" data-target="weight" data-step="-100" type="button">&minus;</button>
-        <input type="number" id="sticky-style-weight-number" min="${weightMin}" max="${weightMax}" step="100" value="${s.weight}">
-        <button class="sticky-style-stepper" data-target="weight" data-step="100" type="button">&plus;</button>
-      </div>
-    </div>
-    <div class="sticky-style-actions">
-      <button class="sticky-style-reset" id="sticky-style-reset" type="button">デフォルトに戻す</button>
-    </div>
-  </div>`;
-}
-
-function buildStickyNoteHTML(r, activeClass = "") {
-  const dateStr = formatReminderDate(r.createdAt);
-  const archiveActionHTML = r.archived
-    ? `<button class="sticky-restore" title="アクティブに戻す">&#x21a9;&#xfe0f;</button>`
-    : `<button class="sticky-archive" title="アーカイブ">&#x1f4e5;</button>`;
-  return `<div class="sticky-note${activeClass}" data-id="${escapeHTML(r.id)}">
-    <div class="sticky-note-body">
-      ${dateStr ? `<div class="sticky-note-date">${dateStr}</div>` : ""}
-      <div class="sticky-text sticky-text-md">${renderStickyMd(r.text)}</div>
-    </div>
-    <div class="sticky-actions">
-      <button class="sticky-delete" title="削除">&times;</button>
-      ${archiveActionHTML}
-      <button class="sticky-edit" title="編集">&#9998;</button>
-    </div>
-  </div>`;
-}
-
-let stickyCurrentIndex = 0;
-let stickyRandomMode = false;
-
-// アクティブ / アーカイブの表示切替
-let currentReminderTab = "active"; // "active" | "archived"
-
-function getActiveReminders() {
-  return getReminders().filter((r) => !r.archived);
-}
-
-function getArchivedReminders() {
-  return getReminders().filter((r) => r.archived);
-}
-
-function getDisplayReminders() {
-  // 現在のタブでフィルタしてから新しい順（createdAt 降順）で表示する。
-  const list = currentReminderTab === "archived" ? getArchivedReminders() : getActiveReminders();
-  return [...list].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-}
-
-function buildReminderTabsHTML() {
-  const activeCount = getActiveReminders().length;
-  const archivedCount = getArchivedReminders().length;
-  const isArchive = currentReminderTab === "archived";
-  return `<div class="sticky-tabs" role="tablist">
-    <button type="button" class="sticky-tab${!isArchive ? " active" : ""}" data-tab="active" role="tab" aria-selected="${!isArchive}">
-      アクティブ <span class="sticky-tab-count">${activeCount}</span>
-    </button>
-    <button type="button" class="sticky-tab${isArchive ? " active" : ""}" data-tab="archived" role="tab" aria-selected="${isArchive}">
-      アーカイブ <span class="sticky-tab-count">${archivedCount}</span>
-    </button>
-  </div>`;
-}
-
-function buildReminderBoardHTML() {
-  const reminders = getDisplayReminders();
-  // インデックスを範囲内に補正
-  if (stickyCurrentIndex >= reminders.length) stickyCurrentIndex = Math.max(0, reminders.length - 1);
-
-  const notesHTML = reminders.map((r, i) => {
-    const activeClass = i === stickyCurrentIndex ? " active" : "";
-    return buildStickyNoteHTML(r, activeClass);
-  }).join("");
-
-  const randomActiveClass = stickyRandomMode ? " active" : "";
-  const styleActiveClass = stickyStylePanelOpen ? " active" : "";
-  const navHTML = reminders.length >= 1
-    ? `<div class="sticky-nav">
-        ${reminders.length > 1 ? `
-          <button class="sticky-nav-btn" id="sticky-prev">&#9664;</button>
-          <span class="sticky-counter" id="sticky-counter">${stickyCurrentIndex + 1} / ${reminders.length}</span>
-          <button class="sticky-nav-btn" id="sticky-next">&#9654;</button>
-          <button class="sticky-nav-btn sticky-random-btn${randomActiveClass}" id="sticky-random" title="ランダム">&#x1f500;</button>
-        ` : ""}
-        <button class="sticky-nav-btn sticky-expand-btn" id="sticky-expand" title="拡大表示">&#x1f50d;</button>
-        <button class="sticky-nav-btn sticky-style-btn${styleActiveClass}" id="sticky-style-btn" title="文字スタイル">&#x2699;&#xfe0f;</button>
+function buildMichishirubeCardHTML() {
+  const pick = pickMichTopReminder();
+  const inner = pick
+    ? `<div class="mich-compact-note" title="クリックで一覧へ">
+        ${pick.createdAt ? `<div class="sticky-note-date">${formatReminderDate(pick.createdAt)}</div>` : ""}
+        <div class="mich-compact-text sticky-text sticky-text-md" id="mich-compact-text">${renderStickyMd(pick.text)}</div>
       </div>`
-    : "";
-
-  const isArchive = currentReminderTab === "archived";
-  const emptyHTML = isArchive
-    ? '<p class="sticky-empty">アーカイブされたメモはまだありません。</p>'
-    : '<p class="sticky-empty">まだメモがありません。<br>下から追加してみましょう。</p>';
-
+    : `<p class="sticky-empty">まだメモがありません。<br>「道しるべ」ページから追加できます。</p>`;
+  const count = getActiveReminders().length;
   return `
-    <div class="card draggable-card reminder-board-card" id="card-reminder-board" draggable="false">
+    <div class="card draggable-card reminder-board-card mich-compact-card" id="card-reminder-board" draggable="false">
       <div class="card-drag-handle" title="ドラッグで移動">⠿</div>
-      <div class="card-title">今日意識すること</div>
-      ${buildReminderTabsHTML()}
-      ${navHTML}
-      ${buildStyleSettingsPanelHTML()}
-      <div class="sticky-notes" id="sticky-notes">
-        ${notesHTML || emptyHTML}
-      </div>
-      <div class="sticky-add-area" id="sticky-add-area"${isArchive ? " hidden" : ""}>
-        <div class="sticky-add-row">
-          <div id="sticky-input" class="sticky-input" contenteditable="true" spellcheck="false" data-placeholder=""></div>
-          <button class="btn btn-primary btn-sm" id="btn-add-sticky">追加</button>
-        </div>
+      <div class="card-title">道しるべ</div>
+      ${inner}
+      <div class="mich-compact-footer">
+        ${count > 1 ? `<button class="sticky-nav-btn sticky-random-btn" id="mich-shuffle-btn" title="別のメモを表示">&#x1f500;</button>` : "<span></span>"}
+        <a class="mich-compact-link" href="#/michishirube">一覧を見る（${count}件） →</a>
       </div>
     </div>`;
 }
 
-function attachReminderEvents() {
-  // タブ切替（アクティブ / アーカイブ）。入力欄が無くてもタブだけは動かしたいので addBtn ガードより前に配線。
-  attachReminderTabEvents();
+/** Markdown ライブラリ遅延ロード完了時に応急描画を差し替える */
+function refreshMichCompactText() {
+  const el = document.getElementById("mich-compact-text");
+  if (el && _michTopPick) el.innerHTML = renderStickyMd(_michTopPick.text);
+}
+addMdRefreshHook(refreshMichCompactText);
 
-  const addBtn = document.getElementById("btn-add-sticky");
-  const input = document.getElementById("sticky-input");
-  if (!addBtn || !input) return;
+function attachMichishirubeCardEvents() {
+  const card = document.getElementById("card-reminder-board");
+  if (!card) return;
 
-  // contenteditable 化したのでフローティング書式ツールバーを登録
-  appendMarkdownToEditor(input, "");
-  attachFloatingToolbar(input);
-
-  // 追加
-  function addSticky() {
-    const text = readEditableMarkdown(input);
-    if (!text) return;
-    const reminders = getReminders();
-    reminders.push({ id: Date.now().toString(36), text, createdAt: Date.now(), archived: false });
-    saveReminders(reminders);
-    currentReminderTab = "active"; // アーカイブ閲覧中に追加した場合もアクティブへ戻す
-    stickyCurrentIndex = 0; // 新規追加分は降順ソートで先頭(1/N)に来る
-    refreshStickyNotes();
-    writeEditableMarkdown(input, "");
-    input.focus();
-  }
-
-  addBtn.addEventListener("click", addSticky);
-  // contenteditable は内容に合わせて自動でサイズが伸縮するため手動リサイズは不要
-
-  // 削除・編集・アーカイブ・復元（イベント委譲）
-  const container = document.getElementById("sticky-notes");
-  if (container) {
-    container.addEventListener("click", (e) => {
-      // 削除（×）。アーカイブと取り違えないよう確認ダイアログを出す。
-      const delBtn = e.target.closest(".sticky-delete");
-      if (delBtn) {
-        const note = delBtn.closest(".sticky-note");
-        if (!note) return;
-        const id = note.dataset.id;
-        if (!confirm("このメモを完全に削除しますか？\n（アーカイブで残したい場合はキャンセルして 📥 ボタンを使ってください）")) return;
-        const reminders = getReminders().filter((r) => r.id !== id);
-        saveReminders(reminders);
-        const dispLen = getDisplayReminders().length;
-        if (stickyCurrentIndex >= dispLen) stickyCurrentIndex = Math.max(0, dispLen - 1);
-        refreshStickyNotes();
-        return;
-      }
-
-      // アーカイブ
-      const archBtn = e.target.closest(".sticky-archive");
-      if (archBtn) {
-        const note = archBtn.closest(".sticky-note");
-        if (!note) return;
-        const id = note.dataset.id;
-        const reminders = getReminders();
-        const target = reminders.find((r) => r.id === id);
-        if (!target) return;
-        target.archived = true;
-        saveReminders(reminders);
-        const dispLen = getDisplayReminders().length;
-        if (stickyCurrentIndex >= dispLen) stickyCurrentIndex = Math.max(0, dispLen - 1);
-        refreshStickyNotes();
-        return;
-      }
-
-      // 復元（アーカイブ → アクティブ）
-      const restoreBtn = e.target.closest(".sticky-restore");
-      if (restoreBtn) {
-        const note = restoreBtn.closest(".sticky-note");
-        if (!note) return;
-        const id = note.dataset.id;
-        const reminders = getReminders();
-        const target = reminders.find((r) => r.id === id);
-        if (!target) return;
-        target.archived = false;
-        saveReminders(reminders);
-        const dispLen = getDisplayReminders().length;
-        if (stickyCurrentIndex >= dispLen) stickyCurrentIndex = Math.max(0, dispLen - 1);
-        refreshStickyNotes();
-        return;
-      }
-
-      // 編集
-      const editBtn = e.target.closest(".sticky-edit");
-      if (editBtn) {
-        const note = editBtn.closest(".sticky-note");
-        if (!note) return;
-        const id = note.dataset.id;
-        const reminders = getReminders();
-        const target = reminders.find((r) => r.id === id);
-        if (!target) return;
-        const body = note.querySelector(".sticky-note-body");
-        const textEl = note.querySelector(".sticky-text");
-        if (!body || !textEl) return;
-
-        // テキストを編集用 contenteditable に差し替え
-        const editor = document.createElement("div");
-        editor.className = "sticky-edit-area";
-        editor.setAttribute("contenteditable", "true");
-        editor.setAttribute("spellcheck", "false");
-        appendMarkdownToEditor(editor, target.text || "");
-        textEl.replaceWith(editor);
-        attachFloatingToolbar(editor);
-        editor.focus();
-
-        // 編集ボタンを「保存」に変更
-        editBtn.innerHTML = "&#10003;";
-        editBtn.title = "保存";
-        editBtn.classList.add("sticky-save");
-
-        // 保存処理
-        function save() {
-          const newText = readEditableMarkdown(editor);
-          if (newText) {
-            target.text = newText;
-            saveReminders(reminders);
-          }
-          refreshStickyNotes();
-        }
-
-        editBtn.removeEventListener("click", save);
-        editBtn.addEventListener("click", (ev) => { ev.stopPropagation(); save(); }, { once: true });
-        // Enter は改行のみ。保存は ✓ ボタンで行う（新規入力欄と同じルール）
-        return;
-      }
-
-      // カード本体クリックで次のカードへ（削除・編集ボタン以外）
-      // 編集中（textarea がある場合）はめくらない
-      const note = e.target.closest(".sticky-note");
-      if (note && getReminders().length > 1 && !note.querySelector(".sticky-edit-area")) {
-        navigateSticky(1);
-        return;
+  // 🔀 で別のメモに差し替え（ページ遷移はしない）
+  const shuffleBtn = document.getElementById("mich-shuffle-btn");
+  if (shuffleBtn) {
+    shuffleBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const list = getActiveReminders();
+      if (list.length <= 1) return;
+      let next;
+      do { next = list[Math.floor(Math.random() * list.length)]; } while (_michTopPick && next.id === _michTopPick.id);
+      _michTopPick = next;
+      const note = card.querySelector(".mich-compact-note");
+      if (note) {
+        note.innerHTML = `
+          ${next.createdAt ? `<div class="sticky-note-date">${formatReminderDate(next.createdAt)}</div>` : ""}
+          <div class="mich-compact-text sticky-text sticky-text-md" id="mich-compact-text">${renderStickyMd(next.text)}</div>`;
       }
     });
   }
 
-  // ◀ ▶ ボタン
-  attachStickyNavEvents();
-
-  // 文字スタイル設定パネル
-  attachStyleSettingsEvents();
-
-  // スワイプ対応
-  attachStickySwipeEvents();
-}
-
-function attachStyleSettingsEvents() {
-  const btn = document.getElementById("sticky-style-btn");
-  const panel = document.getElementById("sticky-style-panel");
-  if (!btn || !panel) return;
-
-  btn.addEventListener("click", () => {
-    stickyStylePanelOpen = !stickyStylePanelOpen;
-    panel.hidden = !stickyStylePanelOpen;
-    btn.classList.toggle("active", stickyStylePanelOpen);
+  // カード本体クリック → 道しるべページへ（ドラッグハンドル・リンク・🔀 は除外）
+  card.addEventListener("click", (e) => {
+    if (e.target.closest(".card-drag-handle") || e.target.closest("a") || e.target.closest("#mich-shuffle-btn")) return;
+    window.location.hash = "/michishirube";
   });
-
-  const sizeRange = document.getElementById("sticky-style-size-range");
-  const sizeNum = document.getElementById("sticky-style-size-number");
-  const wRange = document.getElementById("sticky-style-weight-range");
-  const wNum = document.getElementById("sticky-style-weight-number");
-  const resetBtn = document.getElementById("sticky-style-reset");
-
-  function update(target, rawValue) {
-    const cur = getReminderStyle();
-    const limits = REMINDER_STYLE_LIMITS;
-    if (target === "size") {
-      cur.size = clampNum(rawValue, limits.sizeMin, limits.sizeMax);
-      if (sizeRange) sizeRange.value = String(cur.size);
-      if (sizeNum) sizeNum.value = String(cur.size);
-    } else if (target === "weight") {
-      // step 100 に丸める
-      const w = Math.round(clampNum(rawValue, limits.weightMin, limits.weightMax) / 100) * 100;
-      cur.weight = clampNum(w, limits.weightMin, limits.weightMax);
-      if (wRange) wRange.value = String(cur.weight);
-      if (wNum) wNum.value = String(cur.weight);
-    }
-    saveReminderStyle(cur);
-  }
-
-  if (sizeRange) sizeRange.addEventListener("input", (e) => update("size", e.target.value));
-  if (sizeNum) sizeNum.addEventListener("input", (e) => update("size", e.target.value));
-  if (wRange) wRange.addEventListener("input", (e) => update("weight", e.target.value));
-  if (wNum) wNum.addEventListener("input", (e) => update("weight", e.target.value));
-
-  panel.querySelectorAll(".sticky-style-stepper").forEach((b) => {
-    b.addEventListener("click", () => {
-      const target = b.dataset.target;
-      const step = Number(b.dataset.step) || 0;
-      const cur = getReminderStyle();
-      update(target, (target === "size" ? cur.size : cur.weight) + step);
-    });
-  });
-
-  if (resetBtn) {
-    resetBtn.addEventListener("click", () => {
-      saveReminderStyle({ ...REMINDER_STYLE_DEFAULT });
-      if (sizeRange) sizeRange.value = String(REMINDER_STYLE_DEFAULT.size);
-      if (sizeNum) sizeNum.value = String(REMINDER_STYLE_DEFAULT.size);
-      if (wRange) wRange.value = String(REMINDER_STYLE_DEFAULT.weight);
-      if (wNum) wNum.value = String(REMINDER_STYLE_DEFAULT.weight);
-    });
-  }
-}
-
-function attachStickyNavEvents() {
-  const prevBtn = document.getElementById("sticky-prev");
-  const nextBtn = document.getElementById("sticky-next");
-  const randomBtn = document.getElementById("sticky-random");
-  const expandBtn = document.getElementById("sticky-expand");
-  if (prevBtn) prevBtn.addEventListener("click", () => { navigateSticky(-1); });
-  if (nextBtn) nextBtn.addEventListener("click", () => { navigateSticky(1); });
-  if (randomBtn) randomBtn.addEventListener("click", () => {
-    stickyRandomMode = !stickyRandomMode;
-    randomBtn.classList.toggle("active", stickyRandomMode);
-  });
-  if (expandBtn) expandBtn.addEventListener("click", openReminderModal);
-}
-
-function attachReminderTabEvents() {
-  const board = document.getElementById("card-reminder-board");
-  if (!board) return;
-  board.querySelectorAll(".sticky-tab").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const tab = btn.dataset.tab;
-      if (!tab || tab === currentReminderTab) return;
-      currentReminderTab = tab;
-      stickyCurrentIndex = 0;
-      refreshStickyNotes();
-    });
-  });
-}
-
-function navigateSticky(delta) {
-  const reminders = getDisplayReminders();
-  const len = reminders.length;
-  if (len === 0) return;
-  if (stickyRandomMode && len > 1) {
-    let next;
-    do { next = Math.floor(Math.random() * len); } while (next === stickyCurrentIndex);
-    stickyCurrentIndex = next;
-  } else {
-    stickyCurrentIndex = (stickyCurrentIndex + delta + len) % len;
-  }
-  showStickyAtIndex();
-}
-
-function showStickyAtIndex() {
-  const container = document.getElementById("sticky-notes");
-  if (!container) return;
-  const notes = container.querySelectorAll(".sticky-note");
-  notes.forEach((note, i) => {
-    note.classList.toggle("active", i === stickyCurrentIndex);
-  });
-
-  // カウンター更新
-  const counterEl = document.getElementById("sticky-counter");
-  if (counterEl) counterEl.textContent = `${stickyCurrentIndex + 1} / ${notes.length}`;
-
-  // ボタンの disabled 更新
-  const prevBtn = document.getElementById("sticky-prev");
-  const nextBtn = document.getElementById("sticky-next");
-  if (prevBtn) prevBtn.disabled = false;
-  if (nextBtn) nextBtn.disabled = false;
-}
-
-function refreshStickyNotes() {
-  const board = document.getElementById("card-reminder-board");
-  if (!board) return;
-  const reminders = getDisplayReminders();
-
-  // インデックス補正
-  if (stickyCurrentIndex >= reminders.length) stickyCurrentIndex = Math.max(0, reminders.length - 1);
-
-  // タブ更新（カウント表示と active 状態）
-  const existingTabs = board.querySelector(".sticky-tabs");
-  const tabsHTML = buildReminderTabsHTML();
-  if (existingTabs) {
-    existingTabs.outerHTML = tabsHTML;
-  } else {
-    const title = board.querySelector(".card-title");
-    if (title) title.insertAdjacentHTML("afterend", tabsHTML);
-  }
-  attachReminderTabEvents();
-
-  // 入力欄表示制御（アーカイブ閲覧中は非表示）
-  const addArea = board.querySelector("#sticky-add-area");
-  if (addArea) addArea.hidden = currentReminderTab === "archived";
-
-  // ナビゲーション更新
-  const existingNav = board.querySelector(".sticky-nav");
-  if (reminders.length >= 1) {
-    const randomActiveClass = stickyRandomMode ? " active" : "";
-    const styleActiveClass = stickyStylePanelOpen ? " active" : "";
-    const navHTML = `<div class="sticky-nav">
-      ${reminders.length > 1 ? `
-        <button class="sticky-nav-btn" id="sticky-prev">&#9664;</button>
-        <span class="sticky-counter" id="sticky-counter">${stickyCurrentIndex + 1} / ${reminders.length}</span>
-        <button class="sticky-nav-btn" id="sticky-next">&#9654;</button>
-        <button class="sticky-nav-btn sticky-random-btn${randomActiveClass}" id="sticky-random" title="ランダム">&#x1f500;</button>
-      ` : ""}
-      <button class="sticky-nav-btn sticky-expand-btn" id="sticky-expand" title="拡大表示">&#x1f50d;</button>
-      <button class="sticky-nav-btn sticky-style-btn${styleActiveClass}" id="sticky-style-btn" title="文字スタイル">&#x2699;&#xfe0f;</button>
-    </div>`;
-    if (existingNav) {
-      existingNav.outerHTML = navHTML;
-    } else {
-      const tabsEl = board.querySelector(".sticky-tabs");
-      if (tabsEl) tabsEl.insertAdjacentHTML("afterend", navHTML);
-    }
-    // パネルが未生成なら追加（初回起動時に reminders 0 件 → 1件目追加 のケース）
-    if (!board.querySelector(".sticky-style-panel")) {
-      const navEl = board.querySelector(".sticky-nav");
-      if (navEl) navEl.insertAdjacentHTML("afterend", buildStyleSettingsPanelHTML());
-    }
-    attachStickyNavEvents();
-    attachStyleSettingsEvents();
-  } else if (existingNav) {
-    existingNav.remove();
-  }
-
-  // カード描画
-  const container = document.getElementById("sticky-notes");
-  if (!container) return;
-  if (reminders.length === 0) {
-    const emptyHTML = currentReminderTab === "archived"
-      ? '<p class="sticky-empty">アーカイブされたメモはまだありません。</p>'
-      : '<p class="sticky-empty">まだメモがありません。<br>下から追加してみましょう。</p>';
-    container.innerHTML = emptyHTML;
-    return;
-  }
-  container.innerHTML = reminders.map((r, i) => {
-    const activeClass = i === stickyCurrentIndex ? " active" : "";
-    return buildStickyNoteHTML(r, activeClass);
-  }).join("");
-
-  attachStickySwipeEvents();
-}
-
-function attachStickySwipeEvents() {
-  const container = document.getElementById("sticky-notes");
-  if (!container || container._swipeAttached) return;
-  container._swipeAttached = true;
-
-  let startX = 0, startY = 0;
-  container.addEventListener("touchstart", (e) => {
-    startX = e.touches[0].clientX;
-    startY = e.touches[0].clientY;
-  }, { passive: true });
-
-  container.addEventListener("touchend", (e) => {
-    const dx = e.changedTouches[0].clientX - startX;
-    const dy = e.changedTouches[0].clientY - startY;
-    if (Math.abs(dx) < 40 || Math.abs(dx) < Math.abs(dy)) return; // 横スワイプのみ
-    navigateSticky(dx < 0 ? 1 : -1);
-  }, { passive: true });
-}
-
-/* ── 拡大モーダル ── */
-
-let reminderModalKeyHandler = null;
-let reminderModalEditing = false;
-
-function openReminderModal() {
-  const reminders = getDisplayReminders();
-  if (reminders.length === 0) return;
-
-  // 既存モーダルがあれば閉じる
-  closeReminderModal();
-  reminderModalEditing = false;
-
-  const overlay = document.createElement("div");
-  overlay.id = "reminder-modal-overlay";
-  overlay.className = "reminder-modal-overlay";
-  overlay.innerHTML = `
-    <div class="reminder-modal" role="dialog" aria-modal="true" aria-label="今日意識すること">
-      <button class="reminder-modal-close" id="reminder-modal-close" aria-label="閉じる">&times;</button>
-      <div class="reminder-modal-header">
-        <span class="reminder-modal-title">今日意識すること</span>
-        <span class="reminder-modal-date" id="reminder-modal-date"></span>
-      </div>
-      <div class="reminder-modal-body" id="reminder-modal-body"></div>
-      <div class="reminder-modal-actions">
-        <div class="reminder-modal-nav">
-          <div class="reminder-modal-nav-center">
-            ${reminders.length > 1 ? `
-              <button class="sticky-nav-btn" id="reminder-modal-prev" title="前へ">&#9664;</button>
-              <span class="sticky-counter" id="reminder-modal-counter"></span>
-              <button class="sticky-nav-btn" id="reminder-modal-next" title="次へ">&#9654;</button>
-              <button class="sticky-nav-btn sticky-random-btn${stickyRandomMode ? ' active' : ''}" id="reminder-modal-random" title="ランダム">&#x1f500;</button>
-            ` : ""}
-          </div>
-          <div class="reminder-modal-fontsize" role="group" aria-label="文字サイズ">
-            <button class="sticky-nav-btn reminder-fontsize-btn" id="reminder-modal-font-dec" title="文字を小さく" aria-label="文字を小さく">A-</button>
-            <button class="sticky-nav-btn reminder-fontsize-btn" id="reminder-modal-font-inc" title="文字を大きく" aria-label="文字を大きく">A+</button>
-          </div>
-        </div>
-        <div class="reminder-modal-buttons" id="reminder-modal-buttons"></div>
-      </div>
-    </div>
-  `;
-  document.body.appendChild(overlay);
-
-  renderReminderModalContent();
-  renderReminderModalButtons();
-
-  // × ボタン
-  document.getElementById("reminder-modal-close")?.addEventListener("click", () => {
-    closeReminderModal();
-  });
-
-  // 背景クリック
-  overlay.addEventListener("click", (e) => {
-    if (e.target === overlay) {
-      closeReminderModal();
-    }
-  });
-
-  // ESC キー
-  reminderModalKeyHandler = (e) => {
-    if (e.key !== "Escape") return;
-    if (reminderModalEditing) {
-      // 編集中は ESC で編集をキャンセル（破棄）
-      reminderModalEditing = false;
-      renderReminderModalContent();
-      renderReminderModalButtons();
-    } else {
-      closeReminderModal();
-    }
-  };
-  document.addEventListener("keydown", reminderModalKeyHandler);
-
-  // ナビ
-  document.getElementById("reminder-modal-prev")?.addEventListener("click", () => {
-    navigateSticky(-1);
-    renderReminderModalContent();
-  });
-  document.getElementById("reminder-modal-next")?.addEventListener("click", () => {
-    navigateSticky(1);
-    renderReminderModalContent();
-  });
-  document.getElementById("reminder-modal-random")?.addEventListener("click", (e) => {
-    stickyRandomMode = !stickyRandomMode;
-    e.currentTarget.classList.toggle("active", stickyRandomMode);
-    const boardRandomBtn = document.getElementById("sticky-random");
-    if (boardRandomBtn) boardRandomBtn.classList.toggle("active", stickyRandomMode);
-  });
-
-  // 文字サイズ A-/A+
-  applyModalTextSize(getModalTextSize());
-  updateModalFontButtonsState();
-  document.getElementById("reminder-modal-font-dec")?.addEventListener("click", () => {
-    const cur = getModalTextSize();
-    const next = setModalTextSize(cur - REMINDER_MODAL_SIZE_LIMITS.step);
-    if (next !== cur) updateModalFontButtonsState();
-  });
-  document.getElementById("reminder-modal-font-inc")?.addEventListener("click", () => {
-    const cur = getModalTextSize();
-    const next = setModalTextSize(cur + REMINDER_MODAL_SIZE_LIMITS.step);
-    if (next !== cur) updateModalFontButtonsState();
-  });
-}
-
-function updateModalFontButtonsState() {
-  const cur = getModalTextSize();
-  const decBtn = document.getElementById("reminder-modal-font-dec");
-  const incBtn = document.getElementById("reminder-modal-font-inc");
-  if (decBtn) decBtn.disabled = cur <= REMINDER_MODAL_SIZE_LIMITS.min;
-  if (incBtn) incBtn.disabled = cur >= REMINDER_MODAL_SIZE_LIMITS.max;
-}
-
-function renderReminderModalContent() {
-  const reminders = getDisplayReminders();
-  if (reminders.length === 0) {
-    closeReminderModal();
-    return;
-  }
-  if (stickyCurrentIndex >= reminders.length) stickyCurrentIndex = Math.max(0, reminders.length - 1);
-  const target = reminders[stickyCurrentIndex];
-  if (!target) return;
-
-  const body = document.getElementById("reminder-modal-body");
-  if (body) {
-    if (reminderModalEditing) {
-      body.innerHTML = `<div class="reminder-modal-editor" id="reminder-modal-editor" contenteditable="true" spellcheck="false"></div>`;
-      const ed = document.getElementById("reminder-modal-editor");
-      if (ed) {
-        ed.dataset.id = target.id;
-        appendMarkdownToEditor(ed, target.text);
-        // ロード直後のシリアライズ結果を「変更なし」基準にする
-        // (target.text と serialize 結果は等価でも文字列としては微差が出るため)
-        ed.dataset.original = serializeEditorMarkdown(ed);
-        attachFloatingToolbar(ed);
-        setTimeout(() => {
-          ed.focus();
-          const range = document.createRange();
-          range.selectNodeContents(ed);
-          range.collapse(false);
-          const sel = window.getSelection();
-          sel.removeAllRanges();
-          sel.addRange(range);
-        }, 30);
-      }
-    } else {
-      body.innerHTML = `<div class="reminder-modal-text sticky-text-md" id="reminder-modal-text" data-id="${escapeHTML(target.id)}"></div>`;
-      const textEl = document.getElementById("reminder-modal-text");
-      if (textEl) {
-        textEl.innerHTML = renderStickyMd(target.text);
-        textEl.title = "クリックで次へ";
-        textEl.addEventListener("click", () => {
-          if (reminders.length <= 1) return;
-          navigateSticky(1);
-          renderReminderModalContent();
-        });
-      }
-    }
-  }
-
-  const dateEl = document.getElementById("reminder-modal-date");
-  if (dateEl) dateEl.textContent = formatReminderDate(target.createdAt);
-
-  const counter = document.getElementById("reminder-modal-counter");
-  if (counter) counter.textContent = `${stickyCurrentIndex + 1} / ${reminders.length}`;
-}
-
-function renderReminderModalButtons() {
-  const container = document.getElementById("reminder-modal-buttons");
-  if (!container) return;
-  if (reminderModalEditing) {
-    container.innerHTML = `
-      <button class="btn btn-outline btn-sm" id="reminder-modal-cancel">キャンセル</button>
-      <button class="btn btn-primary btn-sm" id="reminder-modal-save">保存</button>
-    `;
-    document.getElementById("reminder-modal-cancel")?.addEventListener("click", () => {
-      reminderModalEditing = false;
-      renderReminderModalContent();
-      renderReminderModalButtons();
-    });
-    document.getElementById("reminder-modal-save")?.addEventListener("click", () => {
-      saveReminderModalEdit();
-      reminderModalEditing = false;
-      renderReminderModalContent();
-      renderReminderModalButtons();
-      showToast("保存しました", "success");
-    });
-  } else {
-    const isArchive = currentReminderTab === "archived";
-    const archiveBtnHTML = isArchive
-      ? `<button class="btn btn-outline btn-sm" id="reminder-modal-restore">↩ 戻す</button>`
-      : `<button class="btn btn-outline btn-sm" id="reminder-modal-archive">📥 アーカイブ</button>`;
-    container.innerHTML = `
-      <button class="btn btn-danger btn-sm" id="reminder-modal-delete">🗑 削除</button>
-      ${archiveBtnHTML}
-      <button class="btn btn-primary btn-sm" id="reminder-modal-edit">✎ 編集</button>
-    `;
-    document.getElementById("reminder-modal-edit")?.addEventListener("click", () => {
-      reminderModalEditing = true;
-      renderReminderModalContent();
-      renderReminderModalButtons();
-    });
-    document.getElementById("reminder-modal-delete")?.addEventListener("click", () => {
-      const list = getDisplayReminders();
-      const target = list[stickyCurrentIndex];
-      if (!target) return;
-      if (!confirm("このメモを削除しますか？")) return;
-      const remaining = getReminders().filter((r) => r.id !== target.id);
-      saveReminders(remaining);
-      if (getDisplayReminders().length === 0) {
-        closeReminderModal();
-        refreshStickyNotes();
-        return;
-      }
-      if (stickyCurrentIndex >= getDisplayReminders().length) {
-        stickyCurrentIndex = Math.max(0, getDisplayReminders().length - 1);
-      }
-      refreshStickyNotes();
-      renderReminderModalContent();
-      renderReminderModalButtons();
-    });
-    document.getElementById("reminder-modal-archive")?.addEventListener("click", () => {
-      const list = getDisplayReminders();
-      const target = list[stickyCurrentIndex];
-      if (!target) return;
-      const reminders = getReminders();
-      const found = reminders.find((r) => r.id === target.id);
-      if (!found) return;
-      found.archived = true;
-      saveReminders(reminders);
-      if (getDisplayReminders().length === 0) {
-        closeReminderModal();
-        refreshStickyNotes();
-        return;
-      }
-      if (stickyCurrentIndex >= getDisplayReminders().length) {
-        stickyCurrentIndex = Math.max(0, getDisplayReminders().length - 1);
-      }
-      refreshStickyNotes();
-      renderReminderModalContent();
-      renderReminderModalButtons();
-      showToast("アーカイブしました", "success");
-    });
-    document.getElementById("reminder-modal-restore")?.addEventListener("click", () => {
-      const list = getDisplayReminders();
-      const target = list[stickyCurrentIndex];
-      if (!target) return;
-      const reminders = getReminders();
-      const found = reminders.find((r) => r.id === target.id);
-      if (!found) return;
-      found.archived = false;
-      saveReminders(reminders);
-      if (getDisplayReminders().length === 0) {
-        closeReminderModal();
-        refreshStickyNotes();
-        return;
-      }
-      if (stickyCurrentIndex >= getDisplayReminders().length) {
-        stickyCurrentIndex = Math.max(0, getDisplayReminders().length - 1);
-      }
-      refreshStickyNotes();
-      renderReminderModalContent();
-      renderReminderModalButtons();
-      showToast("アクティブに戻しました", "success");
-    });
-  }
-}
-
-function saveReminderModalEdit() {
-  const ed = document.getElementById("reminder-modal-editor");
-  if (!ed) return;
-  const id = ed.dataset.id;
-  const original = ed.dataset.original ?? "";
-  const newText = serializeEditorMarkdown(ed).trim();
-  if (!id || !newText || newText === original) return;
-  const reminders = getReminders();
-  const target = reminders.find((r) => r.id === id);
-  if (!target) return;
-  target.text = newText;
-  saveReminders(reminders);
-  ed.dataset.original = newText;
-  refreshStickyNotes();
-}
-
-function closeReminderModal() {
-  const overlay = document.getElementById("reminder-modal-overlay");
-  if (overlay) overlay.remove();
-  if (reminderModalKeyHandler) {
-    document.removeEventListener("keydown", reminderModalKeyHandler);
-    reminderModalKeyHandler = null;
-  }
-  reminderModalEditing = false;
 }
 
 /* ── おやすみモード ── */
@@ -1923,7 +975,7 @@ function buildFormHTML(date, record, tasks, isEdit, morningDialogue, isRestDay =
 
   // 朝問答 + 付箋リマインダーもカードマップに統合
   cards["card-morning-dialogue"] = buildMorningDialogueHTML(morningDialogue);
-  cards["card-reminder-board"] = buildReminderBoardHTML();
+  cards["card-reminder-board"] = buildMichishirubeCardHTML();
 
   // localStorage のレイアウトに従ってカードを順序でソート
   const layout = getLayoutPreference();
