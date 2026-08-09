@@ -5,9 +5,9 @@
  * 朝のタスク整理（ソクラテス式問答）統合
  */
 
-import { recordsApi, analysisApi, morningDialogueApi, categoriesApi } from "../api.js?v=20260725b";
-import { showToast } from "../app.js?v=20260725b";
-import { showTaskCompleteAnimation } from "./task-stats.js?v=20260725b";
+import { recordsApi, analysisApi, morningDialogueApi, categoriesApi } from "../api.js?v=20260809a";
+import { showToast } from "../app.js?v=20260809a";
+import { showTaskCompleteAnimation } from "./task-stats.js?v=20260809a";
 import {
   renderStickyMd,
   formatReminderDate,
@@ -16,7 +16,7 @@ import {
   getRemindersSnapshot,
   setRemindersSnapshot,
   addMdRefreshHook,
-} from "./michishirube.js?v=20260725b";
+} from "./michishirube.js?v=20260809a";
 
 /* ── カテゴリ管理 ── */
 
@@ -743,11 +743,62 @@ function padTime(t) {
   return `${h.padStart(2, "0")}:${m}`;
 }
 
+/** 現在時刻を "HH:MM" で返す */
+function nowHHMM() {
+  const now = new Date();
+  return `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+}
+
+/** 対象日が今日かどうか（YYYY-MM-DD 比較。ローカルタイムで判定） */
+function isToday(date) {
+  return date === new Date().toLocaleDateString("sv-SE");
+}
+
+/**
+ * 自動入力された欄を一瞬光らせる。
+ * Why: 勝手に時刻が入ったことに気づかないまま確定してしまうのを防ぐ。
+ *      トーストは行を足すたびに出て邪魔なので、その場のフラッシュで知らせる。
+ */
+function flashAutofilled(el) {
+  if (!el) return;
+  el.classList.remove("time-autofilled");
+  void el.offsetWidth; // アニメーションを頭から再生させるためのリフロー
+  el.classList.add("time-autofilled");
+  setTimeout(() => el.classList.remove("time-autofilled"), 1000);
+}
+
+/**
+ * 内容だけ入力されて開始時刻が空の行に、現在時刻を補う。
+ *
+ * Why: 「時刻を打たずに内容だけ書いて Enter / 別欄へ移動」を成立させるため。
+ *      開始時刻が空の行は collapseTimelineRow() が折りたためず、展開されたまま残っていた。
+ * 過去日を編集しているときは「現在時刻」に意味がないので何もしない
+ * （行の折りたたみだけは collapseTimelineRow() 側で成立する）。
+ *
+ * @param {HTMLElement} row .timeline-row
+ * @param {string} date 対象日 (YYYY-MM-DD)
+ * @returns {boolean} 補完したか
+ */
+function autofillStartTime(row, date) {
+  if (!row || !isToday(date)) return false;
+  const startInput = row.querySelector(".timeline-start");
+  const activity = row.querySelector(".timeline-activity")?.value.trim() || "";
+  if (!startInput || startInput.value || !activity) return false;
+
+  startInput.value = nowHHMM();
+  flashAutofilled(startInput);
+  // 直後に折りたたまれると input のフラッシュが見えないので、
+  // サマリー側でも光らせるようフラグを立てておく（collapseTimelineRow が消費する）。
+  row.dataset.timeAutofilled = "1";
+  return true;
+}
+
 function buildTimelineRowHTML(start = "", end = "", activity = "") {
   const hasEnd = !!end;
-  const isCompleted = !!(start && activity);
+  // 時刻なしでも内容さえ入っていれば折りたたむ（過去日の時刻なし行が展開されたまま残らないように）
+  const isCompleted = !!activity;
   const summaryText = isCompleted
-    ? `${start}${end ? " ～ " + end : ""}　${escapeHTMLAttr(activity)}`
+    ? `${start ? `${start}${end ? " ～ " + end : ""}　` : ""}${escapeHTMLAttr(activity)}`
     : "";
   return `
     <div class="timeline-row${hasEnd ? " has-end" : ""}${isCompleted ? " collapsed" : ""}">
@@ -776,12 +827,18 @@ function collapseTimelineRow(row) {
   const start = row.querySelector(".timeline-start").value;
   const end = row.querySelector(".timeline-end").value;
   const activity = row.querySelector(".timeline-activity").value.trim();
-  if (!start || !activity) return; // 未入力なら折りたたまない
+  if (!activity) return; // 内容が空なら折りたたまない（時刻だけの行は編集中とみなす）
   const summary = row.querySelector(".timeline-row-summary");
-  summary.textContent = `${start}${end ? " ～ " + end : ""}　${activity}`;
+  summary.textContent = `${start ? `${start}${end ? " ～ " + end : ""}　` : ""}${activity}`;
   summary.style.display = "";
   row.querySelector(".timeline-row-edit").style.display = "none";
   row.classList.add("collapsed");
+
+  // autofillStartTime() が現在時刻を入れた直後なら、折りたたみ後のサマリーも光らせる
+  if (row.dataset.timeAutofilled) {
+    delete row.dataset.timeAutofilled;
+    flashAutofilled(summary);
+  }
 }
 
 /**
@@ -1446,8 +1503,7 @@ function attachFormEvents(date, isEdit) {
         toggleEnd.style.display = "none";
         row.classList.add("has-end");
         const endInput = row.querySelector(".timeline-end");
-        const now = new Date();
-        endInput.value = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+        endInput.value = nowHHMM();
         endInput.focus();
         return;
       }
@@ -1499,13 +1555,15 @@ function attachFormEvents(date, isEdit) {
       debounceTimelineSave();
     });
 
-    // 行からフォーカスが外れたら折りたたむ
+    // 行からフォーカスが外れたら、時刻が空なら現在時刻を補ってから折りたたむ
     timelineRows.addEventListener("focusout", (e) => {
       const row = e.target.closest(".timeline-row");
       if (!row || row.classList.contains("collapsed")) return;
       // フォーカスが同じ行内の別要素に移る場合は折りたたまない
       setTimeout(() => {
         if (row.contains(document.activeElement)) return;
+        // 値を JS で入れても input イベントは飛ばないので、補完したら明示的に保存を予約する
+        if (autofillStartTime(row, date)) debounceTimelineSave();
         collapseTimelineRow(row);
       }, 100);
     });
@@ -1520,12 +1578,13 @@ function attachFormEvents(date, isEdit) {
       }
     });
 
-    // Enterキーで次の行を追加
+    // Enterキーで次の行を追加（時刻が空なら現在時刻を補ってから確定させる）
     timelineRows.addEventListener("keydown", (e) => {
       if (e.key !== "Enter") return;
       if (!e.target.classList.contains("timeline-activity")) return;
       e.preventDefault();
       const currentRow = e.target.closest(".timeline-row");
+      autofillStartTime(currentRow, date);
       const currentEnd = currentRow?.querySelector(".timeline-end")?.value || "";
       timelineRows.insertAdjacentHTML(
         "beforeend",
@@ -1544,9 +1603,7 @@ function attachFormEvents(date, isEdit) {
       const rows = timelineRows.querySelectorAll(".timeline-row");
       const lastRow = rows[rows.length - 1];
       const lastEnd = lastRow?.querySelector(".timeline-end")?.value || "";
-      const now = new Date();
-      const nowStr = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
-      timelineRows.insertAdjacentHTML("beforeend", buildTimelineRowHTML(lastEnd || nowStr, "", ""));
+      timelineRows.insertAdjacentHTML("beforeend", buildTimelineRowHTML(lastEnd || nowHHMM(), "", ""));
       // 新しい行の活動入力にフォーカス
       const newRow = timelineRows.lastElementChild;
       newRow.querySelector(".timeline-activity").focus();
@@ -1557,9 +1614,7 @@ function attachFormEvents(date, isEdit) {
   const addRowBtnTop = document.getElementById("btn-add-timeline-row-top");
   if (addRowBtnTop) {
     addRowBtnTop.addEventListener("click", () => {
-      const now = new Date();
-      const nowStr = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
-      timelineRows.insertAdjacentHTML("afterbegin", buildTimelineRowHTML(nowStr, "", ""));
+      timelineRows.insertAdjacentHTML("afterbegin", buildTimelineRowHTML(nowHHMM(), "", ""));
       const newRow = timelineRows.firstElementChild;
       newRow.querySelector(".timeline-activity").focus();
     });

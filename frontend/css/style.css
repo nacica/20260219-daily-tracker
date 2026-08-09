@@ -2461,6 +2461,30 @@ textarea {
   flex-shrink: 0;
 }
 
+/* 現在時刻を自動入力した欄／折りたたみ行を一瞬光らせる。
+   背景色ではなく box-shadow を使うことで、input・div どちらに当てても
+   元の背景を壊さずフェードアウトできる。 */
+@keyframes time-autofill-flash {
+  0%,
+  55% {
+    box-shadow: 0 0 0 2px var(--cyan), var(--cyan-glow);
+  }
+  100% {
+    box-shadow: 0 0 0 2px transparent;
+  }
+}
+
+.time-autofilled {
+  border-radius: 6px;
+  animation: time-autofill-flash 1s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .time-autofilled {
+    animation: none;
+  }
+}
+
 .timeline-activity {
   flex: 1;
   min-width: 0;
