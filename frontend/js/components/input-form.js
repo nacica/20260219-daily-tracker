@@ -5,9 +5,9 @@
  * 朝のタスク整理（ソクラテス式問答）統合
  */
 
-import { recordsApi, analysisApi, morningDialogueApi, categoriesApi } from "../api.js?v=20260809a";
-import { showToast } from "../app.js?v=20260809a";
-import { showTaskCompleteAnimation } from "./task-stats.js?v=20260809a";
+import { recordsApi, analysisApi, morningDialogueApi, categoriesApi } from "../api.js?v=20260813a";
+import { showToast } from "../app.js?v=20260813a";
+import { showTaskCompleteAnimation } from "./task-stats.js?v=20260813a";
 import {
   renderStickyMd,
   formatReminderDate,
@@ -16,7 +16,7 @@ import {
   getRemindersSnapshot,
   setRemindersSnapshot,
   addMdRefreshHook,
-} from "./michishirube.js?v=20260809a";
+} from "./michishirube.js?v=20260813a";
 
 /* ── カテゴリ管理 ── */
 

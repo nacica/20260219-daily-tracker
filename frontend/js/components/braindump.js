@@ -126,7 +126,7 @@ let currentLabels = []; // 編集中メモ / 新規メモのラベル配列
 let allLabels = []; // 全メモから集計したラベル一覧 [{name, count}]
 let filterLabels = []; // 一覧フィルタで選択中のラベル名（OR検索）
 
-// 一覧の表示期間（"recent" = 最近30日 / "YYYY-MM" = 月単位）
+// 一覧の表示期間（"recent" = 最近30日 / "all" = 全期間 / "YYYY-MM" = 月単位）
 const RECENT_DAYS = 30;
 let periodMode = "recent";
 let availableMonths = []; // メモが存在する月 ["2026-07", ...]（新しい順）
@@ -379,7 +379,7 @@ export async function renderBraindump() {
   }
 }
 
-// ===== 表示期間（最近30日 / 月別） =====
+// ===== 表示期間（最近30日 / 全期間 / 月別） =====
 
 function buildAvailableMonths(dates) {
   const set = new Set();
@@ -397,6 +397,7 @@ function monthLabel(ym) {
 function renderPeriodBar() {
   const options = [
     `<option value="recent"${periodMode === "recent" ? " selected" : ""}>最近${RECENT_DAYS}日</option>`,
+    `<option value="all"${periodMode === "all" ? " selected" : ""}>全期間</option>`,
     ...availableMonths.map(ym =>
       `<option value="${ym}"${periodMode === ym ? " selected" : ""}>${monthLabel(ym)}</option>`
     ),
@@ -419,13 +420,13 @@ function attachPeriodBarEvents() {
 
 /**
  * 現在の表示状態に応じて一覧データを取得する。
- * - ラベルフィルタ中: 全期間から検索（キャッシュ利用）
+ * - ラベルフィルタ中 / 期間が「全期間」: 全期間から取得（キャッシュ利用）
  * - 通常: 最近30日 or 選択中の月の範囲
  * 取得失敗時は既存の一覧を維持する。
  */
 async function loadEntriesForCurrentPeriod() {
   try {
-    if (filterLabels.length > 0) {
+    if (filterLabels.length > 0 || periodMode === "all") {
       if (!allEntriesCache) allEntriesCache = await braindumpApi.list() || [];
       recentEntries = allEntriesCache;
     } else if (periodMode === "recent") {
@@ -747,9 +748,11 @@ function renderRecentEntries() {
   if (list.length === 0) {
     const msg = filterLabels.length > 0
       ? `選択中のラベルに該当するメモはありません`
-      : periodMode === "recent"
-        ? `最近${RECENT_DAYS}日間のメモはありません`
-        : `${monthLabel(periodMode)}のメモはありません`;
+      : periodMode === "all"
+        ? `メモはまだありません`
+        : periodMode === "recent"
+          ? `最近${RECENT_DAYS}日間のメモはありません`
+          : `${monthLabel(periodMode)}のメモはありません`;
     return `
       <div class="empty-state" style="padding: 32px 0;">
         <div class="icon">📝</div>
