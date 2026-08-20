@@ -9,7 +9,7 @@
  * SWR でも古いコードが出続けることはない（新バージョンは新 URL として取得される）。
  */
 
-const CACHE_NAME = "daily-tracker-v330";
+const CACHE_NAME = "daily-tracker-v331";
 const STATIC_ASSETS = [
   "/",
   "/index.html",

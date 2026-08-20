@@ -5,9 +5,9 @@
  * 朝のタスク整理（ソクラテス式問答）統合
  */
 
-import { recordsApi, analysisApi, morningDialogueApi, categoriesApi } from "../api.js?v=20260820b";
-import { showToast } from "../app.js?v=20260820b";
-import { showTaskCompleteAnimation } from "./task-stats.js?v=20260820b";
+import { recordsApi, analysisApi, morningDialogueApi, categoriesApi } from "../api.js?v=20260820c";
+import { showToast } from "../app.js?v=20260820c";
+import { showTaskCompleteAnimation } from "./task-stats.js?v=20260820c";
 import {
   renderStickyMd,
   formatReminderDate,
@@ -16,7 +16,7 @@ import {
   getRemindersSnapshot,
   setRemindersSnapshot,
   addMdRefreshHook,
-} from "./michishirube.js?v=20260820b";
+} from "./michishirube.js?v=20260820c";
 
 /* ── カテゴリ管理 ── */
 
@@ -974,9 +974,6 @@ function buildFormHTML(date, record, tasks, isEdit, morningDialogue, isRestDay =
         <div class="card-drag-handle" title="ドラッグで移動">⠿</div>
         <div class="card-title">タスク管理</div>
         <label>予定タスク</label>
-        <button class="btn btn-outline btn-sm" id="btn-carry-over" style="margin-bottom: 8px; width: 100%;">
-          昨日の未完了タスクを引き継ぐ
-        </button>
         <ul class="task-list" id="planned-list">
           ${incompleteTasks.map((t) => buildTaskItem(t, false)).join("")}
         </ul>
@@ -1702,77 +1699,6 @@ function attachFormEvents(date, isEdit) {
       saveDataQuietly();
     });
   }
-
-  // 昨日の未完了タスク引き継ぎ
-  document.getElementById("btn-carry-over").addEventListener("click", async (e) => {
-    const btn = e.target;
-    btn.disabled = true;
-    btn.textContent = "読み込み中...";
-
-    const base = new Date(date + "T00:00:00");
-    let found = null;
-    let searchedDate = null;
-    for (let i = 1; i <= 7; i++) {
-      const d = new Date(base);
-      d.setDate(d.getDate() - i);
-      searchedDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-      try {
-        found = await recordsApi.get(searchedDate);
-        const planned = found?.tasks?.planned || [];
-        const completed = found?.tasks?.completed || [];
-        const backlog = found?.tasks?.backlog || [];
-        const hasIncomplete = planned.filter((t) => !completed.includes(t)).length > 0;
-        const hasBacklog = backlog.length > 0;
-        if (hasIncomplete || hasBacklog) break;
-        found = null;
-      } catch {
-        found = null;
-      }
-    }
-
-    try {
-      if (!found) {
-        showToast("直近7日間に引き継ぐタスクが見つかりません", "info");
-        return;
-      }
-      const planned = found.tasks?.planned || [];
-      const completed = found.tasks?.completed || [];
-      const incomplete = planned.filter((t) => !completed.includes(t));
-
-      const existing = new Set(
-        [...document.querySelectorAll("#planned-list .task-remove, #completed-list .task-remove, #backlog-list .task-remove")]
-          .map((el) => el.dataset.remove)
-      );
-      let added = 0;
-      for (const task of incomplete) {
-        if (!existing.has(task)) {
-          plannedList.insertAdjacentHTML("beforeend", buildTaskItem(task, false));
-          added++;
-        }
-      }
-      // 近日中タスクも引き継ぐ
-      const prevBacklog = found.tasks?.backlog || [];
-      for (const task of prevBacklog) {
-        if (!existing.has(task)) {
-          backlogList.insertAdjacentHTML("beforeend", buildBacklogItem(task));
-          added++;
-          existing.add(task);
-        }
-      }
-      syncBacklogCount();
-      if (added > 0) {
-        showToast(`${found.date} から ${added}件のタスクを引き継ぎました`, "success");
-        saveDataQuietly();
-      } else {
-        showToast("すべて既に追加済みです", "info");
-      }
-    } catch (err) {
-      showToast("タスク引き継ぎに失敗: " + err.message, "error");
-    } finally {
-      btn.disabled = false;
-      btn.textContent = "昨日の未完了タスクを引き継ぐ";
-    }
-  });
 
   // カテゴリ選択時の新規作成ハンドリング
   function handleCategorySelect(selectEl) {
