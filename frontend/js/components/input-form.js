@@ -5,9 +5,9 @@
  * 朝のタスク整理（ソクラテス式問答）統合
  */
 
-import { recordsApi, analysisApi, morningDialogueApi, categoriesApi } from "../api.js?v=20260813a";
-import { showToast } from "../app.js?v=20260813a";
-import { showTaskCompleteAnimation } from "./task-stats.js?v=20260813a";
+import { recordsApi, analysisApi, morningDialogueApi, categoriesApi } from "../api.js?v=20260820a";
+import { showToast } from "../app.js?v=20260820a";
+import { showTaskCompleteAnimation } from "./task-stats.js?v=20260820a";
 import {
   renderStickyMd,
   formatReminderDate,
@@ -16,7 +16,7 @@ import {
   getRemindersSnapshot,
   setRemindersSnapshot,
   addMdRefreshHook,
-} from "./michishirube.js?v=20260813a";
+} from "./michishirube.js?v=20260820a";
 
 /* ── カテゴリ管理 ── */
 
@@ -329,11 +329,36 @@ function _prevDateStr(date, daysAgo) {
   return d.toLocaleDateString("sv-SE");
 }
 
-/** 朝問答 plan + 瞑想タスク + backlog 引き継ぎを 1 箇所で適用 */
-function _mergeTasks(existingRecord, morningDialogue, prevRecords) {
+/** タスクが文字列/オブジェクトどちらでも名前を取り出す */
+function _taskName(t) {
+  return typeof t === "string" ? t : t?.name || t?.task || "";
+}
+
+/** 朝問答 plan + 瞑想タスク + 予定/backlog 引き継ぎを 1 箇所で適用 */
+function _mergeTasks(existingRecord, morningDialogue, prevRecords, date) {
   const tasks = existingRecord?.tasks
     ? { planned: [...(existingRecord.tasks.planned || [])], completed: [...(existingRecord.tasks.completed || [])], backlog: [...(existingRecord.tasks.backlog || [])] }
     : { planned: [], completed: [], backlog: [] };
+
+  // 予定タスク自動引き継ぎ: 今日の記録がまだ無い初回表示のときだけ、
+  // 直近の記録の未完了タスクを予定リストに載せる（完了 or 削除するまで毎日残る仕様）。
+  // 一度保存された後は再引き継ぎしない — 削除したタスクが翌描画で復活しないようにするため。
+  if (isToday(date) && !existingRecord?.tasks && Array.isArray(prevRecords) && prevRecords.length > 0) {
+    const sorted = prevRecords.slice().sort((a, b) => (a.date < b.date ? 1 : -1));
+    // タスクを記録した最新の日を引き継ぎ元にする（完了済みだけの日ならそこで止める＝復活させない）
+    const src = sorted.find((p) => (p?.tasks?.planned || []).length > 0 || (p?.tasks?.completed || []).length > 0);
+    if (src) {
+      const completedNames = new Set((src.tasks.completed || []).map(_taskName));
+      const existingNames = new Set([...tasks.planned, ...tasks.completed, ...tasks.backlog].map(_taskName));
+      for (const t of src.tasks.planned || []) {
+        const name = _taskName(t);
+        if (name && !completedNames.has(name) && !existingNames.has(name)) {
+          tasks.planned.push(name);
+          existingNames.add(name);
+        }
+      }
+    }
+  }
 
   // 近日中タスク引き継ぎ: 直近7日を1回の list で取得済み → 新しい日から非空 backlog を採用
   if (tasks.backlog.length === 0 && Array.isArray(prevRecords) && prevRecords.length > 0) {
@@ -430,7 +455,7 @@ export async function renderInputForm(date) {
     // メモリ上に既にフレッシュな reminders があれば localStorage 側で上書きしない
     if (getRemindersSnapshot().length === 0) setRemindersSnapshot(cached.reminders);
     // キャッシュ内容から tasks を合成（prevRecords はキャッシュ済みのものを使う）
-    const cachedTasks = cached.tasks || _mergeTasks(cached.existingRecord, cached.morningDialogue, cached.prevRecords || []);
+    const cachedTasks = cached.tasks || _mergeTasks(cached.existingRecord, cached.morningDialogue, cached.prevRecords || [], date);
     _paintForm(main, date, cached.existingRecord || null, cached.morningDialogue || null, cachedTasks,
       !!cached.isRestDay, cached.restReason || "");
     if (!cached.isRestDay) {
@@ -457,7 +482,7 @@ export async function renderInputForm(date) {
   const morningDialogue = morningResult.status === "fulfilled" ? morningResult.value : null;
   const prevRecords = prevResult.status === "fulfilled" ? (prevResult.value || []) : [];
 
-  const tasks = _mergeTasks(existingRecord, morningDialogue, prevRecords);
+  const tasks = _mergeTasks(existingRecord, morningDialogue, prevRecords, date);
   const isRestDay = existingRecord?.rest_day || false;
   const restReason = existingRecord?.rest_reason || "";
 
