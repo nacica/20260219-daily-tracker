@@ -5,9 +5,9 @@
  * 朝のタスク整理（ソクラテス式問答）統合
  */
 
-import { recordsApi, analysisApi, morningDialogueApi, categoriesApi } from "../api.js?v=20260820a";
-import { showToast } from "../app.js?v=20260820a";
-import { showTaskCompleteAnimation } from "./task-stats.js?v=20260820a";
+import { recordsApi, analysisApi, morningDialogueApi, categoriesApi } from "../api.js?v=20260820b";
+import { showToast } from "../app.js?v=20260820b";
+import { showTaskCompleteAnimation } from "./task-stats.js?v=20260820b";
 import {
   renderStickyMd,
   formatReminderDate,
@@ -16,7 +16,7 @@ import {
   getRemindersSnapshot,
   setRemindersSnapshot,
   addMdRefreshHook,
-} from "./michishirube.js?v=20260820a";
+} from "./michishirube.js?v=20260820b";
 
 /* ── カテゴリ管理 ── */
 
@@ -334,7 +334,7 @@ function _taskName(t) {
   return typeof t === "string" ? t : t?.name || t?.task || "";
 }
 
-/** 朝問答 plan + 瞑想タスク + 予定/backlog 引き継ぎを 1 箇所で適用 */
+/** 朝問答 plan + 予定/backlog 引き継ぎを 1 箇所で適用 */
 function _mergeTasks(existingRecord, morningDialogue, prevRecords, date) {
   const tasks = existingRecord?.tasks
     ? { planned: [...(existingRecord.tasks.planned || [])], completed: [...(existingRecord.tasks.completed || [])], backlog: [...(existingRecord.tasks.backlog || [])] }
@@ -384,16 +384,6 @@ function _mergeTasks(existingRecord, morningDialogue, prevRecords, date) {
     for (const task of plan.carried_over || []) {
       if (task && !existingNames.has(task)) { tasks.planned.push(task); existingNames.add(task); }
     }
-  }
-
-  // デフォルトタスク「トラタカ瞑想」を自動注入（未登録かつ未完了の場合）
-  const MEDITATION_TASK = "トラタカ瞑想";
-  const allTaskNames = new Set([
-    ...tasks.planned.map((t) => (typeof t === "string" ? t : t.name || t.task || "")),
-    ...tasks.completed.map((t) => (typeof t === "string" ? t : t.name || t.task || "")),
-  ]);
-  if (!allTaskNames.has(MEDITATION_TASK)) {
-    tasks.planned.unshift(MEDITATION_TASK);
   }
 
   return tasks;
