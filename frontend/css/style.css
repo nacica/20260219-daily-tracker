@@ -292,10 +292,6 @@ body {
   border-color: rgba(0, 153, 204, 0.15);
 }
 
-[data-theme="light"] .morning-context {
-  background: rgba(0, 0, 0, 0.02);
-}
-
 [data-theme="light"] .btn-primary {
   box-shadow: 0 4px 16px rgba(0, 153, 204, 0.25);
 }
@@ -2802,55 +2798,7 @@ textarea {
   to { transform: translateY(0); opacity: 1; }
 }
 
-/* ===== 朝のタスク整理 ===== */
-
-.morning-dialogue-card {
-  margin-bottom: var(--gap);
-  border: 1px solid rgba(0, 212, 255, 0.15);
-}
-
-.morning-dialogue-card .card-title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.morning-dialogue-card .card-title::before {
-  content: '';
-  font-size: 0;
-}
-
-.morning-description {
-  color: var(--text-secondary);
-  font-size: 0.9rem;
-  line-height: 1.7;
-  margin-bottom: 14px;
-}
-
-.morning-focus-message {
-  font-size: 1.05rem;
-  font-weight: 600;
-  color: var(--cyan);
-  padding: 12px 16px;
-  background: rgba(0, 212, 255, 0.06);
-  border-left: 3px solid var(--cyan);
-  border-radius: var(--radius-sm);
-  margin-bottom: 10px;
-}
-
-.morning-context {
-  color: var(--text-secondary);
-  font-size: 0.88rem;
-  line-height: 1.7;
-  padding: 10px 14px;
-  background: rgba(255, 255, 255, 0.02);
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
-}
-
-.morning-completed {
-  border-color: rgba(0, 212, 255, 0.08);
-}
+/* ===== 対話履歴（日記入力対話で使用） ===== */
 
 .morning-dialogue-history {
   border-top: 1px solid var(--border);
@@ -2914,9 +2862,8 @@ textarea {
   color: #16a34a;
 }
 
-/* ===== 朝タスク + 付箋リマインダー (各列内に配置) ===== */
+/* ===== 付箋リマインダー (各列内に配置) ===== */
 
-.morning-col .morning-dialogue-card,
 .reminder-col .reminder-board-card {
   margin-bottom: 0;
 }

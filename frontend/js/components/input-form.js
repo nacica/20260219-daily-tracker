@@ -2,12 +2,11 @@
  * 行動記録入力フォームコンポーネント
  * 新規作成・既存レコードの編集に対応
  * デスクトップ: 2列ドラッグ&ドロップレイアウト
- * 朝のタスク整理（ソクラテス式問答）統合
  */
 
-import { recordsApi, analysisApi, morningDialogueApi, categoriesApi } from "../api.js?v=20260829b";
-import { showToast } from "../app.js?v=20260829b";
-import { showTaskCompleteAnimation } from "./task-stats.js?v=20260829b";
+import { recordsApi, analysisApi, categoriesApi } from "../api.js?v=20260829c";
+import { showToast } from "../app.js?v=20260829c";
+import { showTaskCompleteAnimation } from "./task-stats.js?v=20260829c";
 import {
   renderStickyMd,
   formatReminderDate,
@@ -16,7 +15,7 @@ import {
   getRemindersSnapshot,
   setRemindersSnapshot,
   addMdRefreshHook,
-} from "./michishirube.js?v=20260829b";
+} from "./michishirube.js?v=20260829c";
 
 /* ── カテゴリ管理 ── */
 
@@ -246,12 +245,11 @@ function flattenMasonry(grid) {
 
 const DEFAULT_LAYOUT = {
   "card-activity-log":     { order: 0 },
-  "card-morning-dialogue": { order: 1 },
-  "card-reminder-board":   { order: 2 },
-  "card-task-mgmt":        { order: 3 },
-  "card-backlog":          { order: 4 },
-  "card-actions":          { order: 5 },
-  "card-completed":        { order: 6 },
+  "card-reminder-board":   { order: 1 },
+  "card-task-mgmt":        { order: 2 },
+  "card-backlog":          { order: 3 },
+  "card-actions":          { order: 4 },
+  "card-completed":        { order: 5 },
 };
 
 const CARD_IDS = Object.keys(DEFAULT_LAYOUT);
@@ -284,7 +282,7 @@ function saveLayoutPreference(layout) {
 
 /**
  * /input 画面の楽観描画用キャッシュ
- * localStorage に前回描画時のスナップショット（record, morningDialogue, tasks, 休養日状態）を保存し、
+ * localStorage に前回描画時のスナップショット（record, tasks, 休養日状態）を保存し、
  * 次回起動時に API 応答を待たずに即描画する。app.js のホーム画面からも書き込み可能
  * （ホームで取得済みの record を事前ウォームアップするため）。
  */
@@ -334,8 +332,8 @@ function _taskName(t) {
   return typeof t === "string" ? t : t?.name || t?.task || "";
 }
 
-/** 朝問答 plan + 予定/backlog 引き継ぎを 1 箇所で適用 */
-function _mergeTasks(existingRecord, morningDialogue, prevRecords, date) {
+/** 予定/backlog 引き継ぎを 1 箇所で適用 */
+function _mergeTasks(existingRecord, prevRecords, date) {
   const tasks = existingRecord?.tasks
     ? { planned: [...(existingRecord.tasks.planned || [])], completed: [...(existingRecord.tasks.completed || [])], backlog: [...(existingRecord.tasks.backlog || [])] }
     : { planned: [], completed: [], backlog: [] };
@@ -369,32 +367,14 @@ function _mergeTasks(existingRecord, morningDialogue, prevRecords, date) {
     }
   }
 
-  // 朝問答 plan からタスクマージ（completed のみ）
-  if (morningDialogue?.status === "completed" && morningDialogue.plan) {
-    const plan = morningDialogue.plan;
-    const existingNames = new Set([
-      ...tasks.planned.map((t) => (typeof t === "string" ? t : t.name || t.task || "")),
-      ...tasks.completed.map((t) => (typeof t === "string" ? t : t.name || t.task || "")),
-      ...tasks.backlog.map((t) => (typeof t === "string" ? t : t.name || t.task || "")),
-    ]);
-    for (const item of plan.tasks_today || []) {
-      const name = item.task || "";
-      if (name && !existingNames.has(name)) { tasks.planned.push(name); existingNames.add(name); }
-    }
-    for (const task of plan.carried_over || []) {
-      if (task && !existingNames.has(task)) { tasks.planned.push(task); existingNames.add(task); }
-    }
-  }
-
   return tasks;
 }
 
 /** フォームを描画してイベントを再アタッチする共通処理 */
-function _paintForm(main, date, existingRecord, morningDialogue, tasks, isRestDay, restReason) {
+function _paintForm(main, date, existingRecord, tasks, isRestDay, restReason) {
   const isEdit = !!existingRecord;
-  main.innerHTML = buildFormHTML(date, existingRecord, tasks, isEdit, morningDialogue, isRestDay, restReason);
+  main.innerHTML = buildFormHTML(date, existingRecord, tasks, isEdit, isRestDay, restReason);
   attachFormEvents(date, isEdit);
-  attachMorningDialogueEvents(date, morningDialogue);
   attachMichishirubeCardEvents();
   attachRestDayEvents(date, isRestDay);
 }
@@ -429,7 +409,7 @@ function focusFirstActivityInput() {
  *
  * 高速化戦略:
  *   1. localStorage キャッシュから即描画（スピナー回避）
- *   2. クリティカルパスの API 5 本を並列: record / morning / reminders / categories / 直近7日の list
+ *   2. クリティカルパスの API 4 本を並列: record / reminders / categories / 直近7日の list
  *   3. reminders / categories は 5 分 TTL のセッションキャッシュで二重取得を回避
  */
 export async function renderInputForm(date) {
@@ -445,8 +425,8 @@ export async function renderInputForm(date) {
     // メモリ上に既にフレッシュな reminders があれば localStorage 側で上書きしない
     if (getRemindersSnapshot().length === 0) setRemindersSnapshot(cached.reminders);
     // キャッシュ内容から tasks を合成（prevRecords はキャッシュ済みのものを使う）
-    const cachedTasks = cached.tasks || _mergeTasks(cached.existingRecord, cached.morningDialogue, cached.prevRecords || [], date);
-    _paintForm(main, date, cached.existingRecord || null, cached.morningDialogue || null, cachedTasks,
+    const cachedTasks = cached.tasks || _mergeTasks(cached.existingRecord, cached.prevRecords || [], date);
+    _paintForm(main, date, cached.existingRecord || null, cachedTasks,
       !!cached.isRestDay, cached.restReason || "");
     if (!cached.isRestDay) {
       focusFirstActivityInput();
@@ -456,28 +436,26 @@ export async function renderInputForm(date) {
     main.innerHTML = `<div class="loading"><div class="spinner"></div><p>読み込み中...</p></div>`;
   }
 
-  // ── 2. クリティカルパスの API を 5 本並列実行 ──
+  // ── 2. クリティカルパスの API を 4 本並列実行 ──
   const startStr = _prevDateStr(date, 7);
   const endStr = _prevDateStr(date, 1);
 
-  const [recordResult, morningResult, , , prevResult] = await Promise.allSettled([
+  const [recordResult, , , prevResult] = await Promise.allSettled([
     recordsApi.get(date),
-    morningDialogueApi.get(date),
     syncRemindersWithCache(),
     syncCategoriesWithCache(),
     recordsApi.list(startStr, endStr),
   ]);
 
   const existingRecord = recordResult.status === "fulfilled" ? recordResult.value : null;
-  const morningDialogue = morningResult.status === "fulfilled" ? morningResult.value : null;
   const prevRecords = prevResult.status === "fulfilled" ? (prevResult.value || []) : [];
 
-  const tasks = _mergeTasks(existingRecord, morningDialogue, prevRecords, date);
+  const tasks = _mergeTasks(existingRecord, prevRecords, date);
   const isRestDay = existingRecord?.rest_day || false;
   const restReason = existingRecord?.rest_reason || "";
 
   // ── 4. フレッシュデータで再描画 ──
-  _paintForm(main, date, existingRecord, morningDialogue, tasks, isRestDay, restReason);
+  _paintForm(main, date, existingRecord, tasks, isRestDay, restReason);
   // キャッシュからの初回描画でフォーカス済みなら、再描画ではスキップ（カーソル位置を奪わない）
   if (!didAutofocus && !isRestDay) {
     focusFirstActivityInput();
@@ -486,7 +464,6 @@ export async function renderInputForm(date) {
   // ── 5. キャッシュを更新（次回の楽観描画用）──
   saveInputCache(date, {
     existingRecord,
-    morningDialogue,
     tasks,
     isRestDay,
     restReason,
@@ -629,101 +606,6 @@ function attachRestDayEvents(date, isRestDay) {
       }
     });
   }
-}
-
-/* ── 朝問答 HTML 生成 ── */
-
-function buildMorningDialogueHTML(morningDialogue) {
-  // 完了済み: 結果サマリーを表示
-  if (morningDialogue && morningDialogue.status === "completed") {
-    const plan = morningDialogue.plan || {};
-    const focusMessage = plan.focus_message || "";
-    const contextSummary = plan.context_summary || "";
-    const messages = morningDialogue.messages || [];
-
-    return `
-      <div class="card draggable-card morning-dialogue-card morning-completed" id="card-morning-dialogue" draggable="false">
-        <div class="card-drag-handle" title="ドラッグで移動">⠿</div>
-        <div class="card-title">朝のタスク整理</div>
-        <div class="morning-result" id="morning-result">
-          ${focusMessage ? `<div class="morning-focus-message">${escapeHTML(focusMessage)}</div>` : ""}
-          ${contextSummary ? `<div class="morning-context">${escapeHTML(contextSummary)}</div>` : ""}
-          <button class="btn btn-outline btn-sm" id="btn-morning-toggle" style="margin-top: 8px;">
-            対話を見る
-          </button>
-          <div class="morning-dialogue-history" id="morning-dialogue-history" style="display:none; margin-top: 12px;">
-            ${messages.map((m) => `
-              <div class="dialogue-bubble ${m.role === "ai" ? "dialogue-bubble-ai" : "dialogue-bubble-user"}">
-                <div class="dialogue-bubble-label">${m.role === "ai" ? "AI" : "あなた"}</div>
-                <div class="dialogue-bubble-content">${escapeHTML(m.content)}</div>
-              </div>
-            `).join("")}
-          </div>
-        </div>
-      </div>`;
-  }
-
-  // 進行中: 対話UIを表示
-  if (morningDialogue && morningDialogue.status === "in_progress") {
-    const messages = morningDialogue.messages || [];
-    const turnCount = morningDialogue.turn_count || 0;
-    const maxTurns = morningDialogue.max_turns || 5;
-    const isMaxed = turnCount >= maxTurns;
-
-    return `
-      <div class="card draggable-card morning-dialogue-card" id="card-morning-dialogue" draggable="false">
-        <div class="card-drag-handle" title="ドラッグで移動">⠿</div>
-        <div class="card-title">朝のタスク整理</div>
-        <div id="morning-dialogue">
-          <div class="dialogue-header">
-            <span>ターン ${turnCount}/${maxTurns}</span>
-            <div class="dialogue-progress">
-              <div class="dialogue-progress-bar" style="width: ${(turnCount / maxTurns) * 100}%"></div>
-            </div>
-          </div>
-          <div class="dialogue-messages" id="morning-messages">
-            ${messages.map((m) => `
-              <div class="dialogue-bubble ${m.role === "ai" ? "dialogue-bubble-ai" : "dialogue-bubble-user"}">
-                <div class="dialogue-bubble-label">${m.role === "ai" ? "AI" : "あなた"}</div>
-                <div class="dialogue-bubble-content">${escapeHTML(m.content)}</div>
-              </div>
-            `).join("")}
-          </div>
-          ${!isMaxed ? `
-          <div class="dialogue-input-area">
-            <textarea id="morning-input" rows="2" placeholder=""></textarea>
-            <button class="btn btn-primary btn-sm" id="btn-morning-send">送信</button>
-          </div>` : `
-          <div class="dialogue-maxed-notice">
-            <p>ターン上限に達しました。プランをまとめましょう。</p>
-          </div>`}
-          <div class="dialogue-actions" style="margin-top: 8px;">
-            ${turnCount >= 1 ? `
-            <button class="btn btn-primary btn-sm" id="btn-morning-synthesize">
-              プランをまとめる
-            </button>` : ""}
-            <button class="btn btn-outline btn-sm btn-danger" id="btn-morning-cancel">
-              キャンセル
-            </button>
-          </div>
-        </div>
-      </div>`;
-  }
-
-  // 未開始: 開始ボタンを表示
-  return `
-    <div class="card draggable-card morning-dialogue-card" id="card-morning-dialogue" draggable="false">
-      <div class="card-drag-handle" title="ドラッグで移動">⠿</div>
-      <div class="card-title">朝のタスク整理</div>
-      <div id="morning-start">
-        <p class="morning-description">
-          昨日の記録をもとに、ソクラテス式問答で今日やるべきことを整理しましょう。
-        </p>
-        <button class="btn btn-primary" id="btn-start-morning" style="width: 100%;">
-          昨日の続きから始める
-        </button>
-      </div>
-    </div>`;
 }
 
 /* ── タイムライン入力 ── */
@@ -905,7 +787,7 @@ function escapeHTMLAttr(str) {
 
 /* ── HTML 生成 ── */
 
-function buildFormHTML(date, record, tasks, isEdit, morningDialogue, isRestDay = false, restReason = "") {
+function buildFormHTML(date, record, tasks, isEdit, isRestDay = false, restReason = "") {
   const dateLabel = new Date(date + "T00:00:00").toLocaleDateString("ja-JP", {
     year: "numeric", month: "long", day: "numeric", weekday: "long",
   });
@@ -1042,8 +924,7 @@ function buildFormHTML(date, record, tasks, isEdit, morningDialogue, isRestDay =
       </div>`,
   };
 
-  // 朝問答 + 付箋リマインダーもカードマップに統合
-  cards["card-morning-dialogue"] = buildMorningDialogueHTML(morningDialogue);
+  // 付箋リマインダーもカードマップに統合
   cards["card-reminder-board"] = buildMichishirubeCardHTML();
 
   // localStorage のレイアウトに従ってカードを順序でソート
@@ -1220,152 +1101,6 @@ function syncBacklogCount() {
   if (!countEl) return;
   const count = document.querySelectorAll("#backlog-list .task-item").length;
   countEl.textContent = count;
-}
-
-/* ── 朝問答イベント ── */
-
-function attachMorningDialogueEvents(date, morningDialogue) {
-  // 開始ボタン
-  const btnStart = document.getElementById("btn-start-morning");
-  if (btnStart) {
-    btnStart.addEventListener("click", async () => {
-      btnStart.disabled = true;
-      btnStart.textContent = "準備中...";
-      try {
-        const dialogue = await morningDialogueApi.start(date);
-        // ページ再レンダリング
-        await renderInputForm(date);
-      } catch (err) {
-        showToast("朝問答の開始に失敗しました: " + err.message, "error");
-        btnStart.disabled = false;
-        btnStart.textContent = "昨日の続きから始める";
-      }
-    });
-  }
-
-  // 送信ボタン
-  const btnSend = document.getElementById("btn-morning-send");
-  if (btnSend) {
-    const input = document.getElementById("morning-input");
-
-    async function sendReply() {
-      const message = input.value.trim();
-      if (!message) return;
-
-      btnSend.disabled = true;
-      btnSend.textContent = "...";
-      input.disabled = true;
-
-      try {
-        await morningDialogueApi.reply(date, message);
-        await renderInputForm(date);
-      } catch (err) {
-        showToast("送信に失敗しました: " + err.message, "error");
-        btnSend.disabled = false;
-        btnSend.textContent = "送信";
-        input.disabled = false;
-      }
-    }
-
-    btnSend.addEventListener("click", sendReply);
-    input.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" && !e.shiftKey) {
-        e.preventDefault();
-        sendReply();
-      }
-    });
-
-    // 対話メッセージを最下部にスクロール
-    const messagesEl = document.getElementById("morning-messages");
-    if (messagesEl) {
-      messagesEl.scrollTop = messagesEl.scrollHeight;
-    }
-
-    // inputにフォーカス
-    input.focus();
-  }
-
-  // プランをまとめるボタン
-  const btnSynthesize = document.getElementById("btn-morning-synthesize");
-  if (btnSynthesize) {
-    btnSynthesize.addEventListener("click", async () => {
-      btnSynthesize.disabled = true;
-      btnSynthesize.textContent = "まとめ中...";
-      try {
-        await morningDialogueApi.synthesize(date);
-
-        showToast("今日のプランができました！", "success");
-        // ページ再レンダリング（renderInputForm内でプランのタスクを自動マージ）
-        await renderInputForm(date);
-      } catch (err) {
-        showToast("プランの生成に失敗しました: " + err.message, "error");
-        btnSynthesize.disabled = false;
-        btnSynthesize.textContent = "プランをまとめる";
-      }
-    });
-  }
-
-  // キャンセルボタン
-  const btnCancel = document.getElementById("btn-morning-cancel");
-  if (btnCancel) {
-    btnCancel.addEventListener("click", async () => {
-      btnCancel.disabled = true;
-      try {
-        await morningDialogueApi.delete(date);
-        showToast("朝問答をキャンセルしました", "info");
-        await renderInputForm(date);
-      } catch (err) {
-        showToast("キャンセルに失敗しました: " + err.message, "error");
-        btnCancel.disabled = false;
-      }
-    });
-  }
-
-  // 対話履歴トグルボタン（完了済み）
-  const btnToggle = document.getElementById("btn-morning-toggle");
-  if (btnToggle) {
-    btnToggle.addEventListener("click", () => {
-      const history = document.getElementById("morning-dialogue-history");
-      if (history) {
-        const isHidden = history.style.display === "none";
-        history.style.display = isHidden ? "" : "none";
-        btnToggle.textContent = isHidden ? "対話を閉じる" : "対話を見る";
-      }
-    });
-  }
-}
-
-/**
- * 朝問答のプラン結果を予定タスクリストに反映する
- */
-function applyMorningPlanToForm(plan) {
-  const plannedList = document.getElementById("planned-list");
-  if (!plannedList) return;
-
-  // 既存タスクのセット（近日中タスクも含む）
-  const existing = new Set(
-    [...document.querySelectorAll("#planned-list .task-item span, #completed-list .task-item span, #backlog-list .task-item span")]
-      .map((el) => el.textContent.trim())
-  );
-
-  // tasks_today を追加
-  const tasksToday = plan.tasks_today || [];
-  for (const item of tasksToday) {
-    const taskName = item.task || "";
-    if (taskName && !existing.has(taskName)) {
-      plannedList.insertAdjacentHTML("beforeend", buildTaskItem(taskName, false));
-      existing.add(taskName);
-    }
-  }
-
-  // carried_over を追加
-  const carriedOver = plan.carried_over || [];
-  for (const task of carriedOver) {
-    if (task && !existing.has(task)) {
-      plannedList.insertAdjacentHTML("beforeend", buildTaskItem(task, false));
-      existing.add(task);
-    }
-  }
 }
 
 /* ── イベント登録 ── */
