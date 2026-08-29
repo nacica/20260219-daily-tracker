@@ -2200,51 +2200,6 @@ textarea {
   font-feature-settings: "tnum";
 }
 
-/* ===== 改善提案アーカイブ ===== */
-
-.suggest-summary-item {
-  display: flex;
-  align-items: center;
-  padding: 10px 14px;
-  background: rgba(0, 212, 255, 0.04);
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
-}
-
-.filter-btn-group {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.filter-btn {
-  padding: 5px 14px;
-  border-radius: 20px;
-  border: 1px solid var(--border);
-  background: transparent;
-  color: var(--text-muted);
-  font-size: 0.68rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  cursor: pointer;
-  transition: background 0.2s, color 0.2s, border-color 0.2s, box-shadow 0.2s;
-  font-family: var(--font);
-}
-
-.filter-btn:hover {
-  border-color: var(--cyan);
-  color: var(--cyan);
-  background: rgba(0, 212, 255, 0.05);
-}
-
-.filter-btn.active {
-  background: rgba(0, 212, 255, 0.14);
-  border-color: var(--cyan);
-  color: var(--cyan);
-  box-shadow: 0 0 12px rgba(0, 212, 255, 0.18);
-}
-
 /* ===== スクロールバー ===== */
 
 ::-webkit-scrollbar {
@@ -4360,22 +4315,6 @@ textarea {
     font-size: 0.82rem;
   }
 
-  /* ── Filter Buttons — wider ── */
-  .filter-btn {
-    padding: 6px 18px;
-    font-size: 0.72rem;
-  }
-
-  .filter-btn-group {
-    gap: 8px;
-  }
-
-  /* ── Summary Items ── */
-  .suggest-summary-item {
-    padding: 12px 18px;
-    border-radius: 10px;
-  }
-
   /* ── Toast — repositioned for sidebar ── */
   #toast-container {
     bottom: 32px;
@@ -4469,20 +4408,6 @@ textarea {
     --content-max: 1280px;
   }
 
-  /* Suggestions list — 2 column grid */
-  #suggestions-list {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 16px;
-  }
-
-  #suggestions-list .card {
-    margin-bottom: 0;
-  }
-
-  #suggestions-list .empty-state {
-    grid-column: 1 / -1;
-  }
 }
 
 /* ===================================================

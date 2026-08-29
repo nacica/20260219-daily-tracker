@@ -8,7 +8,6 @@ const TAB_ORDER = [
   "/",
   "/history",
   "/weekly",
-  "/suggestions",
   "/journal",
   "/monthly",
 ];
