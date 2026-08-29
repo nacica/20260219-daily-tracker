@@ -4,9 +4,9 @@
  * デスクトップ: 2列ドラッグ&ドロップレイアウト
  */
 
-import { recordsApi, analysisApi, categoriesApi } from "../api.js?v=20260829c";
-import { showToast } from "../app.js?v=20260829c";
-import { showTaskCompleteAnimation } from "./task-stats.js?v=20260829c";
+import { recordsApi, categoriesApi } from "../api.js?v=20260829d";
+import { showToast } from "../app.js?v=20260829d";
+import { showTaskCompleteAnimation } from "./task-stats.js?v=20260829d";
 import {
   renderStickyMd,
   formatReminderDate,
@@ -15,7 +15,7 @@ import {
   getRemindersSnapshot,
   setRemindersSnapshot,
   addMdRefreshHook,
-} from "./michishirube.js?v=20260829c";
+} from "./michishirube.js?v=20260829d";
 
 /* ── カテゴリ管理 ── */
 
@@ -248,8 +248,7 @@ const DEFAULT_LAYOUT = {
   "card-reminder-board":   { order: 1 },
   "card-task-mgmt":        { order: 2 },
   "card-backlog":          { order: 3 },
-  "card-actions":          { order: 4 },
-  "card-completed":        { order: 5 },
+  "card-completed":        { order: 4 },
 };
 
 const CARD_IDS = Object.keys(DEFAULT_LAYOUT);
@@ -895,24 +894,6 @@ function buildFormHTML(date, record, tasks, isEdit, isRestDay = false, restReaso
         </div>
       </div>`,
 
-    "card-actions": `
-      <div class="card draggable-card" id="card-actions" draggable="false">
-        <div class="card-drag-handle" title="ドラッグで移動">⠿</div>
-        <button class="btn btn-primary" id="btn-submit">
-          ${isEdit ? "記録を更新する" : "記録を保存する"}
-        </button>
-        ${isEdit ? `
-        <div style="margin-top: 10px; display: flex; gap: 10px;">
-          <button class="btn btn-outline btn-sm" id="btn-analyze" style="flex: 1;">
-            AI で分析する
-          </button>
-          <button class="btn btn-outline btn-sm" id="btn-view-analysis" style="flex: 1;"
-            onclick="window.location.hash='/analysis/${record?.date || ''}'">
-            分析を見る
-          </button>
-        </div>` : ""}
-      </div>`,
-
     "card-completed": `
       <div class="card draggable-card completed-tasks-card" id="card-completed" draggable="false"
            style="${hasCompleted ? "" : "display:none"}">
@@ -1031,7 +1012,7 @@ function buildBacklogItem(taskText) {
  * タスクをインライン編集モードに切り替える。
  * 編集対象はテキスト部分のみ（カテゴリは維持）。Enter / blur で保存、Esc でキャンセル。
  * 保存時は li 内の data-* 属性（data-task / data-remove / data-edit / data-to-backlog or data-to-today）も
- * 新しいテキストに揃える。これらは saveDataQuietly() と submitForm() がタスク収集に使うため、
+ * 新しいテキストに揃える。これらは saveDataQuietly() がタスク収集に使うため、
  * 1 つでも古いままだと保存値が壊れる。
  * onSave は attachFormEvents 内の saveDataQuietly を呼び出すための注入。
  */
@@ -1187,8 +1168,6 @@ function attachFormEvents(date, isEdit) {
           }
         }
         isEdit = true;
-        const btnSubmit = document.getElementById("btn-submit");
-        if (btnSubmit) btnSubmit.textContent = "記録を更新する";
       }
     } catch (err) {
       showToast("自動保存に失敗しました: " + err.message, "error");
@@ -1603,29 +1582,6 @@ function attachFormEvents(date, isEdit) {
     // Enter での自動登録は廃止（追加ボタンクリックでのみ登録）
   }
 
-  // フォーム送信
-  document.getElementById("btn-submit").addEventListener("click", async (e) => {
-    await submitForm(date, isEdit, e.target);
-  });
-
-  // AI 分析ボタン（編集時のみ）
-  const btnAnalyze = document.getElementById("btn-analyze");
-  if (btnAnalyze) {
-    btnAnalyze.addEventListener("click", async (e) => {
-      e.target.disabled = true;
-      e.target.textContent = "分析中...";
-      try {
-        await analysisApi.generate(date);
-        showToast("分析が完了しました！", "success");
-        window.location.hash = `/analysis/${date}`;
-      } catch (err) {
-        showToast(`分析に失敗しました: ${err.message}`, "error");
-        e.target.disabled = false;
-        e.target.textContent = "AI で分析する";
-      }
-    });
-  }
-
   // ドラッグ&ドロップ（デスクトップのみ）
   attachDragDropEvents();
 
@@ -1957,78 +1913,6 @@ function persistCurrentLayout(grid) {
     layout[card.id] = { order: orderIndex };
   });
   saveLayoutPreference(layout);
-}
-
-/* ── フォーム送信 ── */
-
-async function submitForm(date, isEdit, btn) {
-  // タイムラインモードの場合は textarea を同期
-  const timelineModeEl = document.getElementById("timeline-mode");
-  if (timelineModeEl && timelineModeEl.style.display !== "none") {
-    document.getElementById("raw-input").value = timelineToRawInput();
-  }
-  const rawInput = document.getElementById("raw-input").value.trim();
-  if (!rawInput) {
-    showToast("行動ログを入力してください", "error");
-    return;
-  }
-
-  const incompleteTasks = [...document.querySelectorAll("#planned-list .task-item .task-remove")]
-    .map((el) => el.dataset.remove)
-    .filter(Boolean);
-
-  const completedTasks = [...document.querySelectorAll("#completed-list .task-item .task-remove")]
-    .map((el) => el.dataset.remove)
-    .filter(Boolean);
-
-  const backlogTasks = [...document.querySelectorAll("#backlog-list .task-item .task-remove")]
-    .map((el) => el.dataset.remove)
-    .filter(Boolean);
-
-  const plannedTasks = [...incompleteTasks, ...completedTasks];
-  const availHoursEl = document.getElementById("available-hours");
-  const availHoursVal = availHoursEl?.value ? parseFloat(availHoursEl.value) : null;
-
-  btn.disabled = true;
-  const originalText = btn.textContent;
-  btn.textContent = "保存中...";
-
-  try {
-    if (isEdit) {
-      const updateData = {
-        raw_input: rawInput,
-        tasks_planned: plannedTasks,
-        tasks_completed: completedTasks,
-        tasks_backlog: backlogTasks,
-      };
-      if (availHoursVal !== null) updateData.available_hours = availHoursVal;
-      await recordsApi.update(date, updateData);
-      showToast("記録を更新しました！", "success");
-    } else {
-      try {
-        await recordsApi.create(date, rawInput, plannedTasks, completedTasks, backlogTasks);
-      } catch (createErr) {
-        if (createErr.message.includes("409") || createErr.message.includes("すでに存在")) {
-          const updateData = {
-            raw_input: rawInput,
-            tasks_planned: plannedTasks,
-            tasks_completed: completedTasks,
-            tasks_backlog: backlogTasks,
-          };
-          if (availHoursVal !== null) updateData.available_hours = availHoursVal;
-          await recordsApi.update(date, updateData);
-        } else {
-          throw createErr;
-        }
-      }
-      showToast("記録を保存しました！", "success");
-    }
-    window.location.hash = "/";
-  } catch (err) {
-    showToast(`保存に失敗しました: ${err.message}`, "error");
-    btn.disabled = false;
-    btn.textContent = originalText;
-  }
 }
 
 /* ── ユーティリティ ── */
