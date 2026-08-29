@@ -4,9 +4,9 @@
  * デスクトップ: 2列ドラッグ&ドロップレイアウト
  */
 
-import { recordsApi, categoriesApi } from "../api.js?v=20260829f";
-import { showToast } from "../app.js?v=20260829f";
-import { showTaskCompleteAnimation } from "./task-stats.js?v=20260829f";
+import { recordsApi, categoriesApi } from "../api.js?v=20260829g";
+import { showToast } from "../app.js?v=20260829g";
+import { showTaskCompleteAnimation } from "./task-stats.js?v=20260829g";
 import {
   renderStickyMd,
   formatReminderDate,
@@ -15,7 +15,7 @@ import {
   getRemindersSnapshot,
   setRemindersSnapshot,
   addMdRefreshHook,
-} from "./michishirube.js?v=20260829f";
+} from "./michishirube.js?v=20260829g";
 
 /* ── カテゴリ管理 ── */
 

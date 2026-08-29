@@ -116,10 +116,11 @@ function labelChipStyle(name) {
 // board フィールドで絞り込む。ブレインダンプ本体（board=null）は全メモを表示する。
 
 const BOARDS = {
-  "cfd-silver":    { title: "CFD銀" },
-  "sumco-breakout": { title: "SUMCOデイトレ・新高値ブレイク" },
-  "crude-oil":     { title: "原油" },
-  "natural-gas":   { title: "天然ガス" },
+  "cfd-silver":  { title: "CFD銀" },
+  "sumco":       { title: "sumcoデイトレ" },
+  "breakout":    { title: "新高値ブレイク" },
+  "crude-oil":   { title: "原油" },
+  "natural-gas": { title: "天然ガス" },
 };
 
 let currentBoard = null; // null = ブレインダンプ本体
