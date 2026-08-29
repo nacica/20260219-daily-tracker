@@ -1025,6 +1025,50 @@ textarea {
   border-color: rgba(0, 212, 255, 0.3);
 }
 
+/* ── スマホ: タスク行を2段レイアウトに ──
+   1行に7要素を詰めるとテキスト幅が1文字分しか残らず縦書き状態になるため、
+   上段=チェック+バッジ / 中段=タスク名(全幅・2行クランプ) / 下段=操作ボタン右寄せ */
+@media (max-width: 600px) {
+  .task-item {
+    flex-wrap: wrap;
+    row-gap: 8px;
+  }
+  .task-item > span:not(.task-category-badge):not(.task-drag-handle) {
+    order: 1;
+    flex: 1 1 100%;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    cursor: pointer;
+    line-height: 1.5;
+  }
+  .task-item > span.task-text.expanded {
+    display: block;
+    -webkit-line-clamp: unset;
+  }
+  .task-item > .task-edit-input {
+    order: 1;
+    flex: 1 1 100%;
+  }
+  .task-item > .task-drag-handle,
+  .task-item > .task-edit,
+  .task-item > .task-move-backlog,
+  .task-item > .task-move-today,
+  .task-item > .task-remove {
+    order: 2;
+  }
+  /* 下段ボタン群を右寄せ（ハンドル有無どちらでも先頭要素に margin-left:auto） */
+  .task-item > .task-drag-handle { margin-left: auto; }
+  .task-item > .task-edit { margin-left: auto; }
+  .task-item > .task-drag-handle ~ .task-edit { margin-left: 0; }
+  /* タップしやすいよう操作ボタンを少し大きく */
+  .task-item > .task-edit,
+  .task-item > .task-remove {
+    padding: 6px 10px;
+  }
+}
+
 /* 近日中（バックログ）カード */
 .backlog-card {
   border-color: rgba(255, 170, 0, 0.12);

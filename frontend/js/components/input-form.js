@@ -5,9 +5,9 @@
  * 朝のタスク整理（ソクラテス式問答）統合
  */
 
-import { recordsApi, analysisApi, morningDialogueApi, categoriesApi } from "../api.js?v=20260820c";
-import { showToast } from "../app.js?v=20260820c";
-import { showTaskCompleteAnimation } from "./task-stats.js?v=20260820c";
+import { recordsApi, analysisApi, morningDialogueApi, categoriesApi } from "../api.js?v=20260829a";
+import { showToast } from "../app.js?v=20260829a";
+import { showTaskCompleteAnimation } from "./task-stats.js?v=20260829a";
 import {
   renderStickyMd,
   formatReminderDate,
@@ -16,7 +16,7 @@ import {
   getRemindersSnapshot,
   setRemindersSnapshot,
   addMdRefreshHook,
-} from "./michishirube.js?v=20260820c";
+} from "./michishirube.js?v=20260829a";
 
 /* ── カテゴリ管理 ── */
 
@@ -1772,6 +1772,11 @@ function attachFormEvents(date, isEdit) {
     // 編集ボタン
     if (e.target.dataset.edit !== undefined) {
       startTaskEdit(e.target, saveDataQuietly);
+      return;
+    }
+    // タスク名タップで2行クランプ⇔全文表示を切り替え（スマホ用）
+    if (e.target.classList.contains("task-text")) {
+      e.target.classList.toggle("expanded");
       return;
     }
     // 「近日中へ移動」ボタン
