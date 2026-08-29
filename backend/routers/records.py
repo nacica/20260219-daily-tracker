@@ -41,7 +41,6 @@ async def create_record(body: RecordCreate):
     tasks = Tasks(
         planned=body.tasks_planned,
         completed=body.tasks_completed,
-        backlog=body.tasks_backlog,
         completion_rate=len(body.tasks_completed) / len(body.tasks_planned) if body.tasks_planned else 0.0,
     )
 
@@ -112,15 +111,13 @@ async def update_record(date: str, body: RecordUpdate):
     if body.available_hours is not None:
         update_data["available_hours"] = body.available_hours
 
-    if body.tasks_planned is not None or body.tasks_completed is not None or body.tasks_backlog is not None:
+    if body.tasks_planned is not None or body.tasks_completed is not None:
         planned = body.tasks_planned if body.tasks_planned is not None else existing.get("tasks", {}).get("planned", [])
         completed = body.tasks_completed if body.tasks_completed is not None else existing.get("tasks", {}).get("completed", [])
-        backlog = body.tasks_backlog if body.tasks_backlog is not None else existing.get("tasks", {}).get("backlog", [])
         completion_rate = len(completed) / len(planned) if planned else 0.0
         update_data["tasks"] = {
             "planned": planned,
             "completed": completed,
-            "backlog": backlog,
             "completion_rate": completion_rate,
         }
 

@@ -36,7 +36,6 @@ class Tasks(BaseModel):
     """その日のタスク"""
     planned: list[str] = []
     completed: list[str] = []
-    backlog: list[str] = []
     completion_rate: float = 0.0
 
 
@@ -48,7 +47,6 @@ class RecordCreate(BaseModel):
     raw_input: str = Field(default="", description="ユーザーが入力した生テキスト")
     tasks_planned: list[str] = Field(default=[], description="予定タスク")
     tasks_completed: list[str] = Field(default=[], description="完了タスク")
-    tasks_backlog: list[str] = Field(default=[], description="近日中タスク")
 
 
 class RecordUpdate(BaseModel):
@@ -56,7 +54,6 @@ class RecordUpdate(BaseModel):
     raw_input: Optional[str] = None
     tasks_planned: Optional[list[str]] = None
     tasks_completed: Optional[list[str]] = None
-    tasks_backlog: Optional[list[str]] = None
     rest_day: Optional[bool] = None
     rest_reason: Optional[str] = None
     available_hours: Optional[float] = None

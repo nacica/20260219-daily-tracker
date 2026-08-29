@@ -69,7 +69,6 @@ function buildChoiceHTML(date, record) {
   const tasks = record?.tasks || {};
   const plannedTasks = tasks.planned || [];
   const completedTasks = tasks.completed || [];
-  const backlogTasks = tasks.backlog || [];
 
   let recordHTML = "";
   if (rawInput) {
@@ -98,16 +97,6 @@ function buildChoiceHTML(date, record) {
       <div class="card">
         <div class="card-title">タスク ${completedTasks.length}/${plannedTasks.length} 完了（${completionRate}%）</div>
         <ul style="list-style: none; padding: 0; margin: 0; font-size: 0.9rem;">${taskListHTML}</ul>
-      </div>`;
-  }
-
-  if (backlogTasks.length > 0) {
-    recordHTML += `
-      <div class="card">
-        <div class="card-title">持ち越しタスク</div>
-        <ul style="list-style: none; padding: 0; margin: 0; font-size: 0.9rem;">
-          ${backlogTasks.map((t) => `<li style="margin-bottom: 4px;">📋 ${escapeHTML(t)}</li>`).join("")}
-        </ul>
       </div>`;
   }
 

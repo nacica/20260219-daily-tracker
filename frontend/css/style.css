@@ -989,38 +989,6 @@ textarea {
   font-family: inherit;
 }
 
-/* 近日中タスク移動ボタン */
-.task-move-backlog,
-.task-move-today {
-  background: none;
-  border: 1px solid var(--border);
-  cursor: pointer;
-  font-size: 0.82rem;
-  padding: 6px 12px;
-  border-radius: 6px;
-  transition: color 0.2s, background 0.2s, border-color 0.2s;
-  line-height: 1;
-  flex-shrink: 0;
-}
-
-.task-move-backlog {
-  color: var(--text-muted);
-}
-.task-move-backlog:hover {
-  color: var(--neon-amber);
-  background: rgba(255, 170, 0, 0.1);
-  border-color: rgba(255, 170, 0, 0.3);
-}
-
-.task-move-today {
-  color: var(--cyan-dim);
-}
-.task-move-today:hover {
-  color: var(--cyan);
-  background: rgba(0, 212, 255, 0.1);
-  border-color: rgba(0, 212, 255, 0.3);
-}
-
 /* ── スマホ: タスク行を2段レイアウトに ──
    1行に7要素を詰めるとテキスト幅が1文字分しか残らず縦書き状態になるため、
    上段=チェック+バッジ / 中段=タスク名(全幅・2行クランプ) / 下段=操作ボタン右寄せ */
@@ -1049,8 +1017,6 @@ textarea {
   }
   .task-item > .task-drag-handle,
   .task-item > .task-edit,
-  .task-item > .task-move-backlog,
-  .task-item > .task-move-today,
   .task-item > .task-remove {
     order: 2;
   }
@@ -1063,40 +1029,6 @@ textarea {
   .task-item > .task-remove {
     padding: 6px 10px;
   }
-}
-
-/* 近日中（バックログ）カード */
-.backlog-card {
-  border-color: rgba(255, 170, 0, 0.12);
-}
-
-.backlog-description {
-  color: var(--text-muted);
-  font-size: 0.78rem;
-  margin-bottom: 8px;
-}
-
-.backlog-item {
-  opacity: 0.6;
-  border-color: rgba(255, 170, 0, 0.1);
-}
-.backlog-item:hover {
-  opacity: 0.85;
-  border-color: rgba(255, 170, 0, 0.2);
-}
-
-.backlog-count {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 20px;
-  height: 20px;
-  padding: 0 6px;
-  border-radius: 10px;
-  background: rgba(255, 170, 0, 0.1);
-  color: var(--neon-amber);
-  font-size: 0.75rem;
-  font-weight: 700;
 }
 
 /* 完了タスクカード */

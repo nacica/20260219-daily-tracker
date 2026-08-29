@@ -4,9 +4,9 @@
  * デスクトップ: 2列ドラッグ&ドロップレイアウト
  */
 
-import { recordsApi, categoriesApi } from "../api.js?v=20260829d";
-import { showToast } from "../app.js?v=20260829d";
-import { showTaskCompleteAnimation } from "./task-stats.js?v=20260829d";
+import { recordsApi, categoriesApi } from "../api.js?v=20260829e";
+import { showToast } from "../app.js?v=20260829e";
+import { showTaskCompleteAnimation } from "./task-stats.js?v=20260829e";
 import {
   renderStickyMd,
   formatReminderDate,
@@ -15,7 +15,7 @@ import {
   getRemindersSnapshot,
   setRemindersSnapshot,
   addMdRefreshHook,
-} from "./michishirube.js?v=20260829d";
+} from "./michishirube.js?v=20260829e";
 
 /* ── カテゴリ管理 ── */
 
@@ -247,8 +247,7 @@ const DEFAULT_LAYOUT = {
   "card-activity-log":     { order: 0 },
   "card-reminder-board":   { order: 1 },
   "card-task-mgmt":        { order: 2 },
-  "card-backlog":          { order: 3 },
-  "card-completed":        { order: 4 },
+  "card-completed":        { order: 3 },
 };
 
 const CARD_IDS = Object.keys(DEFAULT_LAYOUT);
@@ -331,11 +330,11 @@ function _taskName(t) {
   return typeof t === "string" ? t : t?.name || t?.task || "";
 }
 
-/** 予定/backlog 引き継ぎを 1 箇所で適用 */
+/** 予定タスク引き継ぎを 1 箇所で適用 */
 function _mergeTasks(existingRecord, prevRecords, date) {
   const tasks = existingRecord?.tasks
-    ? { planned: [...(existingRecord.tasks.planned || [])], completed: [...(existingRecord.tasks.completed || [])], backlog: [...(existingRecord.tasks.backlog || [])] }
-    : { planned: [], completed: [], backlog: [] };
+    ? { planned: [...(existingRecord.tasks.planned || [])], completed: [...(existingRecord.tasks.completed || [])] }
+    : { planned: [], completed: [] };
 
   // 予定タスク自動引き継ぎ: 今日の記録がまだ無い初回表示のときだけ、
   // 直近の記録の未完了タスクを予定リストに載せる（完了 or 削除するまで毎日残る仕様）。
@@ -346,7 +345,7 @@ function _mergeTasks(existingRecord, prevRecords, date) {
     const src = sorted.find((p) => (p?.tasks?.planned || []).length > 0 || (p?.tasks?.completed || []).length > 0);
     if (src) {
       const completedNames = new Set((src.tasks.completed || []).map(_taskName));
-      const existingNames = new Set([...tasks.planned, ...tasks.completed, ...tasks.backlog].map(_taskName));
+      const existingNames = new Set([...tasks.planned, ...tasks.completed].map(_taskName));
       for (const t of src.tasks.planned || []) {
         const name = _taskName(t);
         if (name && !completedNames.has(name) && !existingNames.has(name)) {
@@ -354,15 +353,6 @@ function _mergeTasks(existingRecord, prevRecords, date) {
           existingNames.add(name);
         }
       }
-    }
-  }
-
-  // 近日中タスク引き継ぎ: 直近7日を1回の list で取得済み → 新しい日から非空 backlog を採用
-  if (tasks.backlog.length === 0 && Array.isArray(prevRecords) && prevRecords.length > 0) {
-    const sorted = prevRecords.slice().sort((a, b) => (a.date < b.date ? 1 : -1));
-    for (const p of sorted) {
-      const bk = p?.tasks?.backlog || [];
-      if (bk.length > 0) { tasks.backlog = [...bk]; break; }
     }
   }
 
@@ -794,7 +784,6 @@ function buildFormHTML(date, record, tasks, isEdit, isRestDay = false, restReaso
   const rawInput = record?.raw_input || "";
   const plannedTasks = tasks.planned || [];
   const completedTasks = tasks.completed || [];
-  const backlogTasks = tasks.backlog || [];
   const hasCompleted = completedTasks.length > 0;
   const incompleteTasks = plannedTasks.filter((t) => !completedTasks.includes(t));
 
@@ -877,21 +866,6 @@ function buildFormHTML(date, record, tasks, isEdit, isRestDay = false, restReaso
             <button class="btn btn-outline btn-sm" id="btn-add-category">追加</button>
           </div>
         </details>
-      </div>`,
-
-    "card-backlog": `
-      <div class="card draggable-card backlog-card" id="card-backlog" draggable="false">
-        <div class="card-drag-handle" title="ドラッグで移動">⠿</div>
-        <div class="card-title">近日中 <span class="backlog-count" id="backlog-count">${backlogTasks.length}</span></div>
-        <p class="backlog-description">今日やらなくてもいいけど、近いうちにやりたいタスク</p>
-        <ul class="task-list backlog-list" id="backlog-list">
-          ${backlogTasks.map((t) => buildBacklogItem(t)).join("")}
-        </ul>
-        <div class="task-input-row">
-          <select id="backlog-category" class="category-select">${buildCategoryOptions(getLastCategory())}</select>
-          <input type="text" id="backlog-input" placeholder="" />
-          <button class="btn btn-outline btn-sm" id="btn-add-backlog">追加</button>
-        </div>
       </div>`,
 
     "card-completed": `
@@ -991,19 +965,6 @@ function buildTaskItem(taskText, isCompleted) {
       <input type="checkbox" ${isCompleted ? "checked" : ""} data-task="${escapeHTML(taskText)}" />
       ${buildCategoryBadge(category)}<span class="task-text">${escapeHTML(text)}</span>
       <button class="task-edit" data-edit="${escapeHTML(taskText)}" title="編集">✎</button>
-      ${!isCompleted ? `<button class="task-move-backlog" data-to-backlog="${escapeHTML(taskText)}" title="近日中へ移動">▼</button>` : ""}
-      <button class="task-remove" data-remove="${escapeHTML(taskText)}" title="削除">✕</button>
-    </li>`;
-}
-
-function buildBacklogItem(taskText) {
-  const { category, text } = parseTaskCategory(taskText);
-  return `
-    <li class="task-item backlog-item">
-      <span class="task-drag-handle" title="ドラッグで並べ替え">⠿</span>
-      ${buildCategoryBadge(category)}<span class="task-text">${escapeHTML(text)}</span>
-      <button class="task-edit" data-edit="${escapeHTML(taskText)}" title="編集">✎</button>
-      <button class="task-move-today" data-to-today="${escapeHTML(taskText)}" title="今日やるへ昇格">▲</button>
       <button class="task-remove" data-remove="${escapeHTML(taskText)}" title="削除">✕</button>
     </li>`;
 }
@@ -1011,7 +972,7 @@ function buildBacklogItem(taskText) {
 /**
  * タスクをインライン編集モードに切り替える。
  * 編集対象はテキスト部分のみ（カテゴリは維持）。Enter / blur で保存、Esc でキャンセル。
- * 保存時は li 内の data-* 属性（data-task / data-remove / data-edit / data-to-backlog or data-to-today）も
+ * 保存時は li 内の data-* 属性（data-task / data-remove / data-edit）も
  * 新しいテキストに揃える。これらは saveDataQuietly() がタスク収集に使うため、
  * 1 つでも古いままだと保存値が壊れる。
  * onSave は attachFormEvents 内の saveDataQuietly を呼び出すための注入。
@@ -1054,10 +1015,6 @@ function startTaskEdit(editBtn, onSave) {
     if (eBtn) eBtn.dataset.edit = newFullText;
     const rBtn = li.querySelector(".task-remove");
     if (rBtn) rBtn.dataset.remove = newFullText;
-    const bBtn = li.querySelector(".task-move-backlog");
-    if (bBtn) bBtn.dataset.toBacklog = newFullText;
-    const tBtn = li.querySelector(".task-move-today");
-    if (tBtn) tBtn.dataset.toToday = newFullText;
 
     if (newFullText !== oldFullText && typeof onSave === "function") onSave();
   }
@@ -1075,13 +1032,6 @@ function syncCompletedCard() {
   const count = document.querySelectorAll("#completed-list .task-item").length;
   card.style.display = count > 0 ? "" : "none";
   document.getElementById("completed-count").textContent = count;
-}
-
-function syncBacklogCount() {
-  const countEl = document.getElementById("backlog-count");
-  if (!countEl) return;
-  const count = document.querySelectorAll("#backlog-list .task-item").length;
-  countEl.textContent = count;
 }
 
 /* ── イベント登録 ── */
@@ -1105,8 +1055,6 @@ function attachFormEvents(date, isEdit) {
   const plannedList = document.getElementById("planned-list");
   const plannedInput = document.getElementById("planned-input");
   const completedList = document.getElementById("completed-list");
-  const backlogList = document.getElementById("backlog-list");
-  const backlogInput = document.getElementById("backlog-input");
 
   // バックグラウンド自動保存（排他制御付き）
   let isSaving = false;
@@ -1127,13 +1075,10 @@ function attachFormEvents(date, isEdit) {
     const completedTasks = [...document.querySelectorAll("#completed-list .task-item .task-remove")]
       .map((el) => el.dataset.remove)
       .filter(Boolean);
-    const backlogTasks = [...document.querySelectorAll("#backlog-list .task-item .task-remove")]
-      .map((el) => el.dataset.remove)
-      .filter(Boolean);
     const plannedTasks = [...incompleteTasks, ...completedTasks];
 
     // 何も入力されていなければ保存しない
-    if (!isEdit && !rawInput && plannedTasks.length === 0 && backlogTasks.length === 0) return;
+    if (!isEdit && !rawInput && plannedTasks.length === 0) return;
 
     const availHoursEl = document.getElementById("available-hours");
     const availHoursVal = availHoursEl?.value ? parseFloat(availHoursEl.value) : null;
@@ -1145,13 +1090,12 @@ function attachFormEvents(date, isEdit) {
           raw_input: rawInput,
           tasks_planned: plannedTasks,
           tasks_completed: completedTasks,
-          tasks_backlog: backlogTasks,
         };
         if (availHoursVal !== null) updateData.available_hours = availHoursVal;
         await recordsApi.update(date, updateData);
       } else {
         try {
-          await recordsApi.create(date, rawInput, plannedTasks, completedTasks, backlogTasks);
+          await recordsApi.create(date, rawInput, plannedTasks, completedTasks);
         } catch (createErr) {
           // 409 (既に存在) の場合は update にフォールバック
           if (createErr.message.includes("409") || createErr.message.includes("すでに存在")) {
@@ -1159,7 +1103,6 @@ function attachFormEvents(date, isEdit) {
               raw_input: rawInput,
               tasks_planned: plannedTasks,
               tasks_completed: completedTasks,
-              tasks_backlog: backlogTasks,
             };
             if (availHoursVal !== null) updateData.available_hours = availHoursVal;
             await recordsApi.update(date, updateData);
@@ -1439,9 +1382,7 @@ function attachFormEvents(date, isEdit) {
   }
 
   const plannedCategorySel = document.getElementById("planned-category");
-  const backlogCategorySel = document.getElementById("backlog-category");
   plannedCategorySel.addEventListener("change", () => handleCategorySelect(plannedCategorySel));
-  backlogCategorySel.addEventListener("change", () => handleCategorySelect(backlogCategorySel));
 
   // タスク追加
   function addTask() {
@@ -1458,28 +1399,11 @@ function attachFormEvents(date, isEdit) {
   document.getElementById("btn-add-task").addEventListener("click", addTask);
   // Enter での自動登録は廃止（追加ボタンクリックでのみ登録）
 
-  // 近日中タスク追加
-  function addBacklogTask() {
-    const text = backlogInput.value.trim();
-    if (!text) return;
-    const category = backlogCategorySel.value;
-    const fullText = formatTaskWithCategory(text, category);
-    backlogList.insertAdjacentHTML("beforeend", buildBacklogItem(fullText));
-    backlogInput.value = "";
-    backlogInput.focus();
-    syncBacklogCount();
-    saveDataQuietly();
-  }
-
-  document.getElementById("btn-add-backlog").addEventListener("click", addBacklogTask);
-  // Enter での自動登録は廃止（追加ボタンクリックでのみ登録）
-
-  // タスク削除 & チェックボックス切り替え & レーン移動（イベント委任）
+  // タスク削除 & チェックボックス切り替え（イベント委任）
   function handleTaskClick(e) {
     if (e.target.dataset.remove !== undefined) {
       e.target.closest("li").remove();
       syncCompletedCard();
-      syncBacklogCount();
       saveDataQuietly();
       return;
     }
@@ -1491,26 +1415,6 @@ function attachFormEvents(date, isEdit) {
     // タスク名タップで2行クランプ⇔全文表示を切り替え（スマホ用）
     if (e.target.classList.contains("task-text")) {
       e.target.classList.toggle("expanded");
-      return;
-    }
-    // 「近日中へ移動」ボタン
-    if (e.target.dataset.toBacklog !== undefined) {
-      const li = e.target.closest("li");
-      const taskText = e.target.dataset.toBacklog;
-      li.remove();
-      backlogList.insertAdjacentHTML("beforeend", buildBacklogItem(taskText));
-      syncBacklogCount();
-      saveDataQuietly();
-      return;
-    }
-    // 「今日やるへ昇格」ボタン
-    if (e.target.dataset.toToday !== undefined) {
-      const li = e.target.closest("li");
-      const taskText = e.target.dataset.toToday;
-      li.remove();
-      plannedList.insertAdjacentHTML("beforeend", buildTaskItem(taskText, false));
-      syncBacklogCount();
-      saveDataQuietly();
       return;
     }
     if (e.target.type === "checkbox") {
@@ -1532,7 +1436,6 @@ function attachFormEvents(date, isEdit) {
 
   plannedList.addEventListener("click", handleTaskClick);
   completedList.addEventListener("click", handleTaskClick);
-  backlogList.addEventListener("click", handleTaskClick);
 
   // カテゴリ管理
   function renderCategoryManageList() {
@@ -1594,7 +1497,6 @@ function attachFormEvents(date, isEdit) {
 function attachTaskSortEvents(saveDataQuietly) {
   const lists = [
     document.getElementById("planned-list"),
-    document.getElementById("backlog-list"),
   ];
 
   let draggedItem = null;
