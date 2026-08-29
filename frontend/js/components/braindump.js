@@ -111,6 +111,28 @@ function labelChipStyle(name) {
   return `--bd-chip-bg:${c.bg}; --bd-chip-fg:${c.fg}; --bd-chip-bg-dark:${c.bgDark}; --bd-chip-fg-dark:${c.fgDark};`;
 }
 
+// ===== ボード（トレードメモ専用ページ） =====
+// ブレインダンプと全く同じ仕様の専用ページ。データは同じ保存先を共有し、
+// board フィールドで絞り込む。ブレインダンプ本体（board=null）は全メモを表示する。
+
+const BOARDS = {
+  "cfd-silver":    { title: "CFD銀" },
+  "sumco-breakout": { title: "SUMCOデイトレ・新高値ブレイク" },
+  "crude-oil":     { title: "原油" },
+  "natural-gas":   { title: "天然ガス" },
+};
+
+let currentBoard = null; // null = ブレインダンプ本体
+
+function boardTitle() {
+  return currentBoard && BOARDS[currentBoard] ? BOARDS[currentBoard].title : "ブレインダンプ";
+}
+
+/** localStorage キーのボード別サフィックス（本体は従来キーを維持） */
+function boardKeySuffix() {
+  return currentBoard ? `:${currentBoard}` : "";
+}
+
 // ===== 状態管理 =====
 
 let currentDate = today();
@@ -132,13 +154,17 @@ let periodMode = "recent";
 let availableMonths = []; // メモが存在する月 ["2026-07", ...]（新しい順）
 let allEntriesCache = null; // ラベルフィルタ（全期間検索）用キャッシュ
 
-// 一覧の並び順モード（"created" = 作成日順 / "updated" = 更新日順）。localStorage に保持
+// 一覧の並び順モード（"created" = 作成日順 / "updated" = 更新日順）。localStorage にボード別で保持
 const SORT_MODE_STORAGE_KEY = "braindump:sortMode";
 let sortMode = "created";
-try {
-  const saved = localStorage.getItem(SORT_MODE_STORAGE_KEY);
-  if (saved === "created" || saved === "updated") sortMode = saved;
-} catch {}
+
+function loadSortModeForBoard() {
+  sortMode = "created";
+  try {
+    const saved = localStorage.getItem(SORT_MODE_STORAGE_KEY + boardKeySuffix());
+    if (saved === "created" || saved === "updated") sortMode = saved;
+  } catch {}
+}
 // ノートID別の textarea スクロール位置を記憶（同ノートに戻ったとき前回位置を復元）
 const scrollPositions = new Map();
 
@@ -149,19 +175,19 @@ function saveCurrentScroll() {
   if (key) scrollPositions.set(key, ed.scrollTop);
 }
 
-// 直前に開いていたノートIDを localStorage に保持し、リロード後も同じノートを復元する
+// 直前に開いていたノートIDを localStorage にボード別で保持し、リロード後も同じノートを復元する
 const LAST_ENTRY_STORAGE_KEY = "braindump:lastOpenEntryId";
 
 function rememberOpenEntry(id) {
   try {
-    if (id) localStorage.setItem(LAST_ENTRY_STORAGE_KEY, id);
-    else localStorage.removeItem(LAST_ENTRY_STORAGE_KEY);
+    if (id) localStorage.setItem(LAST_ENTRY_STORAGE_KEY + boardKeySuffix(), id);
+    else localStorage.removeItem(LAST_ENTRY_STORAGE_KEY + boardKeySuffix());
   } catch {}
 }
 
 function getRememberedEntryId() {
   try {
-    return localStorage.getItem(LAST_ENTRY_STORAGE_KEY);
+    return localStorage.getItem(LAST_ENTRY_STORAGE_KEY + boardKeySuffix());
   } catch {
     return null;
   }
@@ -272,16 +298,19 @@ function insertPlainTextAtCursor(text) {
 
 // ===== メインレンダー =====
 
-export async function renderBraindump() {
+export async function renderBraindump(board = null) {
+  currentBoard = board && BOARDS[board] ? board : null;
   currentDate = today();
   newEntryId = null; // ページ遷移時にリセット
+  editingEntryId = null;
   currentLabels = [];
   filterLabels = [];
+  loadSortModeForBoard();
   const main = document.querySelector("main");
   main.innerHTML = `<div class="loading"><div class="spinner"></div><p>読み込み中...</p></div>`;
 
   try {
-    entries = await braindumpApi.listByDate(currentDate) || [];
+    entries = await braindumpApi.listByDate(currentDate, currentBoard) || [];
   } catch {
     entries = [];
   }
@@ -295,15 +324,15 @@ export async function renderBraindump() {
 
   // メモが存在する月の一覧（月別表示のプルダウン用）
   try {
-    const res = await braindumpApi.datesWithEntries();
+    const res = await braindumpApi.datesWithEntries(null, null, currentBoard);
     availableMonths = buildAvailableMonths((res && res.dates) || []);
   } catch {
     availableMonths = [];
   }
 
-  // ラベル一覧（全メモから集計）
+  // ラベル一覧（表示中ボードのメモから集計）
   try {
-    const res = await braindumpApi.listLabels();
+    const res = await braindumpApi.listLabels(currentBoard);
     allLabels = (res && res.labels) || [];
   } catch {
     allLabels = [];
@@ -314,7 +343,7 @@ export async function renderBraindump() {
       <!-- 左カラム: 入力エリア (7) -->
       <div class="braindump-left">
         <div class="braindump-header">
-          <h2 class="braindump-title">ブレインダンプ</h2>
+          <h2 class="braindump-title">${escapeHTML(boardTitle())}</h2>
           <div class="braindump-header-actions">
             <button class="btn btn-primary btn-sm" id="bd-new-btn">＋ 新しいメモ</button>
             <button class="btn btn-outline btn-sm" id="bd-manage-labels-btn" title="ラベルを管理">⚙ タグ管理</button>
@@ -427,13 +456,13 @@ function attachPeriodBarEvents() {
 async function loadEntriesForCurrentPeriod() {
   try {
     if (filterLabels.length > 0 || periodMode === "all") {
-      if (!allEntriesCache) allEntriesCache = await braindumpApi.list() || [];
+      if (!allEntriesCache) allEntriesCache = await braindumpApi.list(null, null, currentBoard) || [];
       recentEntries = allEntriesCache;
     } else if (periodMode === "recent") {
-      recentEntries = await braindumpApi.list(daysAgo(RECENT_DAYS - 1), today()) || [];
+      recentEntries = await braindumpApi.list(daysAgo(RECENT_DAYS - 1), today(), currentBoard) || [];
     } else {
       // 月末日は文字列比較のため "-31" 固定で全月に対応できる
-      recentEntries = await braindumpApi.list(`${periodMode}-01`, `${periodMode}-31`) || [];
+      recentEntries = await braindumpApi.list(`${periodMode}-01`, `${periodMode}-31`, currentBoard) || [];
     }
   } catch {
     // 取得失敗時は既存データを維持
@@ -675,7 +704,7 @@ function attachSortBarEvents() {
       const mode = btn.dataset.mode;
       if (mode === sortMode) return;
       sortMode = mode;
-      try { localStorage.setItem(SORT_MODE_STORAGE_KEY, mode); } catch {}
+      try { localStorage.setItem(SORT_MODE_STORAGE_KEY + boardKeySuffix(), mode); } catch {}
       refreshSortBar();
       refreshEntriesList();
     });
@@ -1310,7 +1339,7 @@ function resetToNewMode() {
   const header = document.querySelector(".braindump-header");
   if (header) {
     header.innerHTML = `
-      <h2 class="braindump-title">ブレインダンプ</h2>
+      <h2 class="braindump-title">${escapeHTML(boardTitle())}</h2>
       <div class="braindump-header-actions">
         <button class="btn btn-primary btn-sm" id="bd-new-btn">＋ 新しいメモ</button>
         <button class="btn btn-outline btn-sm" id="bd-manage-labels-btn" title="ラベルを管理">⚙ タグ管理</button>
@@ -1410,8 +1439,8 @@ async function autoSaveNewEntry() {
       // 既に作成済み → 更新
       await braindumpApi.update(newEntryId, content, currentLabels, titleArg);
     } else {
-      // 初回 → 新規作成してIDを保持
-      const created = await braindumpApi.create(currentDate, content, currentLabels, titleArg);
+      // 初回 → 新規作成してIDを保持（表示中ボードのメモとして作成）
+      const created = await braindumpApi.create(currentDate, content, currentLabels, titleArg, currentBoard);
       if (created && created.id) {
         newEntryId = created.id;
         if (titleArg) lastSavedTitle = currentTitle; // 作成時にタイトルも保存済み
@@ -1419,7 +1448,7 @@ async function autoSaveNewEntry() {
       }
     }
     // 右カラムの一覧も更新
-    entries = await braindumpApi.listByDate(currentDate) || [];
+    entries = await braindumpApi.listByDate(currentDate, currentBoard) || [];
     await refreshEntries();
   } catch {
     // 自動保存失敗は静かに無視
@@ -1444,7 +1473,7 @@ async function refreshEntries() {
   await loadEntriesForCurrentPeriod();
   // ラベル一覧も再集計
   try {
-    const res = await braindumpApi.listLabels();
+    const res = await braindumpApi.listLabels(currentBoard);
     allLabels = (res && res.labels) || [];
   } catch {}
   refreshFilterBar();
@@ -1454,9 +1483,9 @@ async function refreshEntries() {
 // ===== ラベル管理モーダル =====
 
 async function openLabelsManager() {
-  // 最新のラベル一覧を取得
+  // 最新のラベル一覧を取得（表示中ボードのみ）
   try {
-    const res = await braindumpApi.listLabels();
+    const res = await braindumpApi.listLabels(currentBoard);
     allLabels = (res && res.labels) || [];
   } catch {}
 
@@ -1510,7 +1539,7 @@ async function openLabelsManager() {
       const trimmed = newName.trim();
       if (!trimmed || trimmed === oldName) return;
       try {
-        const result = await braindumpApi.renameLabel(oldName, trimmed);
+        const result = await braindumpApi.renameLabel(oldName, trimmed, currentBoard);
         showToast(`「${oldName}」→「${trimmed}」に変更（${result.affected}件）`);
         // 編集中メモにも反映
         if (currentLabels.includes(oldName)) {
@@ -1538,7 +1567,7 @@ async function openLabelsManager() {
       const count = target ? target.count : 0;
       if (!confirm(`「${name}」を削除しますか？\n使用中のメモ ${count} 件からもこのラベルが外れます。`)) return;
       try {
-        const result = await braindumpApi.deleteLabel(name);
+        const result = await braindumpApi.deleteLabel(name, currentBoard);
         showToast(`「${name}」を削除（${result.affected}件から除去）`);
         // 編集中メモにも反映
         currentLabels = currentLabels.filter(l => l !== name);

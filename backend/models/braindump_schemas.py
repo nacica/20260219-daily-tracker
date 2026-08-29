@@ -15,6 +15,7 @@ class BraindumpCreate(BaseModel):
     content: str = Field(..., min_length=1, max_length=50000, description="メモ本文")
     labels: Optional[list[str]] = Field(default=None, description="ラベル名リスト")
     title: Optional[str] = Field(default=None, max_length=200, description="手動タイトル（指定時は AI 自動生成をスキップ）")
+    board: Optional[str] = Field(default=None, max_length=50, description="ボードID（トレードメモ等の専用ページ。None=ブレインダンプ本体）")
 
 
 class BraindumpUpdate(BaseModel):
@@ -28,6 +29,7 @@ class LabelRenameRequest(BaseModel):
     """ラベルリネームリクエスト"""
     old_name: str = Field(..., min_length=1, max_length=50)
     new_name: str = Field(..., min_length=1, max_length=50)
+    board: Optional[str] = Field(default=None, description="ボードID（指定時はそのボードのメモのみ対象）")
 
 
 class BraindumpReorderRequest(BaseModel):
@@ -46,6 +48,7 @@ class BraindumpEntry(BaseModel):
     title: Optional[str] = None
     title_custom: bool = False
     labels: list[str] = Field(default_factory=list)
+    board: Optional[str] = None
     sort_order: Optional[float] = None
     created_at: Optional[str] = None
     updated_at: Optional[str] = None

@@ -86,6 +86,7 @@ async def create_braindump(body: BraindumpCreate, background_tasks: BackgroundTa
         "title": temp_title,
         "title_custom": title_custom,
         "labels": _normalize_labels(body.labels),
+        "board": (body.board or "").strip() or None,
         "sort_order": sort_order,
         "created_at": now,
         "updated_at": now,
@@ -104,9 +105,10 @@ async def create_braindump(body: BraindumpCreate, background_tasks: BackgroundTa
 async def list_braindumps(
     start_date: Optional[str] = Query(None, description="開始日 (YYYY-MM-DD)"),
     end_date: Optional[str] = Query(None, description="終了日 (YYYY-MM-DD)"),
+    board: Optional[str] = Query(None, description="ボードID（指定でそのボードのみ）"),
 ):
     """ブレインダンプ一覧を取得する"""
-    entries = firestore_service.list_braindumps(start_date=start_date, end_date=end_date)
+    entries = firestore_service.list_braindumps(start_date=start_date, end_date=end_date, board=board)
     return [BraindumpEntry(**e) for e in entries]
 
 
@@ -114,17 +116,21 @@ async def list_braindumps(
 async def get_dates_with_entries(
     start_date: Optional[str] = Query(None, description="開始日 (YYYY-MM-DD)"),
     end_date: Optional[str] = Query(None, description="終了日 (YYYY-MM-DD)"),
+    board: Optional[str] = Query(None, description="ボードID（指定でそのボードのみ）"),
 ):
     """メモが存在する日付の一覧を返す（カレンダーのマーク表示用）"""
-    entries = firestore_service.list_braindumps(start_date=start_date, end_date=end_date)
+    entries = firestore_service.list_braindumps(start_date=start_date, end_date=end_date, board=board)
     dates = sorted(set(e["date"] for e in entries))
     return {"dates": dates}
 
 
 @router.get("/braindump/by-date/{date}", response_model=list[BraindumpEntry])
-async def get_braindumps_by_date(date: str):
+async def get_braindumps_by_date(
+    date: str,
+    board: Optional[str] = Query(None, description="ボードID（指定でそのボードのみ）"),
+):
     """指定日の全ブレインダンプを取得する"""
-    entries = firestore_service.list_braindumps_for_date(date)
+    entries = firestore_service.list_braindumps_for_date(date, board=board)
     return [BraindumpEntry(**e) for e in entries]
 
 
@@ -281,32 +287,37 @@ async def generate_braindump_title(entry_id: str):
 # ---- ラベル管理 ----
 
 @router.get("/braindump/labels", response_model=LabelListResponse)
-async def list_braindump_labels():
-    """全ブレインダンプから集計したラベル一覧（使用件数付き、件数降順→名前昇順）"""
-    items = firestore_service.aggregate_braindump_labels()
+async def list_braindump_labels(
+    board: Optional[str] = Query(None, description="ボードID（指定でそのボードのメモのみ集計）"),
+):
+    """ブレインダンプから集計したラベル一覧（使用件数付き、件数降順→名前昇順）"""
+    items = firestore_service.aggregate_braindump_labels(board=board)
     return LabelListResponse(labels=[LabelCount(**i) for i in items])
 
 
 @router.post("/braindump/labels/rename")
 async def rename_braindump_label_endpoint(body: LabelRenameRequest):
-    """ラベルをリネーム（使用中の全メモを一括更新）"""
+    """ラベルをリネーム（使用中のメモを一括更新。board 指定時はそのボードのみ）"""
     old = body.old_name.strip()
     new = body.new_name.strip()
     if not old or not new:
         raise HTTPException(status_code=400, detail="ラベル名が空です")
     if old == new:
         return {"affected": 0}
-    affected = firestore_service.rename_braindump_label(old, new)
+    affected = firestore_service.rename_braindump_label(old, new, board=body.board)
     return {"affected": affected}
 
 
 @router.delete("/braindump/labels/{name}")
-async def delete_braindump_label_endpoint(name: str):
-    """ラベルを削除（使用中の全メモからカスケード除去）"""
+async def delete_braindump_label_endpoint(
+    name: str,
+    board: Optional[str] = Query(None, description="ボードID（指定でそのボードのメモのみ対象）"),
+):
+    """ラベルを削除（使用中のメモからカスケード除去。board 指定時はそのボードのみ）"""
     target = (name or "").strip()
     if not target:
         raise HTTPException(status_code=400, detail="ラベル名が空です")
-    affected = firestore_service.delete_braindump_label(target)
+    affected = firestore_service.delete_braindump_label(target, board=board)
     return {"affected": affected}
 
 

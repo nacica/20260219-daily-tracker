@@ -351,8 +351,13 @@ def _braindump_sort_key(entry: dict) -> tuple:
     return (float(order), int(entry.get("entry_number", 1)))
 
 
-def list_braindumps(start_date: Optional[str] = None, end_date: Optional[str] = None) -> list[dict]:
-    """ブレインダンプ一覧を取得（日付 DESC、同一日付内は sort_order ASC）"""
+def list_braindumps(start_date: Optional[str] = None, end_date: Optional[str] = None,
+                    board: Optional[str] = None) -> list[dict]:
+    """ブレインダンプ一覧を取得（日付 DESC、同一日付内は sort_order ASC）
+
+    board 指定時はそのボードのメモのみ返す（複合インデックス不要のため Python 側でフィルタ）。
+    board=None はブレインダンプ本体ページで、ボード分も含む全メモを返す。
+    """
     db = get_db()
     query = db.collection("braindump_entries")
 
@@ -362,6 +367,8 @@ def list_braindumps(start_date: Optional[str] = None, end_date: Optional[str] = 
         query = query.where(filter=FieldFilter("date", "<=", end_date))
 
     results = [doc.to_dict() for doc in query.stream()]
+    if board:
+        results = [e for e in results if e.get("board") == board]
     # 日付 DESC, 同一日付内は sort_order ASC（未設定は entry_number にフォールバック）
     # Python の sort は安定ソートなので、二次キーを先にソートしてから一次キーをソートする
     results.sort(key=_braindump_sort_key)
@@ -369,11 +376,16 @@ def list_braindumps(start_date: Optional[str] = None, end_date: Optional[str] = 
     return results
 
 
-def list_braindumps_for_date(date: str) -> list[dict]:
-    """指定日の全ブレインダンプを取得（sort_order 昇順、未設定は entry_number にフォールバック）"""
+def list_braindumps_for_date(date: str, board: Optional[str] = None) -> list[dict]:
+    """指定日の全ブレインダンプを取得（sort_order 昇順、未設定は entry_number にフォールバック）
+
+    board 指定時はそのボードのメモのみ。entry_number 採番や並び替えでは board を渡さず全件を使う。
+    """
     db = get_db()
     query = db.collection("braindump_entries").where(filter=FieldFilter("date", "==", date))
     results = [doc.to_dict() for doc in query.stream()]
+    if board:
+        results = [e for e in results if e.get("board") == board]
     results.sort(key=_braindump_sort_key)
     return results
 
@@ -479,12 +491,18 @@ def delete_braindump(entry_id: str) -> bool:
     return True
 
 
-def aggregate_braindump_labels() -> list[dict]:
-    """全ブレインダンプを走査してラベル使用件数を集計する"""
+def aggregate_braindump_labels(board: Optional[str] = None) -> list[dict]:
+    """全ブレインダンプを走査してラベル使用件数を集計する
+
+    board 指定時はそのボードのメモのみ集計（ページごとに独立したラベル一覧）。
+    board=None はブレインダンプ本体で、全メモ横断の集計を返す。
+    """
     db = get_db()
     counts: dict[str, int] = {}
     for doc in db.collection("braindump_entries").stream():
         data = doc.to_dict() or {}
+        if board and data.get("board") != board:
+            continue
         for label in data.get("labels") or []:
             if not isinstance(label, str):
                 continue
@@ -495,8 +513,11 @@ def aggregate_braindump_labels() -> list[dict]:
     return [{"name": k, "count": v} for k, v in sorted(counts.items(), key=lambda x: (-x[1], x[0]))]
 
 
-def rename_braindump_label(old_name: str, new_name: str) -> int:
-    """全ブレインダンプの labels 配列の old_name を new_name に置換する。影響件数を返す"""
+def rename_braindump_label(old_name: str, new_name: str, board: Optional[str] = None) -> int:
+    """ブレインダンプの labels 配列の old_name を new_name に置換する。影響件数を返す
+
+    board 指定時はそのボードのメモのみ対象（ページごとに独立したラベル管理）。
+    """
     db = get_db()
     old = (old_name or "").strip()
     new = (new_name or "").strip()
@@ -506,6 +527,8 @@ def rename_braindump_label(old_name: str, new_name: str) -> int:
     affected = 0
     for doc in db.collection("braindump_entries").stream():
         data = doc.to_dict() or {}
+        if board and data.get("board") != board:
+            continue
         labels = data.get("labels") or []
         if not isinstance(labels, list) or old not in labels:
             continue
@@ -523,8 +546,11 @@ def rename_braindump_label(old_name: str, new_name: str) -> int:
     return affected
 
 
-def delete_braindump_label(name: str) -> int:
-    """全ブレインダンプの labels 配列から name を除去する。影響件数を返す"""
+def delete_braindump_label(name: str, board: Optional[str] = None) -> int:
+    """ブレインダンプの labels 配列から name を除去する。影響件数を返す
+
+    board 指定時はそのボードのメモのみ対象（ページごとに独立したラベル管理）。
+    """
     db = get_db()
     target = (name or "").strip()
     if not target:
@@ -533,6 +559,8 @@ def delete_braindump_label(name: str) -> int:
     affected = 0
     for doc in db.collection("braindump_entries").stream():
         data = doc.to_dict() or {}
+        if board and data.get("board") != board:
+            continue
         labels = data.get("labels") or []
         if not isinstance(labels, list) or target not in labels:
             continue

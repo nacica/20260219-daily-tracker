@@ -198,24 +198,30 @@ export const journalApi = {
 // ---- ブレインダンプ ----
 
 export const braindumpApi = {
-  /** メモ作成（1日に複数作成可能。title 指定で手動タイトルを同時設定） */
-  create: (date, content, labels = null, title = null) => {
+  /** メモ作成（1日に複数作成可能。title 指定で手動タイトルを同時設定。board 指定で専用ページのメモに） */
+  create: (date, content, labels = null, title = null, board = null) => {
     const body = { date, content };
     if (labels) body.labels = labels;
     if (title) body.title = title;
+    if (board) body.board = board;
     return apiFetch("/braindump", { method: "POST", body });
   },
 
-  /** メモ一覧（日付範囲） */
-  list: (startDate, endDate) => {
+  /** メモ一覧（日付範囲。board 指定でそのボードのみ） */
+  list: (startDate, endDate, board = null) => {
     const params = new URLSearchParams();
     if (startDate) params.set("start_date", startDate);
     if (endDate) params.set("end_date", endDate);
+    if (board) params.set("board", board);
     return apiFetch(`/braindump?${params}`);
   },
 
-  /** 指定日の全メモ取得 */
-  listByDate: (date) => apiFetch(`/braindump/by-date/${date}`),
+  /** 指定日の全メモ取得（board 指定でそのボードのみ） */
+  listByDate: (date, board = null) => {
+    const params = new URLSearchParams();
+    if (board) params.set("board", board);
+    return apiFetch(`/braindump/by-date/${date}?${params}`);
+  },
 
   /** 指定日のメモを並び替え（ordered_ids の順に sort_order を再採番） */
   reorder: (date, orderedIds) =>
@@ -224,11 +230,12 @@ export const braindumpApi = {
       body: { ordered_ids: orderedIds },
     }),
 
-  /** メモが存在する日付一覧 */
-  datesWithEntries: (startDate, endDate) => {
+  /** メモが存在する日付一覧（board 指定でそのボードのみ） */
+  datesWithEntries: (startDate, endDate, board = null) => {
     const params = new URLSearchParams();
     if (startDate) params.set("start_date", startDate);
     if (endDate) params.set("end_date", endDate);
+    if (board) params.set("board", board);
     return apiFetch(`/braindump/dates-with-entries?${params}`);
   },
 
@@ -266,19 +273,26 @@ export const braindumpApi = {
     return res.json();
   },
 
-  /** ラベル一覧（全メモから集計、使用件数付き） */
-  listLabels: () => apiFetch("/braindump/labels"),
+  /** ラベル一覧（使用件数付き。board 指定でそのボードのメモのみ集計） */
+  listLabels: (board = null) => {
+    const params = new URLSearchParams();
+    if (board) params.set("board", board);
+    return apiFetch(`/braindump/labels?${params}`);
+  },
 
-  /** ラベルをリネーム（影響件数を返す） */
-  renameLabel: (oldName, newName) =>
-    apiFetch("/braindump/labels/rename", {
-      method: "POST",
-      body: { old_name: oldName, new_name: newName },
-    }),
+  /** ラベルをリネーム（影響件数を返す。board 指定でそのボードのみ対象） */
+  renameLabel: (oldName, newName, board = null) => {
+    const body = { old_name: oldName, new_name: newName };
+    if (board) body.board = board;
+    return apiFetch("/braindump/labels/rename", { method: "POST", body });
+  },
 
-  /** ラベルを削除（カスケード除去、影響件数を返す） */
-  deleteLabel: (name) =>
-    apiFetch(`/braindump/labels/${encodeURIComponent(name)}`, { method: "DELETE" }),
+  /** ラベルを削除（カスケード除去、影響件数を返す。board 指定でそのボードのみ対象） */
+  deleteLabel: (name, board = null) => {
+    const params = new URLSearchParams();
+    if (board) params.set("board", board);
+    return apiFetch(`/braindump/labels/${encodeURIComponent(name)}?${params}`, { method: "DELETE" });
+  },
 };
 
 // ---- Udemy コース制作 Tips ----
