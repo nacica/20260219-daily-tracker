@@ -10,10 +10,10 @@
  *     リダイレクトのみ提供する。
  */
 
-import { addRoute, navigate, updateNavActive } from "./router.js?v=20260829g";
-import { recordsApi } from "./api.js?v=20260829g";
-import { initSwipeNav } from "./swipe-nav.js?v=20260829g";
-import { initSidebarResize } from "./sidebar-resize.js?v=20260829g";
+import { addRoute, navigate, updateNavActive } from "./router.js?v=20260830a";
+import { recordsApi } from "./api.js?v=20260830a";
+import { initSwipeNav } from "./swipe-nav.js?v=20260830a";
+import { initSidebarResize } from "./sidebar-resize.js?v=20260830a";
 
 // ===== バックエンドのウォームアップ（コールドスタート対策） =====
 // Cloud Run は min-instances 0 で運用しているため、久しぶりのアクセスでは
@@ -33,20 +33,20 @@ import { initSidebarResize } from "./sidebar-resize.js?v=20260829g";
 
 // ===== 動的 import ヘルパー =====
 // 各コンポーネントは初回訪問時に初めてネットワーク取得（以降は SW キャッシュから即応答）
-const loadInputForm       = () => import("./components/input-form.js?v=20260829g");
-const loadAnalysisView    = () => import("./components/analysis-view.js?v=20260829g");
-const loadHistoryList     = () => import("./components/history-list.js?v=20260829g");
-const loadWeeklyReport    = () => import("./components/weekly-report.js?v=20260829g");
-const loadMonthlyReport   = () => import("./components/monthly-report.js?v=20260829g");
-const loadJournal         = () => import("./components/journal.js?v=20260829g");
-const loadBraindump       = () => import("./components/braindump.js?v=20260829g");
-const loadTaskStats       = () => import("./components/task-stats.js?v=20260829g");
-const loadFlashcardList   = () => import("./components/flashcard-list.js?v=20260829g");
-const loadFlashcardStudy  = () => import("./components/flashcard-study.js?v=20260829g");
-const loadWishlist        = () => import("./components/wishlist.js?v=20260829g");
-const loadGratitude       = () => import("./components/gratitude.js?v=20260829g");
-const loadUdemyTips       = () => import("./components/udemy-tips.js?v=20260829g");
-const loadMichishirube    = () => import("./components/michishirube.js?v=20260829g");
+const loadInputForm       = () => import("./components/input-form.js?v=20260830a");
+const loadAnalysisView    = () => import("./components/analysis-view.js?v=20260830a");
+const loadHistoryList     = () => import("./components/history-list.js?v=20260830a");
+const loadWeeklyReport    = () => import("./components/weekly-report.js?v=20260830a");
+const loadMonthlyReport   = () => import("./components/monthly-report.js?v=20260830a");
+const loadJournal         = () => import("./components/journal.js?v=20260830a");
+const loadBraindump       = () => import("./components/braindump.js?v=20260830a");
+const loadTaskStats       = () => import("./components/task-stats.js?v=20260830a");
+const loadFlashcardList   = () => import("./components/flashcard-list.js?v=20260830a");
+const loadFlashcardStudy  = () => import("./components/flashcard-study.js?v=20260830a");
+const loadWishlist        = () => import("./components/wishlist.js?v=20260830a");
+const loadGratitude       = () => import("./components/gratitude.js?v=20260830a");
+const loadUdemyTips       = () => import("./components/udemy-tips.js?v=20260830a");
+const loadMichishirube    = () => import("./components/michishirube.js?v=20260830a");
 
 // ===== ユーティリティ =====
 
@@ -485,6 +485,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // モバイルスワイプナビゲーション
   initSwipeNav();
+
+  // モバイル用 ナビ折りたたみハンドル（開閉状態は localStorage に記憶）
+  document.getElementById("nav-collapse-handle")?.addEventListener("click", () => {
+    const collapsed = document.documentElement.classList.toggle("nav-collapsed");
+    try { localStorage.setItem("nav-collapsed", collapsed ? "1" : "0"); } catch {}
+  });
 
   // デスクトップ用 サイドバー幅リサイズ
   initSidebarResize();

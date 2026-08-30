@@ -517,6 +517,53 @@ body {
   filter: drop-shadow(0 0 4px rgba(0, 212, 255, 0.8));
 }
 
+/* ===== モバイル用 ナビ折りたたみ =====
+   ハンドル（∧/∨）タップでアイコングリッドをスライドアニメーションで開閉する。
+   開閉状態は html.nav-collapsed クラス + localStorage("nav-collapsed") で管理。
+   デスクトップ（1024px以上）ではハンドルを非表示にし、折りたたみは無効。 */
+
+.nav-inner {
+  overflow: hidden;
+  max-height: 420px;
+  opacity: 1;
+  transition: max-height 0.32s ease, opacity 0.22s ease, padding 0.32s ease;
+}
+
+html.nav-collapsed .nav-inner {
+  max-height: 0;
+  opacity: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+.nav-collapse-handle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 22px;
+  padding: 2px 0 6px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.nav-collapse-handle svg {
+  width: 18px;
+  height: 18px;
+  transition: transform 0.32s ease, color 0.2s;
+}
+
+.nav-collapse-handle:hover svg {
+  color: var(--cyan);
+}
+
+html.nav-collapsed .nav-collapse-handle svg {
+  transform: rotate(180deg);
+}
+
 /* ===== メインコンテンツ ===== */
 
 main {
@@ -3499,12 +3546,22 @@ textarea {
     opacity: 0.5;
   }
 
-  .nav-inner {
+  .nav-inner,
+  html.nav-collapsed .nav-inner {
     flex-direction: column;
     align-items: stretch;
     justify-content: flex-start;
     height: 100%;
     padding: 0;
+    /* デスクトップでは折りたたみ無効（モバイル用の max-height/opacity を解除） */
+    max-height: none;
+    opacity: 1;
+    overflow: visible;
+  }
+
+  /* 折りたたみハンドルはモバイル専用 */
+  .nav-collapse-handle {
+    display: none;
   }
 
   /* Logo area — デスクトップでは再表示 */

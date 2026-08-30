@@ -24,15 +24,15 @@
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Klee+One&display=swap" /></noscript>
 
   <link rel="manifest" href="/manifest.json" />
-  <link rel="stylesheet" href="/css/style.css?v=20260829g" />
+  <link rel="stylesheet" href="/css/style.css?v=20260830a" />
 
   <!-- トップ表示に必要なコアモジュールを先読み（並列 fetch で TTI を短縮） -->
-  <link rel="modulepreload" href="/js/app.js?v=20260829g" />
-  <link rel="modulepreload" href="/js/router.js?v=20260829g" />
-  <link rel="modulepreload" href="/js/api.js?v=20260829g" />
-  <link rel="modulepreload" href="/js/swipe-nav.js?v=20260829g" />
-  <link rel="modulepreload" href="/js/floating-toolbar.js?v=20260829g" />
-  <link rel="modulepreload" href="/js/sidebar-resize.js?v=20260829g" />
+  <link rel="modulepreload" href="/js/app.js?v=20260830a" />
+  <link rel="modulepreload" href="/js/router.js?v=20260830a" />
+  <link rel="modulepreload" href="/js/api.js?v=20260830a" />
+  <link rel="modulepreload" href="/js/swipe-nav.js?v=20260830a" />
+  <link rel="modulepreload" href="/js/floating-toolbar.js?v=20260830a" />
+  <link rel="modulepreload" href="/js/sidebar-resize.js?v=20260830a" />
 
   <!-- FOUC防止: JSモジュール読み込み前にテーマを適用 -->
   <script>
@@ -40,6 +40,12 @@
       var saved = localStorage.getItem('theme');
       var theme = saved || (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
       document.documentElement.setAttribute('data-theme', theme);
+      // モバイルナビ折りたたみ状態の復元（描画前に適用してチラつきを防ぐ）
+      try {
+        if (localStorage.getItem('nav-collapsed') === '1') {
+          document.documentElement.classList.add('nav-collapsed');
+        }
+      } catch (e) {}
     })();
   </script>
 
@@ -210,6 +216,12 @@
         </svg>
       </button>
     </div>
+    <!-- モバイル用 ナビ折りたたみハンドル（デスクトップでは非表示） -->
+    <button class="nav-collapse-handle" id="nav-collapse-handle" type="button" aria-label="メニューを折りたたむ／広げる">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="18 15 12 9 6 15"/>
+      </svg>
+    </button>
   </nav>
 
   <!-- サイドバー幅リサイズ用ドラッグハンドル（デスクトップのみ表示） -->
@@ -268,6 +280,6 @@
   -->
 
   <!-- アプリのメインスクリプト（ES Modules） -->
-  <script type="module" src="/js/app.js?v=20260829g"></script>
+  <script type="module" src="/js/app.js?v=20260830a"></script>
 </body>
 </html>
