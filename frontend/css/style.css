@@ -5163,6 +5163,16 @@ div.journal-textarea.is-empty::before {
   vertical-align: sub;
 }
 
+/* 📷 写真追加（onPhoto を持つエディタでのみ表示） */
+.ft-floating-toolbar .ft-btn-photo {
+  align-items: center;
+}
+.ft-floating-toolbar .ft-btn-photo svg {
+  width: 18px;
+  height: 18px;
+  display: block;
+}
+
 /* リセット A は少し小さめに */
 .ft-floating-toolbar .ft-btn-size-reset {
   font-size: 0.95rem;
@@ -5224,6 +5234,13 @@ div.journal-textarea.is-empty::before {
   gap: 8px;
   margin-top: 10px;
   justify-content: flex-end;
+  align-items: center;
+}
+
+/* 写真追加ボタンは左寄せ（削除ボタンは右端のまま） */
+.braindump-photo-btn {
+  margin-right: auto;
+  white-space: nowrap;
 }
 
 /* エントリ一覧 — ガラス質モノリスカード */

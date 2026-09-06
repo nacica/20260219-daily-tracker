@@ -12,7 +12,7 @@ import {
   appendMarkdownToEditor,
   serializeEditorMarkdown,
   SIZE_SPAN_STRIP,
-} from "../floating-toolbar.js?v=20260725b";
+} from "../floating-toolbar.js?v=20260906b";
 
 // ===== ユーティリティ =====
 
@@ -362,6 +362,8 @@ export async function renderBraindump(board = null) {
             <div class="braindump-resize-bar" id="bd-resize-bar" aria-hidden="true" title="ドラッグして縦幅を調整"></div>
           </div>
           <div class="braindump-form-actions">
+            <input type="file" id="bd-photo-input" accept="image/*" multiple style="display: none;" />
+            <button type="button" class="btn btn-outline btn-sm braindump-photo-btn" id="bd-photo-btn" title="写真を追加（アルバム / カメラ / ファイル）">📷 写真を追加</button>
             <button class="btn btn-danger btn-sm" id="bd-delete-btn" style="display: none;">🗑 削除</button>
           </div>
         </div>
@@ -1013,6 +1015,10 @@ function attachEvents() {
   editorEl?.addEventListener("input", handleNewTextareaInput);
   // クリップボードの貼り付け対応（画像はインライン挿入、テキストはプレーン化）
   editorEl?.addEventListener("paste", handlePasteEvent);
+  // 写真追加（スマホのアルバム / カメラ、PC のファイル選択）
+  document.getElementById("bd-photo-btn")?.addEventListener("click", openPhotoPicker);
+  document.getElementById("bd-photo-input")?.addEventListener("change", handlePhotoInputChange);
+  installEditorSelectionTracker();
   // Tab キーでフォーカス移動を抑止し、タブ文字を挿入
   editorEl?.addEventListener("keydown", handleTabInsert);
   // インライン画像クリックで新しいタブに原寸表示
@@ -1051,7 +1057,7 @@ function attachEvents() {
   initResizeBar();
 
   // 選択時フローティング書式ツールバー（共有モジュール）にエディタを登録
-  if (editorEl) attachFloatingToolbar(editorEl);
+  if (editorEl) attachFloatingToolbar(editorEl, { onPhoto: openPhotoPicker });
 
   // ラベル編集UIのイベント
   attachLabelsEditorEvents();
@@ -1678,6 +1684,117 @@ async function handlePasteEvent(e) {
   }
 }
 
+// ===== 写真追加（ファイル選択 → ブラウザ側で縮小 → アップロード → インライン挿入） =====
+
+// アップロード前の縮小設定（長辺 1600px・JPEG 品質 0.85）。
+// スマホ写真は 1 枚 3〜10MB になりがちで、サーバー上限（10MB）超えと通信量を防ぐ。
+const PHOTO_MAX_EDGE = 1600;
+const PHOTO_JPEG_QUALITY = 0.85;
+// 縮小不要かつこのサイズ以下ならそのまま送る（小さな PNG を無駄に再圧縮しない）
+const PHOTO_PASSTHROUGH_MAX_BYTES = 2 * 1024 * 1024;
+const PHOTO_PASSTHROUGH_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+
+// エディタ内で最後にあった選択位置。ボタン操作やファイル選択ダイアログでフォーカスが
+// 外れても、写真を「書いていた場所」に差し込めるように selectionchange で追跡する。
+let lastEditorRange = null;
+let editorSelectionTrackerInstalled = false;
+
+function installEditorSelectionTracker() {
+  if (editorSelectionTrackerInstalled) return;
+  editorSelectionTrackerInstalled = true;
+  document.addEventListener("selectionchange", () => {
+    const editor = document.getElementById("bd-new-textarea");
+    const sel = window.getSelection();
+    if (!editor || !sel || sel.rangeCount === 0) return;
+    const r = sel.getRangeAt(0);
+    if (editor.contains(r.commonAncestorContainer)) lastEditorRange = r.cloneRange();
+  });
+}
+
+/** 記憶していた選択位置（の末尾）へキャレットを戻す。エディタ外／無効なら末尾扱いになる */
+function restoreEditorSelection() {
+  const editor = document.getElementById("bd-new-textarea");
+  if (!editor || !lastEditorRange) return;
+  if (!editor.contains(lastEditorRange.commonAncestorContainer)) { lastEditorRange = null; return; }
+  const sel = window.getSelection();
+  if (!sel) return;
+  const r = lastEditorRange.cloneRange();
+  r.collapse(false); // 範囲選択中でも選択テキストを消さず、その直後に挿入する
+  sel.removeAllRanges();
+  sel.addRange(r);
+}
+
+/** OS 標準の写真ピッカーを開く（iOS/Android: アルバム / カメラ / ファイル、PC: ファイル選択） */
+function openPhotoPicker() {
+  document.getElementById("bd-photo-input")?.click();
+}
+
+async function handlePhotoInputChange(e) {
+  const input = e.target;
+  const files = Array.from((input && input.files) || []).filter(
+    f => f.type.startsWith("image/") || /\.(heic|heif)$/i.test(f.name || "")
+  );
+  if (input) input.value = ""; // 同じ写真を続けて選べるようにリセット
+  if (files.length === 0) return;
+
+  for (const file of files) {
+    restoreEditorSelection();
+    const prepared = await prepareImageForUpload(file);
+    await pasteImageAtCursor(prepared);
+    // 挿入後のキャレット位置を次の写真の挿入位置として記憶
+    const sel = window.getSelection();
+    const editor = document.getElementById("bd-new-textarea");
+    if (sel && sel.rangeCount > 0 && editor && editor.contains(sel.getRangeAt(0).commonAncestorContainer)) {
+      lastEditorRange = sel.getRangeAt(0).cloneRange();
+    }
+  }
+}
+
+/**
+ * 画像を長辺 PHOTO_MAX_EDGE px 以内に縮小し JPEG 化する。
+ * - GIF はアニメーションを壊さないためそのまま
+ * - 縮小不要かつ小さいファイルはそのまま（再圧縮しない）
+ * - デコードや変換に失敗した場合は元ファイルを返す（サーバー側で判定させる）
+ * 端末の EXIF 回転は <img> デコード時にブラウザが適用するため、描画結果は正しい向きになる。
+ */
+async function prepareImageForUpload(file) {
+  if (file.type === "image/gif") return file;
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise((resolve, reject) => {
+      const im = new Image();
+      im.onload = () => resolve(im);
+      im.onerror = () => reject(new Error("画像をデコードできませんでした"));
+      im.src = url;
+    });
+    const w = img.naturalWidth, h = img.naturalHeight;
+    if (!w || !h) return file;
+    const scale = Math.min(1, PHOTO_MAX_EDGE / Math.max(w, h));
+    if (scale === 1 && file.size <= PHOTO_PASSTHROUGH_MAX_BYTES && PHOTO_PASSTHROUGH_TYPES.has(file.type)) {
+      return file;
+    }
+    const cw = Math.max(1, Math.round(w * scale));
+    const ch = Math.max(1, Math.round(h * scale));
+    const canvas = document.createElement("canvas");
+    canvas.width = cw;
+    canvas.height = ch;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return file;
+    // 透過 PNG を JPEG 化すると透明部が黒くなるため白で下塗り
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, cw, ch);
+    ctx.drawImage(img, 0, 0, cw, ch);
+    const blob = await new Promise(resolve => canvas.toBlob(resolve, "image/jpeg", PHOTO_JPEG_QUALITY));
+    if (!blob) return file;
+    const base = (file.name || "photo").replace(/\.[^.]+$/, "") || "photo";
+    return new File([blob], `${base}.jpg`, { type: "image/jpeg", lastModified: Date.now() });
+  } catch {
+    return file;
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
 async function pasteImageAtCursor(file) {
   const editorEl = document.getElementById("bd-new-textarea");
   if (!editorEl) return;
@@ -1699,7 +1816,7 @@ async function pasteImageAtCursor(file) {
     } else {
       await autoSaveNewEntry();
     }
-    showToast("画像を貼り付けました");
+    showToast("画像を追加しました");
   } catch (err) {
     // アップロード失敗時はインライン画像を除去
     img.remove();

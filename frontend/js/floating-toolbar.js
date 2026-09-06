@@ -13,7 +13,8 @@
  *   - 表示中は位置を固定（選択範囲の rect が変わってもツールバーは動かない）
  *
  * API:
- *   - attachFloatingToolbar(editor): エディタを登録（ツールバー生成 + Ctrl+B キーバインド）
+ *   - attachFloatingToolbar(editor, opts): エディタを登録（ツールバー生成 + Ctrl+B キーバインド）
+ *       opts.onPhoto: 指定するとツールバーに 📷 ボタンが出て、押下時に呼ばれる（写真追加など）
  *   - appendMarkdownToEditor(editor, markdown, opts): markdown → DOM 展開
  *   - serializeEditorMarkdown(editor, opts): DOM → markdown シリアライズ
  *   - SIZE_SPAN_STRIP: 表示用に size span タグだけ剥がす正規表現
@@ -33,9 +34,12 @@ const BOLD_MATCH = /\*\*([^\n*][^\n]*?)\*\*/g;
 // ========== エディタ登録 ==========
 
 const editorRegistry = new WeakSet();
+// エディタごとの追加オプション（onPhoto など）
+const editorOptions = new WeakMap();
 
-export function attachFloatingToolbar(editor) {
+export function attachFloatingToolbar(editor, opts = {}) {
   if (!editor || editor.nodeType !== Node.ELEMENT_NODE) return;
+  editorOptions.set(editor, opts || {});
   if (editorRegistry.has(editor)) return;
   editorRegistry.add(editor);
 
@@ -88,6 +92,10 @@ function ensureToolbar() {
     `<button type="button" class="ft-btn ft-btn-size-down" title="文字を小さく" aria-label="文字を小さく">A<span class="ft-sub">−</span></button>`,
     `<button type="button" class="ft-btn ft-btn-size-reset" title="文字サイズをデフォルトに戻す" aria-label="文字サイズをデフォルトに戻す">A</button>`,
     `<button type="button" class="ft-btn ft-btn-size-up" title="文字を大きく" aria-label="文字を大きく">A<span class="ft-sup">+</span></button>`,
+    `<span class="ft-sep ft-sep-photo" aria-hidden="true"></span>`,
+    `<button type="button" class="ft-btn ft-btn-photo" title="写真を追加" aria-label="写真を追加">` +
+      `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">` +
+      `<path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></button>`,
   ].join("");
   document.body.appendChild(toolbarEl);
 
@@ -102,6 +110,28 @@ function ensureToolbar() {
   bindBtn(".ft-btn-size-down", () => bumpSelectionFontSize(-1));
   bindBtn(".ft-btn-size-reset", () => setSelectionFontSize(DEFAULT_SIZE));
   bindBtn(".ft-btn-size-up", () => bumpSelectionFontSize(+1));
+
+  // 📷 ボタンは click で発火させる（ファイル選択ダイアログはユーザー操作直下でしか開けず、
+  // iOS では touchstart がユーザー操作として扱われないため）。
+  // 押した瞬間にアクティブなエディタの onPhoto を控えておき、選択が解除されても呼べるようにする。
+  const photoBtn = toolbarEl.querySelector(".ft-btn-photo");
+  if (photoBtn) {
+    let pendingPhotoHandler = null;
+    const capture = () => {
+      const ed = getActiveEditor();
+      const o = ed ? editorOptions.get(ed) : null;
+      pendingPhotoHandler = o && typeof o.onPhoto === "function" ? o.onPhoto : null;
+    };
+    photoBtn.addEventListener("mousedown", (e) => { e.preventDefault(); capture(); });
+    photoBtn.addEventListener("touchstart", capture, { passive: true });
+    photoBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      if (!pendingPhotoHandler) capture();
+      const fn = pendingPhotoHandler;
+      pendingPhotoHandler = null;
+      if (fn) fn();
+    });
+  }
 
   document.addEventListener("selectionchange", updateToolbarPosition);
   window.addEventListener("scroll", updateToolbarPosition, true);
@@ -152,6 +182,13 @@ function updateToolbarPosition() {
     toolbarPinned = false;
     return;
   }
+  // 📷 ボタンは onPhoto を持つエディタでだけ表示
+  const opts = editorOptions.get(editor);
+  const showPhoto = !!(opts && typeof opts.onPhoto === "function");
+  const photoBtn = tb.querySelector(".ft-btn-photo");
+  const photoSep = tb.querySelector(".ft-sep-photo");
+  if (photoBtn) photoBtn.style.display = showPhoto ? "" : "none";
+  if (photoSep) photoSep.style.display = showPhoto ? "" : "none";
   // 選択確定後は位置を固定（B/A 操作の度に飛び跳ねないように）。
   // ドラッグ中（未ピン）は選択範囲の上端へ追従し続ける。
   if (toolbarPinned && tb.style.display !== "none") return;

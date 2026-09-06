@@ -14,7 +14,7 @@ import {
   attachFloatingToolbar,
   appendMarkdownToEditor,
   serializeEditorMarkdown,
-} from "../floating-toolbar.js?v=20260725b";
+} from "../floating-toolbar.js?v=20260906b";
 
 /** **bold** + <span style="font-size:Xem"> を保ったまま、テキスト部分はエスケープ + 改行→<br> */
 function renderWishlistNotes(text) {
