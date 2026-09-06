@@ -10,10 +10,10 @@
  *     リダイレクトのみ提供する。
  */
 
-import { addRoute, navigate, updateNavActive } from "./router.js?v=20260830a";
-import { recordsApi } from "./api.js?v=20260830a";
-import { initSwipeNav } from "./swipe-nav.js?v=20260830a";
-import { initSidebarResize } from "./sidebar-resize.js?v=20260830a";
+import { addRoute, navigate, updateNavActive } from "./router.js?v=20260906a";
+import { recordsApi } from "./api.js?v=20260906a";
+import { initSwipeNav } from "./swipe-nav.js?v=20260906a";
+import { initSidebarResize } from "./sidebar-resize.js?v=20260906a";
 
 // ===== バックエンドのウォームアップ（コールドスタート対策） =====
 // Cloud Run は min-instances 0 で運用しているため、久しぶりのアクセスでは
@@ -33,20 +33,20 @@ import { initSidebarResize } from "./sidebar-resize.js?v=20260830a";
 
 // ===== 動的 import ヘルパー =====
 // 各コンポーネントは初回訪問時に初めてネットワーク取得（以降は SW キャッシュから即応答）
-const loadInputForm       = () => import("./components/input-form.js?v=20260830a");
-const loadAnalysisView    = () => import("./components/analysis-view.js?v=20260830a");
-const loadHistoryList     = () => import("./components/history-list.js?v=20260830a");
-const loadWeeklyReport    = () => import("./components/weekly-report.js?v=20260830a");
-const loadMonthlyReport   = () => import("./components/monthly-report.js?v=20260830a");
-const loadJournal         = () => import("./components/journal.js?v=20260830a");
-const loadBraindump       = () => import("./components/braindump.js?v=20260830a");
-const loadTaskStats       = () => import("./components/task-stats.js?v=20260830a");
-const loadFlashcardList   = () => import("./components/flashcard-list.js?v=20260830a");
-const loadFlashcardStudy  = () => import("./components/flashcard-study.js?v=20260830a");
-const loadWishlist        = () => import("./components/wishlist.js?v=20260830a");
-const loadGratitude       = () => import("./components/gratitude.js?v=20260830a");
-const loadUdemyTips       = () => import("./components/udemy-tips.js?v=20260830a");
-const loadMichishirube    = () => import("./components/michishirube.js?v=20260830a");
+const loadInputForm       = () => import("./components/input-form.js?v=20260906a");
+const loadAnalysisView    = () => import("./components/analysis-view.js?v=20260906a");
+const loadHistoryList     = () => import("./components/history-list.js?v=20260906a");
+const loadWeeklyReport    = () => import("./components/weekly-report.js?v=20260906a");
+const loadMonthlyReport   = () => import("./components/monthly-report.js?v=20260906a");
+const loadJournal         = () => import("./components/journal.js?v=20260906a");
+const loadBraindump       = () => import("./components/braindump.js?v=20260906a");
+const loadTaskStats       = () => import("./components/task-stats.js?v=20260906a");
+const loadFlashcardList   = () => import("./components/flashcard-list.js?v=20260906a");
+const loadFlashcardStudy  = () => import("./components/flashcard-study.js?v=20260906a");
+const loadWishlist        = () => import("./components/wishlist.js?v=20260906a");
+const loadGratitude       = () => import("./components/gratitude.js?v=20260906a");
+const loadUdemyTips       = () => import("./components/udemy-tips.js?v=20260906a");
+const loadMichishirube    = () => import("./components/michishirube.js?v=20260906a");
 
 // ===== ユーティリティ =====
 
@@ -71,6 +71,7 @@ const ROUTE_TITLES = {
   "/monthly": { title: "月次レポート", breadcrumb: "月次サマリー" },
   "/journal": { title: "フリージャーナル", breadcrumb: "ジャーナル" },
   "/braindump": { title: "ブレインダンプ", breadcrumb: "頭の整理メモ" },
+  "/stocks": { title: "株全般", breadcrumb: "トレードメモ" },
   "/cfd-silver": { title: "CFD銀", breadcrumb: "トレードメモ" },
   "/sumco": { title: "sumcoデイトレ", breadcrumb: "トレードメモ" },
   "/breakout": { title: "新高値ブレイク", breadcrumb: "トレードメモ" },
@@ -457,6 +458,7 @@ addRoute("/monthly/:yearMonth", async ({ yearMonth }) => (await loadMonthlyRepor
 addRoute("/journal", async () => (await loadJournal()).renderJournal(today()));
 addRoute("/journal/:date", async ({ date }) => (await loadJournal()).renderJournal(date));
 addRoute("/braindump", async () => (await loadBraindump()).renderBraindump());
+addRoute("/stocks", async () => (await loadBraindump()).renderBraindump("stocks"));
 addRoute("/cfd-silver", async () => (await loadBraindump()).renderBraindump("cfd-silver"));
 addRoute("/sumco", async () => (await loadBraindump()).renderBraindump("sumco"));
 addRoute("/breakout", async () => (await loadBraindump()).renderBraindump("breakout"));

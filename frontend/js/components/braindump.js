@@ -116,6 +116,7 @@ function labelChipStyle(name) {
 // board フィールドで絞り込む。ブレインダンプ本体（board=null）は全メモを表示する。
 
 const BOARDS = {
+  "stocks":      { title: "株全般" },
   "cfd-silver":  { title: "CFD銀" },
   "sumco":       { title: "sumcoデイトレ" },
   "breakout":    { title: "新高値ブレイク" },
