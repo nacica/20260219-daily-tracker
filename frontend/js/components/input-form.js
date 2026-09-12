@@ -10,9 +10,9 @@
  * デスクトップ: タスクページはカードのドラッグ&ドロップ（masonry）レイアウト。
  */
 
-import { recordsApi, categoriesApi, taskMetaApi } from "../api.js?v=20260912e";
-import { showToast } from "../app.js?v=20260912e";
-import { showTaskCompleteAnimation } from "./task-stats.js?v=20260912e";
+import { recordsApi, categoriesApi, taskMetaApi } from "../api.js?v=20260912f";
+import { showToast } from "../app.js?v=20260912f";
+import { showTaskCompleteAnimation } from "./task-stats.js?v=20260912f";
 
 /* ── カテゴリ管理 ── */
 
@@ -435,7 +435,7 @@ function removeTaskMeta(fullText) {
 /**
  * この機能より前に作られたタスクにはメタが無い。手元にある記録（直近7日＋今日）から
  * 「最初に登場した日」を追加日、完了タスクは「今日の記録の日」を完了日として推定して保存する。
- * 推定値は approx:true を付け、表示では時刻を出さず「頃」「推定」を添える。
+ * 推定値は approx:true を付け、表示では時刻を出さず日付だけにする。
  */
 function inferLegacyTaskMeta(tasks, existingRecord, prevRecords, date) {
   const records = [...(prevRecords || []), ...(existingRecord ? [{ ...existingRecord, date }] : [])]
@@ -475,7 +475,8 @@ function _fmtMetaDate(d, withTime) {
 /**
  * 完了タスク用の「追加日 → 完了日（達成までの期間）」表示。
  * 24 時間以内なら時刻付きで「◯時間◯分で達成」、それ以上は 24 時間単位で切り上げて「◯日目に達成」。
- * 推定値（approx）は時刻を信用できないので、日付だけ＋カレンダー日数（追加日を 1 日目）で表示する。
+ * 推定値（approx）は時刻を信用できないので、日付だけ＋カレンダー日数（追加日を 1 日目）で表示する
+ * （表示上は通常の値と区別しない）。
  */
 function buildTaskMetaHTML(fullText) {
   const m = _taskMeta.get(_taskKey(fullText));
@@ -489,7 +490,7 @@ function buildTaskMetaHTML(fullText) {
   let dur;
   let withTime = false;
   if (m.approx) {
-    dur = `${Math.round(ms / DAY) + 1}日目に達成・推定`;
+    dur = `${Math.round(ms / DAY) + 1}日目に達成`;
   } else if (ms <= DAY) {
     withTime = true;
     const h = Math.floor(ms / H);
@@ -498,8 +499,7 @@ function buildTaskMetaHTML(fullText) {
   } else {
     dur = `${Math.ceil(ms / DAY)}日目に達成`;
   }
-  const approx = m.approx ? "頃" : "";
-  return `<span class="task-meta">${_fmtMetaDate(c, withTime)}${approx}追加 → ${_fmtMetaDate(d, withTime)}${approx}完了（${dur}）</span>`;
+  return `<span class="task-meta">${_fmtMetaDate(c, withTime)}追加 → ${_fmtMetaDate(d, withTime)}完了（${dur}）</span>`;
 }
 
 /** 日付文字列の前日を返す */
