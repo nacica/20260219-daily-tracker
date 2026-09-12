@@ -1322,6 +1322,10 @@ textarea {
     margin-right: 26px;
   }
 }
+/* 上側の追加欄: リストとの間隔を少し空ける */
+.category-card .task-input-row-top {
+  margin-bottom: 10px;
+}
 /* カード見出しでカテゴリが分かるので、項目内のカテゴリバッジは隠す */
 .category-card .planned-list .task-category-badge {
   display: none;

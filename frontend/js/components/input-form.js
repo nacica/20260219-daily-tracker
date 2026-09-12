@@ -10,9 +10,9 @@
  * デスクトップ: タスクページはカードのドラッグ&ドロップ（masonry）レイアウト。
  */
 
-import { recordsApi, categoriesApi, taskMetaApi } from "../api.js?v=20260912f";
-import { showToast } from "../app.js?v=20260912f";
-import { showTaskCompleteAnimation } from "./task-stats.js?v=20260912f";
+import { recordsApi, categoriesApi, taskMetaApi } from "../api.js?v=20260912g";
+import { showToast } from "../app.js?v=20260912g";
+import { showTaskCompleteAnimation } from "./task-stats.js?v=20260912g";
 
 /* ── カテゴリ管理 ── */
 
@@ -253,6 +253,10 @@ function buildCategoryCardHTML(name, tasks) {
         <div class="card-title">
           <span class="card-title-text">${name ? escapeHTML(name) : "未分類"}</span>
           <span class="card-count category-task-count">${tasks.length}</span>
+        </div>
+        <div class="task-input-row task-input-row-top">
+          <input type="text" class="planned-input" placeholder="タスクを追加" />
+          <button class="btn btn-outline btn-sm btn-add-task">追加</button>
         </div>
         <ul class="task-list planned-list" data-category="${escapeHTML(name)}">${tasks.map((t) => buildTaskItem(t, false)).join("")}</ul>
         <div class="task-input-row">
@@ -1512,9 +1516,9 @@ function attachFormEvents(date, isEdit, mode, initialTasks) {
   const grid = document.getElementById("input-grid");
   if (!grid || !completedList) return;
 
-  // タスク追加（各カテゴリカードの入力欄。カテゴリはカードで決まる）
-  function addTaskFromCard(card) {
-    const input = card?.querySelector(".planned-input");
+  // タスク追加（各カテゴリカードの上下にある入力欄。カテゴリはカードで決まり、どちらから追加しても末尾に入る）
+  function addTaskFromCard(card, btn) {
+    const input = btn?.closest(".task-input-row")?.querySelector(".planned-input") || card?.querySelector(".planned-input");
     const list = card?.querySelector(".planned-list");
     if (!input || !list) return;
     const text = input.value.trim();
@@ -1533,7 +1537,7 @@ function attachFormEvents(date, isEdit, mode, initialTasks) {
   // グリッド全体でイベント委任しておくと、カテゴリ追加で後から差し込んだカードでもそのまま動く
   grid.addEventListener("click", (e) => {
     const addBtn = e.target.closest(".btn-add-task");
-    if (addBtn) { addTaskFromCard(addBtn.closest(".category-card")); return; }
+    if (addBtn) { addTaskFromCard(addBtn.closest(".category-card"), addBtn); return; }
     if (!e.target.closest(".task-list")) return;
 
     if (e.target.dataset.remove !== undefined) {
