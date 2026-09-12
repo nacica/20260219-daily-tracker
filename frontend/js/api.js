@@ -410,6 +410,18 @@ export const categoriesApi = {
     apiFetch("/categories", { method: "PUT", body: { categories } }),
 };
 
+/* ── タスクメタ情報（追加日時・完了日時） ── */
+export const taskMetaApi = {
+  /** 全件取得 → { items: [{ name, created_at, completed_at, approx }] } */
+  get: () => apiFetch("/task-meta"),
+
+  /** 複数件 upsert（含めたフィールドだけをマージ。null を送るとそのフィールドを消す） */
+  upsert: (items) => apiFetch("/task-meta", { method: "POST", body: { items } }),
+
+  /** 名前で削除 */
+  remove: (names) => apiFetch("/task-meta/delete", { method: "POST", body: { names } }),
+};
+
 // ---- リマインダー（今日意識すること） ----
 
 export const remindersApi = {

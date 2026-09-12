@@ -1023,7 +1023,7 @@ textarea {
   flex-shrink: 0;
 }
 
-.task-item > span:not(.task-category-badge):not(.task-drag-handle) {
+.task-item > span:not(.task-category-badge):not(.task-drag-handle):not(.task-meta) {
   flex: 1;
   font-size: 0.9rem;
   min-width: 0;
@@ -1039,6 +1039,20 @@ textarea {
 }
 .task-item.completed > span:not(.task-category-badge):not(.task-drag-handle) {
   color: var(--text-muted);
+}
+/* 完了タスクの「追加日 → 完了日（達成までの期間）」: 項目の下段に折り返して表示 */
+.task-item.completed {
+  flex-wrap: wrap;
+}
+.task-item > .task-meta {
+  flex: 1 1 100%;
+  order: 20;
+  margin-top: 2px;
+  padding-left: 26px;
+  font-size: 0.74rem;
+  line-height: 1.4;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
 }
 
 /* カテゴリバッジ */
@@ -1211,7 +1225,7 @@ textarea {
     flex-wrap: wrap;
     row-gap: 8px;
   }
-  .task-item > span:not(.task-category-badge):not(.task-drag-handle) {
+  .task-item > span:not(.task-category-badge):not(.task-drag-handle):not(.task-meta) {
     order: 1;
     flex: 1 1 100%;
     display: -webkit-box;

@@ -10,9 +10,9 @@
  * デスクトップ: タスクページはカードのドラッグ&ドロップ（masonry）レイアウト。
  */
 
-import { recordsApi, categoriesApi } from "../api.js?v=20260912d";
-import { showToast } from "../app.js?v=20260912d";
-import { showTaskCompleteAnimation } from "./task-stats.js?v=20260912d";
+import { recordsApi, categoriesApi, taskMetaApi } from "../api.js?v=20260912e";
+import { showToast } from "../app.js?v=20260912e";
+import { showTaskCompleteAnimation } from "./task-stats.js?v=20260912e";
 
 /* ── カテゴリ管理 ── */
 
@@ -361,6 +361,147 @@ async function syncCategoriesWithCache() {
   _lastCategoriesSyncAt = Date.now();
 }
 
+/* ── タスクメタ情報（追加日時・完了日時） ──
+ * タスク本体は「[カテゴリ] 本文」の文字列で日時を持たないため、カテゴリを除いた本文を
+ * キーにサーバー（task_meta）で追加日時・完了日時を別管理する。予定タスクは完了するまで
+ * 毎日同じ名前で引き継がれるので、名前キーで日をまたいで追跡できる。
+ * 完了タスク欄に「追加日 → 完了日（何日目 / 何時間で達成）」を表示するのに使う。
+ */
+const _taskMeta = new Map();
+let _lastTaskMetaSyncAt = 0;
+
+async function syncTaskMetaWithCache() {
+  if (Date.now() - _lastTaskMetaSyncAt < SESSION_SYNC_TTL_MS) return;
+  try {
+    const res = await taskMetaApi.get();
+    for (const it of res?.items || []) if (it?.name) _taskMeta.set(it.name, it);
+    _lastTaskMetaSyncAt = Date.now();
+  } catch (e) {
+    console.warn("タスクメタ取得失敗:", e);
+  }
+}
+
+/** メタ情報のキー（カテゴリを除いた本文） */
+function _taskKey(fullText) {
+  return parseTaskCategory(fullText || "").text.trim();
+}
+
+function _pushTaskMeta(items) {
+  if (items.length === 0) return;
+  taskMetaApi.upsert(items).catch((e) => console.warn("タスクメタ保存失敗:", e));
+}
+
+/** タスク追加時: 追加日時を記録（既に同名のメタがあれば触らない） */
+function recordTaskCreated(fullText) {
+  const name = _taskKey(fullText);
+  if (!name || _taskMeta.has(name)) return;
+  const item = { name, created_at: new Date().toISOString(), completed_at: null, approx: false };
+  _taskMeta.set(name, item);
+  _pushTaskMeta([item]);
+}
+
+/** 完了 / 完了解除時: 完了日時を記録（解除なら null で消す） */
+function recordTaskCompleted(fullText, completed) {
+  const name = _taskKey(fullText);
+  if (!name) return;
+  const cur = _taskMeta.get(name) || { name, created_at: new Date().toISOString(), approx: false };
+  const item = { ...cur, name, completed_at: completed ? new Date().toISOString() : null };
+  _taskMeta.set(name, item);
+  _pushTaskMeta([item]);
+}
+
+/** 本文の編集時: キーを付け替える */
+function renameTaskMeta(oldFull, newFull) {
+  const a = _taskKey(oldFull);
+  const b = _taskKey(newFull);
+  if (!a || !b || a === b) return;
+  const cur = _taskMeta.get(a);
+  if (!cur) return;
+  const item = { ...cur, name: b };
+  _taskMeta.set(b, item);
+  _taskMeta.delete(a);
+  _pushTaskMeta([item]);
+  taskMetaApi.remove([a]).catch(() => {});
+}
+
+/** タスク削除時 */
+function removeTaskMeta(fullText) {
+  const name = _taskKey(fullText);
+  if (!name || !_taskMeta.has(name)) return;
+  _taskMeta.delete(name);
+  taskMetaApi.remove([name]).catch(() => {});
+}
+
+/**
+ * この機能より前に作られたタスクにはメタが無い。手元にある記録（直近7日＋今日）から
+ * 「最初に登場した日」を追加日、完了タスクは「今日の記録の日」を完了日として推定して保存する。
+ * 推定値は approx:true を付け、表示では時刻を出さず「頃」「推定」を添える。
+ */
+function inferLegacyTaskMeta(tasks, existingRecord, prevRecords, date) {
+  const records = [...(prevRecords || []), ...(existingRecord ? [{ ...existingRecord, date }] : [])]
+    .filter((r) => r?.date)
+    .sort((a, b) => (a.date < b.date ? -1 : 1));
+  const firstSeen = new Map();
+  for (const r of records) {
+    for (const t of [...(r.tasks?.planned || []), ...(r.tasks?.completed || [])]) {
+      const name = _taskKey(_taskName(t));
+      if (name && !firstSeen.has(name)) firstSeen.set(name, r.date);
+    }
+  }
+  const completedNames = new Set((tasks.completed || []).map((t) => _taskKey(_taskName(t))));
+  const items = [];
+  for (const t of [...(tasks.planned || []), ...(tasks.completed || [])]) {
+    const name = _taskKey(_taskName(t));
+    if (!name) continue;
+    const cur = _taskMeta.get(name);
+    const needCreated = !cur?.created_at;
+    const needCompleted = completedNames.has(name) && !cur?.completed_at;
+    if (!needCreated && !needCompleted) continue;
+    const item = { ...(cur || {}), name };
+    if (needCreated) { item.created_at = `${firstSeen.get(name) || date}T00:00:00`; item.approx = true; }
+    if (needCompleted) { item.completed_at = `${date}T00:00:00`; item.approx = true; }
+    _taskMeta.set(name, item);
+    items.push(item);
+  }
+  _pushTaskMeta(items);
+}
+
+function _fmtMetaDate(d, withTime) {
+  const s = `${d.getMonth() + 1}/${d.getDate()}`;
+  if (!withTime) return s;
+  return `${s} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
+/**
+ * 完了タスク用の「追加日 → 完了日（達成までの期間）」表示。
+ * 24 時間以内なら時刻付きで「◯時間◯分で達成」、それ以上は 24 時間単位で切り上げて「◯日目に達成」。
+ * 推定値（approx）は時刻を信用できないので、日付だけ＋カレンダー日数（追加日を 1 日目）で表示する。
+ */
+function buildTaskMetaHTML(fullText) {
+  const m = _taskMeta.get(_taskKey(fullText));
+  if (!m?.created_at || !m?.completed_at) return "";
+  const c = new Date(m.created_at);
+  const d = new Date(m.completed_at);
+  if (isNaN(c) || isNaN(d)) return "";
+  const H = 3600000;
+  const DAY = 24 * H;
+  const ms = Math.max(0, d - c);
+  let dur;
+  let withTime = false;
+  if (m.approx) {
+    dur = `${Math.round(ms / DAY) + 1}日目に達成・推定`;
+  } else if (ms <= DAY) {
+    withTime = true;
+    const h = Math.floor(ms / H);
+    const mi = Math.floor((ms % H) / 60000);
+    dur = ms < 60000 ? "1分未満で達成" : `${h > 0 ? `${h}時間` : ""}${mi}分で達成`;
+  } else {
+    dur = `${Math.ceil(ms / DAY)}日目に達成`;
+  }
+  const approx = m.approx ? "頃" : "";
+  return `<span class="task-meta">${_fmtMetaDate(c, withTime)}${approx}追加 → ${_fmtMetaDate(d, withTime)}${approx}完了（${dur}）</span>`;
+}
+
 /** 日付文字列の前日を返す */
 function _prevDateStr(date, daysAgo) {
   const d = new Date(date + "T00:00:00");
@@ -474,7 +615,7 @@ async function _renderPage(date, mode) {
 
   const [recordResult, , prevResult] = await Promise.allSettled([
     recordsApi.get(date),
-    isLog ? Promise.resolve() : syncCategoriesWithCache(),
+    isLog ? Promise.resolve() : Promise.all([syncCategoriesWithCache(), syncTaskMetaWithCache()]),
     recordsApi.list(startStr, endStr),
   ]);
 
@@ -482,6 +623,8 @@ async function _renderPage(date, mode) {
   const prevRecords = prevResult.status === "fulfilled" ? (prevResult.value || []) : [];
 
   const tasks = _mergeTasks(existingRecord, prevRecords, date);
+  // メタ情報の無い既存タスクは記録履歴から追加日・完了日を推定しておく（描画前に反映）
+  if (!isLog) inferLegacyTaskMeta(tasks, existingRecord, prevRecords, date);
   const isRestDay = existingRecord?.rest_day || false;
   const restReason = existingRecord?.rest_reason || "";
 
@@ -939,6 +1082,7 @@ function buildTaskItem(taskText, isCompleted) {
       ${buildCategoryBadge(category)}<span class="task-text">${escapeHTML(text)}</span>
       <button class="task-edit" data-edit="${escapeHTML(taskText)}" title="編集">✎</button>
       <button class="task-remove" data-remove="${escapeHTML(taskText)}" title="削除">✕</button>
+      ${isCompleted ? buildTaskMetaHTML(taskText) : ""}
     </li>`;
 }
 
@@ -989,7 +1133,10 @@ function startTaskEdit(editBtn, onSave) {
     const rBtn = li.querySelector(".task-remove");
     if (rBtn) rBtn.dataset.remove = newFullText;
 
-    if (newFullText !== oldFullText && typeof onSave === "function") onSave();
+    if (newFullText !== oldFullText) {
+      renameTaskMeta(oldFullText, newFullText);
+      if (typeof onSave === "function") onSave();
+    }
   }
 
   input.addEventListener("keydown", (e) => {
@@ -1374,6 +1521,7 @@ function attachFormEvents(date, isEdit, mode, initialTasks) {
     if (!text) return;
     const fullText = formatTaskWithCategory(text, card.dataset.category || "");
     list.insertAdjacentHTML("beforeend", buildTaskItem(fullText, false));
+    recordTaskCreated(fullText);
     input.value = "";
     input.focus();
     syncCategoryCounts();
@@ -1389,6 +1537,7 @@ function attachFormEvents(date, isEdit, mode, initialTasks) {
     if (!e.target.closest(".task-list")) return;
 
     if (e.target.dataset.remove !== undefined) {
+      removeTaskMeta(e.target.dataset.remove);
       e.target.closest("li").remove();
       syncCompletedCard();
       syncCategoryCounts();
@@ -1412,8 +1561,13 @@ function attachFormEvents(date, isEdit, mode, initialTasks) {
         li.classList.add("completed");
         e.target.dataset.animating = "1";
         completedList.appendChild(li);
+        // 完了日時を記録し、「追加日 → 完了日（達成までの期間）」を項目に付ける
+        recordTaskCompleted(e.target.dataset.task, true);
+        li.querySelector(".task-meta")?.remove();
+        li.insertAdjacentHTML("beforeend", buildTaskMetaHTML(e.target.dataset.task));
         showTaskCompleteAnimation(e.target);
       } else {
+        recordTaskCompleted(e.target.dataset.task, false);
         // 完了 → 予定へ戻す: 元のカテゴリカードへ（受け皿が無ければ未分類へ付け替え）
         const { category } = parseTaskCategory(e.target.dataset.task);
         const target = getPlannedListFor(category);

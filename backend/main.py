@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 import os
 
-from routers import records, analysis, weekly, dialogue, summaries, journal, diary_dialogue, braindump, reminders, categories, flashcards, wishlist, gratitude, udemy_tips
+from routers import records, analysis, weekly, dialogue, summaries, journal, diary_dialogue, braindump, reminders, categories, flashcards, wishlist, gratitude, udemy_tips, task_meta
 
 # 環境変数の読み込み
 load_dotenv()
@@ -46,6 +46,7 @@ app.include_router(flashcards.router,    prefix="/api/v1", tags=["flashcards"])
 app.include_router(wishlist.router,      prefix="/api/v1", tags=["wishlist"])
 app.include_router(gratitude.router,     prefix="/api/v1", tags=["gratitude"])
 app.include_router(udemy_tips.router,    prefix="/api/v1", tags=["udemy-tips"])
+app.include_router(task_meta.router,     prefix="/api/v1", tags=["task-meta"])
 
 
 @app.on_event("startup")

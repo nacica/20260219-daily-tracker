@@ -766,6 +766,45 @@ def save_categories(categories: list[dict]) -> list[dict]:
     return categories
 
 
+# ---- task_meta (タスクの追加日時・完了日時) ----
+# ドキュメント ID はタスク名の SHA-1（名前に "/" や "." が含まれても安全に扱うため）。
+
+def _task_meta_doc_id(name: str) -> str:
+    import hashlib
+    return hashlib.sha1(name.encode("utf-8")).hexdigest()
+
+
+def get_task_meta() -> list[dict]:
+    """タスクメタ情報を全件取得"""
+    db = get_db()
+    docs = db.collection("task_meta").stream()
+    return [doc.to_dict() for doc in docs]
+
+
+def upsert_task_meta(items: list[dict]) -> list[dict]:
+    """タスクメタ情報を upsert（渡されたフィールドだけをマージ。None も上書きする）"""
+    db = get_db()
+    batch = db.batch()
+    for item in items:
+        name = item.get("name")
+        if not name:
+            continue
+        data = dict(item)
+        data["name"] = name
+        batch.set(db.collection("task_meta").document(_task_meta_doc_id(name)), data, merge=True)
+    batch.commit()
+    return items
+
+
+def delete_task_meta(names: list[str]) -> None:
+    """タスクメタ情報を名前で削除"""
+    db = get_db()
+    batch = db.batch()
+    for name in names:
+        batch.delete(db.collection("task_meta").document(_task_meta_doc_id(name)))
+    batch.commit()
+
+
 # ---- flashcards (単語帳カード) ----
 
 def list_flashcards() -> list[dict]:
