@@ -564,6 +564,173 @@ html.nav-collapsed .nav-collapse-handle svg {
   transform: rotate(180deg);
 }
 
+/* ===== モバイル用 ホームボタン＋ハンドルの行 =====
+   折りたたみ時に残る細いバー。左端にホーム、中央に ∧/∨ ハンドル。 */
+
+.nav-mobile-bar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.nav-home-btn {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 28px;
+  color: var(--text-muted);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.nav-home-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+.nav-home-btn:active,
+.nav-home-btn:hover {
+  color: var(--cyan);
+}
+
+/* ===== ホームランチャー（モバイルのスタート画面） =====
+   #/home ではナビ自体を隠し、main にアイコン集だけを大きなタイルで表示する。
+   デスクトップ（1024px 以上）ではサイドバーが常時表示されるためナビは隠さない。 */
+
+@media (max-width: 1023px) {
+  html.on-home .nav {
+    display: none;
+  }
+}
+
+.launcher {
+  padding: calc(env(safe-area-inset-top, 24px) + 12px) 14px 24px;
+  max-width: 520px;
+  margin: 0 auto;
+}
+
+.launcher-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 6px 18px;
+}
+
+.launcher-title {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.launcher-logo {
+  font-size: 1.15rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: var(--cyan);
+  text-shadow: 0 0 18px rgba(0, 212, 255, 0.4);
+}
+
+.launcher-date {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
+}
+
+.launcher-theme-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: rgba(0, 212, 255, 0.05);
+  color: var(--text-muted);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.launcher-theme-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+.launcher-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.launcher-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  aspect-ratio: 1 / 1;
+  min-height: 96px;
+  padding: 10px 6px;
+  border-radius: 18px;
+  border: 1px solid var(--border);
+  background: rgba(0, 212, 255, 0.05);
+  color: var(--text-secondary);
+  text-decoration: none;
+  transition: background 0.15s, color 0.15s, transform 0.1s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.launcher-tile .icon {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  opacity: 0.9;
+}
+
+.launcher-label {
+  font-size: 0.74rem;
+  font-weight: 600;
+  line-height: 1.2;
+  text-align: center;
+  letter-spacing: 0.02em;
+}
+
+.launcher-tile:active {
+  transform: scale(0.96);
+  background: rgba(0, 212, 255, 0.14);
+  color: var(--cyan);
+}
+
+.launcher-tile:active .icon {
+  filter: drop-shadow(0 0 5px rgba(0, 212, 255, 0.7));
+}
+
+[data-theme="light"] .launcher-logo {
+  color: #0284c7;
+  text-shadow: none;
+}
+
+[data-theme="light"] .launcher-tile {
+  background: #ffffff;
+  border-color: rgba(0, 0, 0, 0.08);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  color: #374151;
+}
+
+[data-theme="light"] .launcher-tile:active {
+  background: rgba(2, 132, 199, 0.1);
+  color: #0284c7;
+}
+
+[data-theme="light"] .launcher-theme-btn {
+  background: #ffffff;
+  border-color: rgba(0, 0, 0, 0.08);
+}
+
 /* ===== メインコンテンツ ===== */
 
 main {
@@ -3559,8 +3726,8 @@ textarea {
     overflow: visible;
   }
 
-  /* 折りたたみハンドルはモバイル専用 */
-  .nav-collapse-handle {
+  /* ホームボタン＋折りたたみハンドルの行はモバイル専用 */
+  .nav-mobile-bar {
     display: none;
   }
 

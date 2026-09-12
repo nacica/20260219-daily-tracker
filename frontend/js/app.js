@@ -10,10 +10,10 @@
  *     リダイレクトのみ提供する。
  */
 
-import { addRoute, navigate, updateNavActive } from "./router.js?v=20260906b";
-import { recordsApi } from "./api.js?v=20260906b";
-import { initSwipeNav } from "./swipe-nav.js?v=20260906b";
-import { initSidebarResize } from "./sidebar-resize.js?v=20260906b";
+import { addRoute, navigate, updateNavActive } from "./router.js?v=20260912a";
+import { recordsApi } from "./api.js?v=20260912a";
+import { initSwipeNav } from "./swipe-nav.js?v=20260912a";
+import { initSidebarResize } from "./sidebar-resize.js?v=20260912a";
 
 // ===== バックエンドのウォームアップ（コールドスタート対策） =====
 // Cloud Run は min-instances 0 で運用しているため、久しぶりのアクセスでは
@@ -33,20 +33,21 @@ import { initSidebarResize } from "./sidebar-resize.js?v=20260906b";
 
 // ===== 動的 import ヘルパー =====
 // 各コンポーネントは初回訪問時に初めてネットワーク取得（以降は SW キャッシュから即応答）
-const loadInputForm       = () => import("./components/input-form.js?v=20260906b");
-const loadAnalysisView    = () => import("./components/analysis-view.js?v=20260906b");
-const loadHistoryList     = () => import("./components/history-list.js?v=20260906b");
-const loadWeeklyReport    = () => import("./components/weekly-report.js?v=20260906b");
-const loadMonthlyReport   = () => import("./components/monthly-report.js?v=20260906b");
-const loadJournal         = () => import("./components/journal.js?v=20260906b");
-const loadBraindump       = () => import("./components/braindump.js?v=20260906b");
-const loadTaskStats       = () => import("./components/task-stats.js?v=20260906b");
-const loadFlashcardList   = () => import("./components/flashcard-list.js?v=20260906b");
-const loadFlashcardStudy  = () => import("./components/flashcard-study.js?v=20260906b");
-const loadWishlist        = () => import("./components/wishlist.js?v=20260906b");
-const loadGratitude       = () => import("./components/gratitude.js?v=20260906b");
-const loadUdemyTips       = () => import("./components/udemy-tips.js?v=20260906b");
-const loadMichishirube    = () => import("./components/michishirube.js?v=20260906b");
+const loadInputForm       = () => import("./components/input-form.js?v=20260912a");
+const loadAnalysisView    = () => import("./components/analysis-view.js?v=20260912a");
+const loadHistoryList     = () => import("./components/history-list.js?v=20260912a");
+const loadWeeklyReport    = () => import("./components/weekly-report.js?v=20260912a");
+const loadMonthlyReport   = () => import("./components/monthly-report.js?v=20260912a");
+const loadJournal         = () => import("./components/journal.js?v=20260912a");
+const loadBraindump       = () => import("./components/braindump.js?v=20260912a");
+const loadTaskStats       = () => import("./components/task-stats.js?v=20260912a");
+const loadFlashcardList   = () => import("./components/flashcard-list.js?v=20260912a");
+const loadFlashcardStudy  = () => import("./components/flashcard-study.js?v=20260912a");
+const loadWishlist        = () => import("./components/wishlist.js?v=20260912a");
+const loadGratitude       = () => import("./components/gratitude.js?v=20260912a");
+const loadUdemyTips       = () => import("./components/udemy-tips.js?v=20260912a");
+const loadMichishirube    = () => import("./components/michishirube.js?v=20260912a");
+const loadHomeLauncher    = () => import("./components/home-launcher.js?v=20260912a");
 
 // ===== ユーティリティ =====
 
@@ -82,6 +83,7 @@ const ROUTE_TITLES = {
   "/wishlist": { title: "やりたいことリスト", breadcrumb: "Wishlist" },
   "/gratitude": { title: "ありがたいノート", breadcrumb: "Gratitude" },
   "/udemy-tips": { title: "Udemy 制作 Tips", breadcrumb: "コース制作の小技集" },
+  "/home": { title: "ホーム", breadcrumb: "メニュー" },
   "/michishirube": { title: "道しるべ", breadcrumb: "今日意識すること" },
 };
 
@@ -471,6 +473,58 @@ addRoute("/wishlist", async () => (await loadWishlist()).renderWishlist());
 addRoute("/gratitude", async () => (await loadGratitude()).renderGratitude());
 addRoute("/udemy-tips", async () => (await loadUdemyTips()).renderUdemyTips());
 addRoute("/michishirube", async () => (await loadMichishirube()).renderMichishirube());
+addRoute("/home", async () => (await loadHomeLauncher()).renderHomeLauncher());
+
+// ===== モバイル用 ホームランチャー制御 =====
+//   - モバイル（<1024px）では起動時に必ず #/home（アイコン集だけの画面）から始める
+//   - バックグラウンドから HOME_RESUME_AFTER_MS 以上経って戻ったときもホームへ戻す
+//   - ホームから各ページへ移動したときは上部ナビを折りたたんだ状態にする（∧で展開可）
+
+const HOME_ROUTE = "/home";
+const HOME_RESUME_AFTER_MS = 5 * 60 * 1000;
+
+function isMobileLayout() {
+  return window.innerWidth < 1024;
+}
+
+function currentBase() {
+  const hash = window.location.hash.slice(1) || "/";
+  return hash === "/" ? "/" : "/" + hash.split("/")[1];
+}
+
+function goHome() {
+  if (currentBase() === HOME_ROUTE) return;
+  window.location.hash = HOME_ROUTE;
+}
+
+let prevBase = null;
+
+/** ルート変更に合わせて html.on-home と ナビ折りたたみ状態を同期する */
+function syncHomeState() {
+  const base = currentBase();
+  const onHome = base === HOME_ROUTE;
+  document.documentElement.classList.toggle("on-home", onHome);
+
+  // ホーム → 他ページ に移動した直後はナビを折りたたむ（モバイルのみ）
+  if (isMobileLayout() && prevBase === HOME_ROUTE && !onHome) {
+    document.documentElement.classList.add("nav-collapsed");
+  }
+  prevBase = base;
+}
+
+let hiddenAt = 0;
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) {
+    hiddenAt = Date.now();
+    return;
+  }
+  if (isMobileLayout() && hiddenAt && Date.now() - hiddenAt >= HOME_RESUME_AFTER_MS) {
+    goHome();
+  }
+  hiddenAt = 0;
+});
+
+window.addEventListener("hashchange", syncHomeState);
 
 // ===== 初期化 =====
 
@@ -480,7 +534,13 @@ document.addEventListener("DOMContentLoaded", () => {
     navigator.serviceWorker.register("/sw.js").catch(() => {});
   }
 
+  // モバイルは毎回ホームランチャーから開始（ハッシュ書き換え → hashchange で描画される）
+  if (isMobileLayout() && currentBase() !== HOME_ROUTE) {
+    window.location.replace("#" + HOME_ROUTE);
+  }
+
   // 初回ナビゲーション
+  syncHomeState();
   navigate();
   updateNavActive();
   updateDesktopHeader();

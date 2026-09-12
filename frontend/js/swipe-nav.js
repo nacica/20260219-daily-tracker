@@ -44,6 +44,8 @@ export function initSwipeNav() {
   let tracking = false;
 
   app.addEventListener("touchstart", (e) => {
+    // ホームランチャー上ではスワイプ遷移しない
+    if (getCurrentBase() === "/home") return;
     // マルチタッチは無視
     if (e.touches.length !== 1) return;
     // デスクトップでは無効 (1024px 以上)
