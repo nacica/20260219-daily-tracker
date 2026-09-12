@@ -4241,6 +4241,12 @@ textarea {
     gap: 16px;
   }
 
+  /* 行動ログページ: カード 1 枚だけのグリッド（masonry 列を作らず横幅いっぱいに広げる） */
+  .input-grid.log-grid > .card {
+    flex: 1;
+    min-width: 0;
+  }
+
   /* Drag handle */
   .card-drag-handle {
     display: flex;
@@ -8989,49 +8995,6 @@ div.gr-add-input.is-empty::before {
   height: 40px;
   background: linear-gradient(transparent, var(--bg-input));
   pointer-events: none;
-}
-
-/* ── トップページのコンパクトカード ── */
-
-.mich-compact-card {
-  cursor: pointer;
-}
-
-.mich-compact-note {
-  padding: 10px 12px;
-  border-radius: 10px;
-  background: var(--bg-input);
-  border: 1px solid var(--border);
-  margin-bottom: 10px;
-  max-height: 260px;
-  overflow: hidden;
-}
-
-.mich-compact-text {
-  font-family: var(--reminder-font);
-  font-size: var(--reminder-text-size);
-  font-weight: var(--reminder-text-weight);
-  line-height: 1.4;
-  color: var(--text-primary);
-  word-break: break-word;
-  overflow-wrap: anywhere;
-}
-
-.mich-compact-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.mich-compact-link {
-  color: var(--cyan, #22d3ee);
-  font-size: 0.85rem;
-  text-decoration: none;
-}
-
-.mich-compact-link:hover {
-  text-decoration: underline;
 }
 
 @media (max-width: 640px) {

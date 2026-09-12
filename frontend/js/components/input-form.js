@@ -1,21 +1,18 @@
 /**
- * 行動記録入力フォームコンポーネント
- * 新規作成・既存レコードの編集に対応
- * デスクトップ: 2列ドラッグ&ドロップレイアウト
+ * タスクページ（#/）と行動ログページ（#/log）の共通コンポーネント
+ *
+ * どちらも「その日の DailyRecord」を扱うが、画面と保存フィールドを分けている:
+ *   - タスクページ  : 予定タスク / 完了タスク（tasks_planned / tasks_completed）
+ *   - 行動ログページ: タイムライン入力 / 活動可能時間 / おやすみモード（raw_input / available_hours）
+ * 保存時は自分のページが担当するフィールドだけを送る（バックエンドは部分更新に対応）ので、
+ * 片方のページの操作でもう片方の内容が消えることはない。
+ *
+ * デスクトップ: タスクページはカードのドラッグ&ドロップ（masonry）レイアウト。
  */
 
-import { recordsApi, categoriesApi } from "../api.js?v=20260912a";
-import { showToast } from "../app.js?v=20260912a";
-import { showTaskCompleteAnimation } from "./task-stats.js?v=20260912a";
-import {
-  renderStickyMd,
-  formatReminderDate,
-  syncRemindersWithCache,
-  getActiveReminders,
-  getRemindersSnapshot,
-  setRemindersSnapshot,
-  addMdRefreshHook,
-} from "./michishirube.js?v=20260912a";
+import { recordsApi, categoriesApi } from "../api.js?v=20260912b";
+import { showToast } from "../app.js?v=20260912b";
+import { showTaskCompleteAnimation } from "./task-stats.js?v=20260912b";
 
 /* ── カテゴリ管理 ── */
 
@@ -243,11 +240,10 @@ function flattenMasonry(grid) {
 
 /* ── レイアウト永続化 ── */
 
+// タスクページに並ぶカード。行動ログは専用ページ（#/log）に分離したのでここには含めない。
 const DEFAULT_LAYOUT = {
-  "card-activity-log":     { order: 0 },
-  "card-reminder-board":   { order: 1 },
-  "card-task-mgmt":        { order: 2 },
-  "card-completed":        { order: 3 },
+  "card-task-mgmt":        { order: 0 },
+  "card-completed":        { order: 1 },
 };
 
 const CARD_IDS = Object.keys(DEFAULT_LAYOUT);
@@ -306,8 +302,7 @@ function saveInputCache(date, snapshot) {
 
 /**
  * セッション内の categories 同期に短い TTL を設けて、
- * 同じセッションで /input を複数回開いた時の重複 API 呼び出しを避ける
- * （reminders の同期は michishirube.js 側で同様の TTL 管理をしている）
+ * 同じセッションでタスクページを複数回開いた時の重複 API 呼び出しを避ける
  */
 const SESSION_SYNC_TTL_MS = 5 * 60 * 1000; // 5分
 let _lastCategoriesSyncAt = 0;
@@ -360,12 +355,11 @@ function _mergeTasks(existingRecord, prevRecords, date) {
 }
 
 /** フォームを描画してイベントを再アタッチする共通処理 */
-function _paintForm(main, date, existingRecord, tasks, isRestDay, restReason) {
+function _paintForm(main, date, existingRecord, tasks, isRestDay, restReason, mode) {
   const isEdit = !!existingRecord;
-  main.innerHTML = buildFormHTML(date, existingRecord, tasks, isEdit, isRestDay, restReason);
-  attachFormEvents(date, isEdit);
-  attachMichishirubeCardEvents();
-  attachRestDayEvents(date, isRestDay);
+  main.innerHTML = buildFormHTML(date, existingRecord, tasks, isEdit, isRestDay, restReason, mode);
+  attachFormEvents(date, isEdit, mode, tasks);
+  if (mode === "log") attachRestDayEvents(date, isRestDay);
 }
 
 /**
@@ -393,31 +387,32 @@ function focusFirstActivityInput() {
 }
 
 /**
- * 入力フォームをメインエリアにレンダリングする
+ * ページ描画の共通処理（タスクページ / 行動ログページ）
  * @param {string} date - 対象日 (YYYY-MM-DD)
+ * @param {"tasks"|"log"} mode - 描画するページ
  *
  * 高速化戦略:
  *   1. localStorage キャッシュから即描画（スピナー回避）
- *   2. クリティカルパスの API 4 本を並列: record / reminders / categories / 直近7日の list
- *   3. reminders / categories は 5 分 TTL のセッションキャッシュで二重取得を回避
+ *   2. クリティカルパスの API を並列: record / categories（タスクページのみ） / 直近7日の list
+ *   3. categories は 5 分 TTL のセッションキャッシュで二重取得を回避
+ *
+ * 直近7日の list は「予定タスクの引き継ぎ」に使う。行動ログページでも取得しておくのは、
+ * その日のレコードを行動ログ側が先に作成した場合でも引き継ぎタスクを一緒に登録し、
+ * タスクページ側の初回表示と同じ結果になるようにするため。
  */
-export async function renderInputForm(date) {
+async function _renderPage(date, mode) {
   const main = document.querySelector("main");
-
-  // 道しるべカードの表示メモは訪問ごとにランダムに選び直す
-  _michTopPick = null;
+  const isLog = mode === "log";
 
   // ── 1. 楽観描画: 前回のキャッシュから即描画 ──
   const cached = loadInputCache(date);
   let didAutofocus = false;
   if (cached) {
-    // メモリ上に既にフレッシュな reminders があれば localStorage 側で上書きしない
-    if (getRemindersSnapshot().length === 0) setRemindersSnapshot(cached.reminders);
     // キャッシュ内容から tasks を合成（prevRecords はキャッシュ済みのものを使う）
     const cachedTasks = cached.tasks || _mergeTasks(cached.existingRecord, cached.prevRecords || [], date);
     _paintForm(main, date, cached.existingRecord || null, cachedTasks,
-      !!cached.isRestDay, cached.restReason || "");
-    if (!cached.isRestDay) {
+      !!cached.isRestDay, cached.restReason || "", mode);
+    if (isLog && !cached.isRestDay) {
       focusFirstActivityInput();
       didAutofocus = true;
     }
@@ -425,14 +420,13 @@ export async function renderInputForm(date) {
     main.innerHTML = `<div class="loading"><div class="spinner"></div><p>読み込み中...</p></div>`;
   }
 
-  // ── 2. クリティカルパスの API を 4 本並列実行 ──
+  // ── 2. クリティカルパスの API を並列実行 ──
   const startStr = _prevDateStr(date, 7);
   const endStr = _prevDateStr(date, 1);
 
-  const [recordResult, , , prevResult] = await Promise.allSettled([
+  const [recordResult, , prevResult] = await Promise.allSettled([
     recordsApi.get(date),
-    syncRemindersWithCache(),
-    syncCategoriesWithCache(),
+    isLog ? Promise.resolve() : syncCategoriesWithCache(),
     recordsApi.list(startStr, endStr),
   ]);
 
@@ -443,99 +437,37 @@ export async function renderInputForm(date) {
   const isRestDay = existingRecord?.rest_day || false;
   const restReason = existingRecord?.rest_reason || "";
 
-  // ── 4. フレッシュデータで再描画 ──
-  _paintForm(main, date, existingRecord, tasks, isRestDay, restReason);
+  // ── 3. フレッシュデータで再描画 ──
+  _paintForm(main, date, existingRecord, tasks, isRestDay, restReason, mode);
   // キャッシュからの初回描画でフォーカス済みなら、再描画ではスキップ（カーソル位置を奪わない）
-  if (!didAutofocus && !isRestDay) {
+  if (isLog && !didAutofocus && !isRestDay) {
     focusFirstActivityInput();
   }
 
-  // ── 5. キャッシュを更新（次回の楽観描画用）──
+  // ── 4. キャッシュを更新（次回の楽観描画用）──
   saveInputCache(date, {
     existingRecord,
     tasks,
     isRestDay,
     restReason,
     prevRecords,
-    reminders: getRemindersSnapshot(),
   });
 }
 
-/* ── 道しるべ コンパクトカード ──
- * 付箋ボード本体は #/michishirube ページ（michishirube.js）へ移設。
- * トップにはランダムに選んだアクティブな付箋を 1 件だけ表示し、
- * クリックで一覧ページへ遷移する。
+/**
+ * タスクページ（#/）: 予定タスク・完了タスクを管理する。
+ * 日付ナビは持たず、常に今日のレコードを対象にする（追加・完了は即時保存）。
  */
-
-// ページ訪問ごとにランダムに選び直す。楽観描画→フレッシュ描画の 2 回の
-// repaint で表示が入れ替わらないよう、選んだ付箋は訪問中は固定する。
-let _michTopPick = null;
-
-function pickMichTopReminder() {
-  const list = getActiveReminders();
-  if (list.length === 0) { _michTopPick = null; return null; }
-  if (!_michTopPick || !list.some((r) => r.id === _michTopPick.id)) {
-    _michTopPick = list[Math.floor(Math.random() * list.length)];
-  }
-  return _michTopPick;
+export function renderTasksPage(date) {
+  return _renderPage(date, "tasks");
 }
 
-function buildMichishirubeCardHTML() {
-  const pick = pickMichTopReminder();
-  const inner = pick
-    ? `<div class="mich-compact-note" title="クリックで一覧へ">
-        ${pick.createdAt ? `<div class="sticky-note-date">${formatReminderDate(pick.createdAt)}</div>` : ""}
-        <div class="mich-compact-text sticky-text sticky-text-md" id="mich-compact-text">${renderStickyMd(pick.text)}</div>
-      </div>`
-    : `<p class="sticky-empty">まだメモがありません。<br>「道しるべ」ページから追加できます。</p>`;
-  const count = getActiveReminders().length;
-  return `
-    <div class="card draggable-card reminder-board-card mich-compact-card" id="card-reminder-board" draggable="false">
-      <div class="card-drag-handle" title="ドラッグで移動">⠿</div>
-      <div class="card-title">道しるべ</div>
-      ${inner}
-      <div class="mich-compact-footer">
-        ${count > 1 ? `<button class="sticky-nav-btn sticky-random-btn" id="mich-shuffle-btn" title="別のメモを表示">&#x1f500;</button>` : "<span></span>"}
-        <a class="mich-compact-link" href="#/michishirube">一覧を見る（${count}件） →</a>
-      </div>
-    </div>`;
-}
-
-/** Markdown ライブラリ遅延ロード完了時に応急描画を差し替える */
-function refreshMichCompactText() {
-  const el = document.getElementById("mich-compact-text");
-  if (el && _michTopPick) el.innerHTML = renderStickyMd(_michTopPick.text);
-}
-addMdRefreshHook(refreshMichCompactText);
-
-function attachMichishirubeCardEvents() {
-  const card = document.getElementById("card-reminder-board");
-  if (!card) return;
-
-  // 🔀 で別のメモに差し替え（ページ遷移はしない）
-  const shuffleBtn = document.getElementById("mich-shuffle-btn");
-  if (shuffleBtn) {
-    shuffleBtn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      const list = getActiveReminders();
-      if (list.length <= 1) return;
-      let next;
-      do { next = list[Math.floor(Math.random() * list.length)]; } while (_michTopPick && next.id === _michTopPick.id);
-      _michTopPick = next;
-      const note = card.querySelector(".mich-compact-note");
-      if (note) {
-        note.innerHTML = `
-          ${next.createdAt ? `<div class="sticky-note-date">${formatReminderDate(next.createdAt)}</div>` : ""}
-          <div class="mich-compact-text sticky-text sticky-text-md" id="mich-compact-text">${renderStickyMd(next.text)}</div>`;
-      }
-    });
-  }
-
-  // カード本体クリック → 道しるべページへ（ドラッグハンドル・リンク・🔀 は除外）
-  card.addEventListener("click", (e) => {
-    if (e.target.closest(".card-drag-handle") || e.target.closest("a") || e.target.closest("#mich-shuffle-btn")) return;
-    window.location.hash = "/michishirube";
-  });
+/**
+ * 行動ログページ（#/log, #/log/:date）: タイムライン入力・活動可能時間・おやすみモード。
+ * 日付ナビ（ヘッダーのカレンダー）から過去日の編集もこのページで行う。
+ */
+export function renderActivityLog(date) {
+  return _renderPage(date, "log");
 }
 
 /* ── おやすみモード ── */
@@ -560,7 +492,7 @@ function attachRestDayEvents(date, isRestDay) {
       try {
         await recordsApi.toggleRestDay(date, true, reason);
         showToast("おやすみモードに設定しました", "success");
-        await renderInputForm(date);
+        await renderActivityLog(date);
       } catch (err) {
         showToast("設定に失敗しました: " + err.message, "error");
         btnConfirm.disabled = false;
@@ -587,7 +519,7 @@ function attachRestDayEvents(date, isRestDay) {
       try {
         await recordsApi.toggleRestDay(date, false, "");
         showToast("おやすみモードを解除しました", "success");
-        await renderInputForm(date);
+        await renderActivityLog(date);
       } catch (err) {
         showToast("解除に失敗しました: " + err.message, "error");
         btnCancelRest.disabled = false;
@@ -776,7 +708,8 @@ function escapeHTMLAttr(str) {
 
 /* ── HTML 生成 ── */
 
-function buildFormHTML(date, record, tasks, isEdit, isRestDay = false, restReason = "") {
+function buildFormHTML(date, record, tasks, isEdit, isRestDay = false, restReason = "", mode = "tasks") {
+  const isLog = mode === "log";
   const dateLabel = new Date(date + "T00:00:00").toLocaleDateString("ja-JP", {
     year: "numeric", month: "long", day: "numeric", weekday: "long",
   });
@@ -787,11 +720,12 @@ function buildFormHTML(date, record, tasks, isEdit, isRestDay = false, restReaso
   const hasCompleted = completedTasks.length > 0;
   const incompleteTasks = plannedTasks.filter((t) => !completedTasks.includes(t));
 
-  // 各カードの HTML をマップで管理
-  const cards = {
-    "card-activity-log": `
-      <div class="card draggable-card" id="card-activity-log" draggable="false">
-        <div class="card-drag-handle" title="ドラッグで移動">⠿</div>
+  // 各カードの HTML をマップで管理（ページごとに出すカードが違う）
+  const cards = {};
+
+  // ── 行動ログページ: タイムライン入力カード（1 枚だけなのでドラッグ不要） ──
+  if (isLog) cards["card-activity-log"] = `
+      <div class="card activity-log-card" id="card-activity-log">
         <div class="card-title-row">
           <div class="card-title">行動ログ</div>
           <button class="btn btn-outline btn-sm timeline-add-btn-top" id="btn-add-timeline-row-top" title="行動を追加">
@@ -837,9 +771,10 @@ function buildFormHTML(date, record, tasks, isEdit, isRestDay = false, restReaso
           </div>
           <p class="available-hours-hint">帰宅後の自由時間を入力。AI分析がこの時間を前提に評価します。</p>
         </div>
-      </div>`,
+      </div>`;
 
-    "card-task-mgmt": `
+  // ── タスクページ: タスク管理 / 完了タスク ──
+  if (!isLog) cards["card-task-mgmt"] = `
       <div class="card draggable-card" id="card-task-mgmt" draggable="false">
         <div class="card-drag-handle" title="ドラッグで移動">⠿</div>
         <div class="card-title">タスク管理</div>
@@ -866,9 +801,9 @@ function buildFormHTML(date, record, tasks, isEdit, isRestDay = false, restReaso
             <button class="btn btn-outline btn-sm" id="btn-add-category">追加</button>
           </div>
         </details>
-      </div>`,
+      </div>`;
 
-    "card-completed": `
+  if (!isLog) cards["card-completed"] = `
       <div class="card draggable-card completed-tasks-card" id="card-completed" draggable="false"
            style="${hasCompleted ? "" : "display:none"}">
         <div class="card-drag-handle" title="ドラッグで移動">⠿</div>
@@ -876,11 +811,7 @@ function buildFormHTML(date, record, tasks, isEdit, isRestDay = false, restReaso
         <ul class="task-list" id="completed-list">
           ${completedTasks.map((t) => buildTaskItem(t, true)).join("")}
         </ul>
-      </div>`,
-  };
-
-  // 付箋リマインダーもカードマップに統合
-  cards["card-reminder-board"] = buildMichishirubeCardHTML();
+      </div>`;
 
   // localStorage のレイアウトに従ってカードを順序でソート
   const layout = getLayoutPreference();
@@ -898,6 +829,28 @@ function buildFormHTML(date, record, tasks, isEdit, isRestDay = false, restReaso
     (r) => `<option value="${r}"${r === restReason ? " selected" : ""}>${r}</option>`
   ).join("");
 
+  // ── タスクページ: 見出し + 列切替バー（デスクトップ）だけのシンプルな構成
+  //    （日付ナビ・おやすみモードは行動ログページ側にある） ──
+  if (!isLog) {
+    return `
+    <div class="input-page-header">
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
+        <h2 style="margin: 0; font-size: 1.2rem;">タスク管理</h2>
+      </div>
+      <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: var(--gap);">${dateLabel}</p>
+    </div>
+
+    <div class="col-toggle-bar" id="col-toggle-bar">
+      ${[1, 2, 3, 4].map((n) => `<button class="col-toggle-btn${n === getColumnCount() ? " active" : ""}" data-cols="${n}">${n}列</button>`).join("")}
+    </div>
+
+    <div class="input-grid" id="input-grid" data-columns="${getColumnCount()}">
+      ${sortedCards.map((c) => c.cardHTML).join("")}
+    </div>
+  `;
+  }
+
+  // ── 行動ログページ: おやすみモード付き。カードは 1 枚なので列切替・ドラッグは無し ──
   return `
     <div class="input-page-header">
       <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
@@ -941,11 +894,7 @@ function buildFormHTML(date, record, tasks, isEdit, isRestDay = false, restReaso
       </div>
     </div>
 
-    <div class="col-toggle-bar" id="col-toggle-bar">
-      ${[1, 2, 3, 4].map((n) => `<button class="col-toggle-btn${n === getColumnCount() ? " active" : ""}" data-cols="${n}">${n}列</button>`).join("")}
-    </div>
-
-    <div class="input-grid" id="input-grid" data-columns="${getColumnCount()}">
+    <div class="input-grid log-grid" id="input-grid" data-columns="1">
       ${sortedCards.map((c) => c.cardHTML).join("")}
     </div>
   `;
@@ -1050,8 +999,16 @@ function attachColumnToggleEvents() {
   distributeMasonry();
 }
 
-function attachFormEvents(date, isEdit) {
-  attachColumnToggleEvents();
+/**
+ * @param {string} date
+ * @param {boolean} isEdit - その日のレコードが既に存在するか
+ * @param {"tasks"|"log"} mode
+ * @param {{planned: string[], completed: string[]}} initialTasks - 描画時点のタスク
+ *   （行動ログページがレコードを新規作成するとき、引き継ぎ済みタスクを一緒に登録するために使う）
+ */
+function attachFormEvents(date, isEdit, mode, initialTasks) {
+  const isLog = mode === "log";
+  if (!isLog) attachColumnToggleEvents();
   const plannedList = document.getElementById("planned-list");
   const plannedInput = document.getElementById("planned-input");
   const completedList = document.getElementById("completed-list");
@@ -1066,45 +1023,61 @@ function attachFormEvents(date, isEdit) {
       return;
     }
 
-    // タイムラインモードの場合は textarea を同期
-    syncTimelineToTextarea();
-    const rawInput = document.getElementById("raw-input").value.trim();
-    const incompleteTasks = [...document.querySelectorAll("#planned-list .task-item .task-remove")]
-      .map((el) => el.dataset.remove)
-      .filter(Boolean);
-    const completedTasks = [...document.querySelectorAll("#completed-list .task-item .task-remove")]
-      .map((el) => el.dataset.remove)
-      .filter(Boolean);
+    let rawInput = "";
+    let availHoursVal = null;
+    let incompleteTasks = [];
+    let completedTasks = [];
+
+    if (isLog) {
+      // タイムラインモードの場合は textarea を同期
+      syncTimelineToTextarea();
+      const rawEl = document.getElementById("raw-input");
+      if (!rawEl) return; // ページ遷移後にデバウンスタイマーが発火した場合
+      rawInput = rawEl.value.trim();
+      const availHoursEl = document.getElementById("available-hours");
+      availHoursVal = availHoursEl?.value ? parseFloat(availHoursEl.value) : null;
+      // 新規作成時に引き継ぎ済みタスクも登録するため（更新時は送らない）
+      const planned = initialTasks?.planned || [];
+      completedTasks = [...(initialTasks?.completed || [])];
+      incompleteTasks = planned.filter((t) => !completedTasks.includes(t));
+    } else {
+      if (!document.getElementById("planned-list")) return; // ページ遷移後
+      incompleteTasks = [...document.querySelectorAll("#planned-list .task-item .task-remove")]
+        .map((el) => el.dataset.remove)
+        .filter(Boolean);
+      completedTasks = [...document.querySelectorAll("#completed-list .task-item .task-remove")]
+        .map((el) => el.dataset.remove)
+        .filter(Boolean);
+    }
     const plannedTasks = [...incompleteTasks, ...completedTasks];
 
-    // 何も入力されていなければ保存しない
-    if (!isEdit && !rawInput && plannedTasks.length === 0) return;
+    // 何も入力されていなければレコードを作らない
+    if (!isEdit) {
+      if (isLog && !rawInput && availHoursVal === null) return;
+      if (!isLog && plannedTasks.length === 0) return;
+    }
 
-    const availHoursEl = document.getElementById("available-hours");
-    const availHoursVal = availHoursEl?.value ? parseFloat(availHoursEl.value) : null;
+    // 更新時は自分のページが担当するフィールドだけを送る
+    // （もう一方のページで編集中の内容を古い値で上書きしないため。バックエンドは部分更新対応）
+    const updateData = isLog
+      ? { raw_input: rawInput }
+      : { tasks_planned: plannedTasks, tasks_completed: completedTasks };
+    if (isLog && availHoursVal !== null) updateData.available_hours = availHoursVal;
 
     isSaving = true;
     try {
       if (isEdit) {
-        const updateData = {
-          raw_input: rawInput,
-          tasks_planned: plannedTasks,
-          tasks_completed: completedTasks,
-        };
-        if (availHoursVal !== null) updateData.available_hours = availHoursVal;
         await recordsApi.update(date, updateData);
       } else {
         try {
           await recordsApi.create(date, rawInput, plannedTasks, completedTasks);
+          // create は活動可能時間を受け付けないので、入力済みなら続けて反映する
+          if (isLog && availHoursVal !== null) {
+            await recordsApi.update(date, { available_hours: availHoursVal });
+          }
         } catch (createErr) {
-          // 409 (既に存在) の場合は update にフォールバック
+          // 409 (既に存在 = もう一方のページが先に作成済み) の場合は update にフォールバック
           if (createErr.message.includes("409") || createErr.message.includes("すでに存在")) {
-            const updateData = {
-              raw_input: rawInput,
-              tasks_planned: plannedTasks,
-              tasks_completed: completedTasks,
-            };
-            if (availHoursVal !== null) updateData.available_hours = availHoursVal;
             await recordsApi.update(date, updateData);
           } else {
             throw createErr;
@@ -1123,18 +1096,24 @@ function attachFormEvents(date, isEdit) {
     }
   }
 
+  // ── ここから行動ログページ専用のイベント（要素が無いタスクページでは何も登録されない） ──
+
   // 行動ログの入力が止まったら自動保存（デバウンス 1.5 秒）
   let rawInputTimer = null;
-  document.getElementById("raw-input").addEventListener("input", () => {
-    clearTimeout(rawInputTimer);
-    rawInputTimer = setTimeout(saveDataQuietly, 1500);
-  });
+  const rawInputEl = document.getElementById("raw-input");
+  if (rawInputEl) {
+    rawInputEl.addEventListener("input", () => {
+      clearTimeout(rawInputTimer);
+      rawInputTimer = setTimeout(saveDataQuietly, 1500);
+    });
+  }
 
   // ── タイムラインモード イベント ──
   function syncTimelineToTextarea() {
     const timelineMode = document.getElementById("timeline-mode");
-    if (timelineMode && timelineMode.style.display !== "none") {
-      document.getElementById("raw-input").value = timelineToRawInput();
+    const rawEl = document.getElementById("raw-input");
+    if (rawEl && timelineMode && timelineMode.style.display !== "none") {
+      rawEl.value = timelineToRawInput();
     }
   }
 
@@ -1357,6 +1336,9 @@ function attachFormEvents(date, isEdit) {
     });
   }
 
+  // ── ここからタスクページ専用のイベント ──
+  if (isLog) return;
+
   // カテゴリ選択時の新規作成ハンドリング
   function handleCategorySelect(selectEl) {
     if (selectEl.value === "__new__") {
@@ -1485,7 +1467,7 @@ function attachFormEvents(date, isEdit) {
     // Enter での自動登録は廃止（追加ボタンクリックでのみ登録）
   }
 
-  // ドラッグ&ドロップ（デスクトップのみ）
+  // カードのドラッグ&ドロップ（デスクトップのみ）
   attachDragDropEvents();
 
   // タスク並べ替え（デスクトップ＋モバイル）

@@ -10,10 +10,10 @@
  *     リダイレクトのみ提供する。
  */
 
-import { addRoute, navigate, updateNavActive } from "./router.js?v=20260912a";
-import { recordsApi } from "./api.js?v=20260912a";
-import { initSwipeNav } from "./swipe-nav.js?v=20260912a";
-import { initSidebarResize } from "./sidebar-resize.js?v=20260912a";
+import { addRoute, navigate, updateNavActive } from "./router.js?v=20260912b";
+import { recordsApi } from "./api.js?v=20260912b";
+import { initSwipeNav } from "./swipe-nav.js?v=20260912b";
+import { initSidebarResize } from "./sidebar-resize.js?v=20260912b";
 
 // ===== バックエンドのウォームアップ（コールドスタート対策） =====
 // Cloud Run は min-instances 0 で運用しているため、久しぶりのアクセスでは
@@ -33,21 +33,21 @@ import { initSidebarResize } from "./sidebar-resize.js?v=20260912a";
 
 // ===== 動的 import ヘルパー =====
 // 各コンポーネントは初回訪問時に初めてネットワーク取得（以降は SW キャッシュから即応答）
-const loadInputForm       = () => import("./components/input-form.js?v=20260912a");
-const loadAnalysisView    = () => import("./components/analysis-view.js?v=20260912a");
-const loadHistoryList     = () => import("./components/history-list.js?v=20260912a");
-const loadWeeklyReport    = () => import("./components/weekly-report.js?v=20260912a");
-const loadMonthlyReport   = () => import("./components/monthly-report.js?v=20260912a");
-const loadJournal         = () => import("./components/journal.js?v=20260912a");
-const loadBraindump       = () => import("./components/braindump.js?v=20260912a");
-const loadTaskStats       = () => import("./components/task-stats.js?v=20260912a");
-const loadFlashcardList   = () => import("./components/flashcard-list.js?v=20260912a");
-const loadFlashcardStudy  = () => import("./components/flashcard-study.js?v=20260912a");
-const loadWishlist        = () => import("./components/wishlist.js?v=20260912a");
-const loadGratitude       = () => import("./components/gratitude.js?v=20260912a");
-const loadUdemyTips       = () => import("./components/udemy-tips.js?v=20260912a");
-const loadMichishirube    = () => import("./components/michishirube.js?v=20260912a");
-const loadHomeLauncher    = () => import("./components/home-launcher.js?v=20260912a");
+const loadInputForm       = () => import("./components/input-form.js?v=20260912b");
+const loadAnalysisView    = () => import("./components/analysis-view.js?v=20260912b");
+const loadHistoryList     = () => import("./components/history-list.js?v=20260912b");
+const loadWeeklyReport    = () => import("./components/weekly-report.js?v=20260912b");
+const loadMonthlyReport   = () => import("./components/monthly-report.js?v=20260912b");
+const loadJournal         = () => import("./components/journal.js?v=20260912b");
+const loadBraindump       = () => import("./components/braindump.js?v=20260912b");
+const loadTaskStats       = () => import("./components/task-stats.js?v=20260912b");
+const loadFlashcardList   = () => import("./components/flashcard-list.js?v=20260912b");
+const loadFlashcardStudy  = () => import("./components/flashcard-study.js?v=20260912b");
+const loadWishlist        = () => import("./components/wishlist.js?v=20260912b");
+const loadGratitude       = () => import("./components/gratitude.js?v=20260912b");
+const loadUdemyTips       = () => import("./components/udemy-tips.js?v=20260912b");
+const loadMichishirube    = () => import("./components/michishirube.js?v=20260912b");
+const loadHomeLauncher    = () => import("./components/home-launcher.js?v=20260912b");
 
 // ===== ユーティリティ =====
 
@@ -65,8 +65,9 @@ function getMain() {
 
 /** ルート名マッピング */
 const ROUTE_TITLES = {
-  "/": { title: "行動記録", breadcrumb: "記録入力" },
-  "/edit": { title: "行動記録", breadcrumb: "記録入力" },
+  "/": { title: "タスク", breadcrumb: "タスク管理" },
+  "/log": { title: "行動ログ", breadcrumb: "行動記録" },
+  "/edit": { title: "行動ログ", breadcrumb: "行動記録" },
   "/history": { title: "履歴一覧", breadcrumb: "履歴" },
   "/weekly": { title: "週次レポート", breadcrumb: "週次分析" },
   "/monthly": { title: "月次レポート", breadcrumb: "月次サマリー" },
@@ -190,9 +191,9 @@ async function openDatePicker(anchorEl) {
       const date = dayEl.dataset.date;
       if (date) {
         closeDatePicker();
-        // 今日なら "/"、それ以外は "/edit/:date" に遷移
+        // 日付を選んだら行動ログページへ（今日なら "/log"、それ以外は "/log/:date"）
         const todayStr = today();
-        window.location.hash = date === todayStr ? "/" : `/edit/${date}`;
+        window.location.hash = date === todayStr ? "/log" : `/log/${date}`;
       }
     }
   });
@@ -443,13 +444,16 @@ document.addEventListener("keydown", (e) => {
 // ===== ルーティング設定 =====
 // 各ルートは初回訪問時に動的 import（トップのバンドルには含めない）
 
-// トップ（旧 /input）
-addRoute("/", async () => (await loadInputForm()).renderInputForm(today()));
-addRoute("/edit/:date", async ({ date }) => (await loadInputForm()).renderInputForm(date));
+// トップ = タスクページ（常に今日）
+addRoute("/", async () => (await loadInputForm()).renderTasksPage(today()));
+// 行動ログページ（今日 / 指定日）
+addRoute("/log", async () => (await loadInputForm()).renderActivityLog(today()));
+addRoute("/log/:date", async ({ date }) => (await loadInputForm()).renderActivityLog(date));
 
 // 旧 URL の後方互換リダイレクト（ブックマーク・他コンポーネントの古いリンク用）
+addRoute("/edit/:date", ({ date }) => { window.location.hash = `/log/${date}`; });
 addRoute("/input", () => { window.location.hash = "/"; });
-addRoute("/input/:date", ({ date }) => { window.location.hash = `/edit/${date}`; });
+addRoute("/input/:date", ({ date }) => { window.location.hash = `/log/${date}`; });
 
 addRoute("/analysis/:date", async ({ date }) => (await loadAnalysisView()).renderAnalysisView(date));
 addRoute("/history", async () => (await loadHistoryList()).renderHistoryList());

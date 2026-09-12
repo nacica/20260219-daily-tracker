@@ -66,7 +66,9 @@ export function updateNavActive() {
   const hash = window.location.hash.slice(1) || "/";
   document.querySelectorAll(".nav-link").forEach((link) => {
     const target = link.dataset.route;
-    link.classList.toggle("active", target && hash.startsWith(target));
+    // "/"（タスク）は前方一致だと全ページで一致してしまうので完全一致で判定する
+    const active = target === "/" ? hash === "/" : !!target && hash.startsWith(target);
+    link.classList.toggle("active", active);
   });
 }
 
