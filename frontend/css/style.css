@@ -1250,48 +1250,67 @@ textarea {
   margin-top: var(--gap);
 }
 
-.completed-count {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 20px;
-  height: 20px;
-  padding: 0 6px;
-  border-radius: 10px;
-  background: rgba(0, 255, 148, 0.12);
-  color: var(--neon-green);
-  font-size: 0.75rem;
-  font-weight: 700;
-}
 
-/* ===== タスクページ: カテゴリ別カード =====
- * 予定タスクをカテゴリごとのカードに分け、列切替（1〜4列）で並べる。
- * カード見出しでカテゴリが分かるので、項目内のカテゴリバッジは隠す。 */
+/* ===== タスクページ: カード見出し =====
+ * カテゴリ色を「バッジ」ではなくカードそのものに溶かす:
+ *   - 見出し文字・左のインジケーターバー・カード上端の細いグラデーション線を --cat-color で着色
+ *   - 未分類 / 完了タスク / カテゴリ管理は --cat-color 未指定 → 既定の水色（--cyan）
+ *   - 件数は右端に等幅数字で控えめに置く（ピル型バッジはやめてノイズを減らす）
+ * カテゴリ色は buildCategoryCardHTML() が style="--cat-color:..." でカードに渡す。 */
+.tasks-grid .card {
+  --cat-color: var(--cyan);
+}
+.tasks-grid .card::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--cat-color) 0%, var(--cat-color) 35%, transparent 100%);
+  opacity: 0.9;
+  pointer-events: none;
+}
+.tasks-grid .card-title {
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  text-transform: none;
+  color: var(--cat-color);
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.tasks-grid .card-title::before {
+  height: 16px;
+  background: var(--cat-color);
+  box-shadow: 0 0 8px var(--cat-color);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--cat-color) 70%, transparent);
+}
+.tasks-grid .card-title-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tasks-grid .card-count {
+  margin-left: auto;
+  font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+}
+/* デスクトップは右上にドラッグハンドル（⠿）が重なるので、件数をその分だけ内側に寄せる */
+@media (min-width: 1024px) {
+  .tasks-grid .card-count {
+    margin-right: 26px;
+  }
+}
+/* カード見出しでカテゴリが分かるので、項目内のカテゴリバッジは隠す */
 .category-card .planned-list .task-category-badge {
   display: none;
-}
-.category-card .card-title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.category-card-badge {
-  font-size: 0.85rem;
-  letter-spacing: normal;
-  text-transform: none;
-}
-.category-task-count {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 20px;
-  height: 20px;
-  padding: 0 6px;
-  border-radius: 10px;
-  background: var(--bg-input);
-  color: var(--text-muted);
-  font-size: 0.75rem;
-  font-weight: 700;
 }
 /* 空のカードにもドロップ先として最低限の高さと案内を出す */
 .category-card .planned-list {

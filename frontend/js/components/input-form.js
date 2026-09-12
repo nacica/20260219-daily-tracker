@@ -10,9 +10,9 @@
  * デスクトップ: タスクページはカードのドラッグ&ドロップ（masonry）レイアウト。
  */
 
-import { recordsApi, categoriesApi } from "../api.js?v=20260912c";
-import { showToast } from "../app.js?v=20260912c";
-import { showTaskCompleteAnimation } from "./task-stats.js?v=20260912c";
+import { recordsApi, categoriesApi } from "../api.js?v=20260912d";
+import { showToast } from "../app.js?v=20260912d";
+import { showTaskCompleteAnimation } from "./task-stats.js?v=20260912d";
 
 /* ── カテゴリ管理 ── */
 
@@ -245,13 +245,15 @@ function groupTasksByCategory(incompleteTasks) {
 }
 
 function buildCategoryCardHTML(name, tasks) {
-  const title = name
-    ? `<span class="task-category-badge category-card-badge" style="background:${getCategoryColor(name)}">${escapeHTML(name)}</span>`
-    : "未分類";
+  // カテゴリ色は CSS 変数でカードに渡し、見出し文字・左バー・上端ラインの色に使う（未分類は既定の水色）
+  const colorStyle = name ? ` style="--cat-color:${getCategoryColor(name)}"` : "";
   return `
-      <div class="card draggable-card category-card${tasks.length === 0 ? " is-empty" : ""}" id="${catCardId(name)}" data-category="${escapeHTML(name)}" draggable="false">
+      <div class="card draggable-card category-card${tasks.length === 0 ? " is-empty" : ""}" id="${catCardId(name)}" data-category="${escapeHTML(name)}" draggable="false"${colorStyle}>
         <div class="card-drag-handle" title="ドラッグで移動">⠿</div>
-        <div class="card-title">${title} <span class="category-task-count">${tasks.length}</span></div>
+        <div class="card-title">
+          <span class="card-title-text">${name ? escapeHTML(name) : "未分類"}</span>
+          <span class="card-count category-task-count">${tasks.length}</span>
+        </div>
         <ul class="task-list planned-list" data-category="${escapeHTML(name)}">${tasks.map((t) => buildTaskItem(t, false)).join("")}</ul>
         <div class="task-input-row">
           <input type="text" class="planned-input" placeholder="タスクを追加" />
@@ -272,7 +274,7 @@ function buildCategoryMgmtCardHTML() {
   return `
       <div class="card draggable-card category-mgmt-card" id="card-category-mgmt" draggable="false">
         <div class="card-drag-handle" title="ドラッグで移動">⠿</div>
-        <div class="card-title">カテゴリ管理</div>
+        <div class="card-title"><span class="card-title-text">カテゴリ管理</span></div>
         <ul class="category-manage-list" id="category-manage-list">${buildCategoryManageListHTML()}</ul>
         <div class="task-input-row">
           <input type="text" id="new-category-input" placeholder="新しいカテゴリ名" />
@@ -830,7 +832,10 @@ function buildFormHTML(date, record, tasks, isEdit, isRestDay = false, restReaso
       <div class="card draggable-card completed-tasks-card" id="card-completed" draggable="false"
            style="${hasCompleted ? "" : "display:none"}">
         <div class="card-drag-handle" title="ドラッグで移動">⠿</div>
-        <div class="card-title">完了タスク <span class="completed-count" id="completed-count">${completedTasks.length}</span></div>
+        <div class="card-title">
+          <span class="card-title-text">完了タスク</span>
+          <span class="card-count" id="completed-count">${completedTasks.length}</span>
+        </div>
         <ul class="task-list" id="completed-list">
           ${completedTasks.map((t) => buildTaskItem(t, true)).join("")}
         </ul>
@@ -863,7 +868,7 @@ function buildFormHTML(date, record, tasks, isEdit, isRestDay = false, restReaso
       ${[1, 2, 3, 4].map((n) => `<button class="col-toggle-btn${n === getColumnCount() ? " active" : ""}" data-cols="${n}">${n}列</button>`).join("")}
     </div>
 
-    <div class="input-grid" id="input-grid" data-columns="${getColumnCount()}">
+    <div class="input-grid tasks-grid" id="input-grid" data-columns="${getColumnCount()}">
       ${cardsHTML}
     </div>
   `;

@@ -11,7 +11,7 @@ import {
   attachFloatingToolbar,
   appendMarkdownToEditor,
   serializeEditorMarkdown,
-} from "../floating-toolbar.js?v=20260912c";
+} from "../floating-toolbar.js?v=20260912d";
 
 // モジュールロード時に読み込み確認ログを出す（キャッシュ診断用）
 const FLASHCARD_LIST_VERSION = "20260424b";
