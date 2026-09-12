@@ -13,7 +13,7 @@ import {
   attachFloatingToolbar,
   appendMarkdownToEditor,
   serializeEditorMarkdown,
-} from "../floating-toolbar.js?v=20260912b";
+} from "../floating-toolbar.js?v=20260912c";
 
 /** contenteditable div / textarea いずれでも markdown を読み書きするヘルパ */
 function readEditableMarkdown(el) {

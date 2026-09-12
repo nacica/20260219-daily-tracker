@@ -10,14 +10,13 @@
  * デスクトップ: タスクページはカードのドラッグ&ドロップ（masonry）レイアウト。
  */
 
-import { recordsApi, categoriesApi } from "../api.js?v=20260912b";
-import { showToast } from "../app.js?v=20260912b";
-import { showTaskCompleteAnimation } from "./task-stats.js?v=20260912b";
+import { recordsApi, categoriesApi } from "../api.js?v=20260912c";
+import { showToast } from "../app.js?v=20260912c";
+import { showTaskCompleteAnimation } from "./task-stats.js?v=20260912c";
 
 /* ── カテゴリ管理 ── */
 
 const CATEGORY_STORAGE_KEY = "task-categories";
-const LAST_CATEGORY_KEY = "task-last-category";
 const DEFAULT_COLORS = ["#0088aa", "#00894d", "#c47800", "#9c27b0", "#c62828", "#0277bd", "#2e7d32", "#e65100"];
 
 function getCategories() {
@@ -56,18 +55,9 @@ async function syncCategoriesFromServer() {
       // サーバーが空でローカルにデータがある場合: ローカルをサーバーに送信
       await categoriesApi.save(local);
     }
-    refreshCategoryDropdowns();
   } catch (e) {
     console.warn("カテゴリ同期失敗:", e);
   }
-}
-
-function getLastCategory() {
-  return localStorage.getItem(LAST_CATEGORY_KEY) || "";
-}
-
-function setLastCategory(name) {
-  localStorage.setItem(LAST_CATEGORY_KEY, name);
 }
 
 function parseTaskCategory(taskStr) {
@@ -86,25 +76,6 @@ function getCategoryColor(categoryName) {
   const found = cats.find((c) => c.name === categoryName);
   if (found) return found.color;
   return DEFAULT_COLORS[0];
-}
-
-function buildCategoryOptions(selectedValue) {
-  const cats = getCategories();
-  let html = `<option value="">カテゴリなし</option>`;
-  for (const c of cats) {
-    const sel = c.name === selectedValue ? " selected" : "";
-    html += `<option value="${escapeHTML(c.name)}"${sel}>${escapeHTML(c.name)}</option>`;
-  }
-  html += `<option value="__new__">＋ 新規作成</option>`;
-  return html;
-}
-
-function refreshCategoryDropdowns() {
-  const last = getLastCategory();
-  for (const sel of document.querySelectorAll(".category-select")) {
-    const current = sel.value;
-    sel.innerHTML = buildCategoryOptions(current || last);
-  }
 }
 
 /* ── カラム数永続化 ── */
@@ -238,38 +209,113 @@ function flattenMasonry(grid) {
   cards.forEach((card) => grid.appendChild(card));
 }
 
-/* ── レイアウト永続化 ── */
+/* ── タスクページ: カテゴリ別カード ──
+ * 予定タスクをカテゴリごとに独立したカードに分け、デスクトップの列切替（1〜4列）と
+ * masonry 配置でそのまま並べる。カードの id はカテゴリ名から作るので、列配置の保存
+ * （masonry-layout-N）もカテゴリ単位で効く。
+ */
 
-// タスクページに並ぶカード。行動ログは専用ページ（#/log）に分離したのでここには含めない。
-const DEFAULT_LAYOUT = {
-  "card-task-mgmt":        { order: 0 },
-  "card-completed":        { order: 1 },
-};
-
-const CARD_IDS = Object.keys(DEFAULT_LAYOUT);
-
-// v2: 行動ログを最上段に昇格させた新デフォルト順序を配信するためキーをリネーム。
-// 旧キー("input-form-layout")は読まずに破棄し、全ユーザーに新デフォルトを適用する。
-const LAYOUT_STORAGE_KEY = "input-form-layout-v2";
-
-function getLayoutPreference() {
-  try {
-    const saved = localStorage.getItem(LAYOUT_STORAGE_KEY);
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      for (const id of CARD_IDS) {
-        if (!parsed[id] || typeof parsed[id].order !== "number") return DEFAULT_LAYOUT;
-      }
-      return parsed;
-    }
-    // 旧キーが残っていれば一度だけ掃除（次回以降の保存は新キーへ）
-    localStorage.removeItem("input-form-layout");
-  } catch {}
-  return DEFAULT_LAYOUT;
+/** カテゴリ名 → カード要素 id（日本語名も安全に id 化する） */
+function catCardId(name) {
+  return "card-cat-" + (name ? encodeURIComponent(name) : "__none__");
 }
 
-function saveLayoutPreference(layout) {
-  localStorage.setItem(LAYOUT_STORAGE_KEY, JSON.stringify(layout));
+/**
+ * 未完了タスクをカテゴリごとにグループ化する。
+ * 順序: 定義済みカテゴリ（カテゴリ管理の並び）→ 定義に無いがタスクに残っているカテゴリ → 未分類。
+ * 定義済みカテゴリはタスクが 0 件でもカードを出す（レイアウトが安定し、追加欄として使えるため）。
+ */
+function groupTasksByCategory(incompleteTasks) {
+  const groups = new Map();
+  for (const c of getCategories()) groups.set(c.name, []);
+  const extra = new Map();
+  const none = [];
+  for (const t of incompleteTasks) {
+    const { category } = parseTaskCategory(t);
+    if (!category) none.push(t);
+    else if (groups.has(category)) groups.get(category).push(t);
+    else {
+      if (!extra.has(category)) extra.set(category, []);
+      extra.get(category).push(t);
+    }
+  }
+  for (const [k, v] of extra) groups.set(k, v);
+  groups.set("", none);
+  return groups;
+}
+
+function buildCategoryCardHTML(name, tasks) {
+  const title = name
+    ? `<span class="task-category-badge category-card-badge" style="background:${getCategoryColor(name)}">${escapeHTML(name)}</span>`
+    : "未分類";
+  return `
+      <div class="card draggable-card category-card${tasks.length === 0 ? " is-empty" : ""}" id="${catCardId(name)}" data-category="${escapeHTML(name)}" draggable="false">
+        <div class="card-drag-handle" title="ドラッグで移動">⠿</div>
+        <div class="card-title">${title} <span class="category-task-count">${tasks.length}</span></div>
+        <ul class="task-list planned-list" data-category="${escapeHTML(name)}">${tasks.map((t) => buildTaskItem(t, false)).join("")}</ul>
+        <div class="task-input-row">
+          <input type="text" class="planned-input" placeholder="タスクを追加" />
+          <button class="btn btn-outline btn-sm btn-add-task">追加</button>
+        </div>
+      </div>`;
+}
+
+function buildCategoryManageListHTML() {
+  return getCategories().map((c) => `
+              <li class="category-manage-item">
+                <span class="task-category-badge" style="background:${c.color}">${escapeHTML(c.name)}</span>
+                <button class="category-remove-btn" data-remove-category="${escapeHTML(c.name)}" title="削除">✕</button>
+              </li>`).join("");
+}
+
+function buildCategoryMgmtCardHTML() {
+  return `
+      <div class="card draggable-card category-mgmt-card" id="card-category-mgmt" draggable="false">
+        <div class="card-drag-handle" title="ドラッグで移動">⠿</div>
+        <div class="card-title">カテゴリ管理</div>
+        <ul class="category-manage-list" id="category-manage-list">${buildCategoryManageListHTML()}</ul>
+        <div class="task-input-row">
+          <input type="text" id="new-category-input" placeholder="新しいカテゴリ名" />
+          <button class="btn btn-outline btn-sm" id="btn-add-category">追加</button>
+        </div>
+      </div>`;
+}
+
+/** カテゴリ名に対応する予定タスクリスト（無ければ未分類リスト） */
+function getPlannedListFor(category) {
+  const lists = [...document.querySelectorAll(".planned-list")];
+  return lists.find((l) => (l.dataset.category || "") === (category || ""))
+    || lists.find((l) => (l.dataset.category || "") === "")
+    || null;
+}
+
+/** 各カテゴリカードの件数バッジと「空」状態を更新 */
+function syncCategoryCounts() {
+  document.querySelectorAll(".category-card").forEach((card) => {
+    const n = card.querySelectorAll(".task-item").length;
+    const el = card.querySelector(".category-task-count");
+    if (el) el.textContent = n;
+    card.classList.toggle("is-empty", n === 0);
+  });
+}
+
+/**
+ * タスク li のカテゴリを付け替える（data-* とバッジを更新）。
+ * data-task / data-edit / data-remove は保存時の収集元なので 3 つとも揃える。
+ */
+function setTaskCategory(li, category) {
+  const cb = li.querySelector('input[type="checkbox"]');
+  if (!cb) return;
+  const { text } = parseTaskCategory(cb.dataset.task);
+  const full = formatTaskWithCategory(text, category);
+  cb.dataset.task = full;
+  const eBtn = li.querySelector(".task-edit");
+  if (eBtn) eBtn.dataset.edit = full;
+  const rBtn = li.querySelector(".task-remove");
+  if (rBtn) rBtn.dataset.remove = full;
+  li.querySelector(".task-category-badge")?.remove();
+  const textSpan = li.querySelector(".task-text");
+  if (textSpan) textSpan.insertAdjacentHTML("beforebegin", buildCategoryBadge(category));
 }
 
 /* ── メインレンダリング ── */
@@ -773,35 +819,12 @@ function buildFormHTML(date, record, tasks, isEdit, isRestDay = false, restReaso
         </div>
       </div>`;
 
-  // ── タスクページ: タスク管理 / 完了タスク ──
-  if (!isLog) cards["card-task-mgmt"] = `
-      <div class="card draggable-card" id="card-task-mgmt" draggable="false">
-        <div class="card-drag-handle" title="ドラッグで移動">⠿</div>
-        <div class="card-title">タスク管理</div>
-        <label>予定タスク</label>
-        <ul class="task-list" id="planned-list">
-          ${incompleteTasks.map((t) => buildTaskItem(t, false)).join("")}
-        </ul>
-        <div class="task-input-row">
-          <select id="planned-category" class="category-select">${buildCategoryOptions(getLastCategory())}</select>
-          <input type="text" id="planned-input" placeholder="" />
-          <button class="btn btn-outline btn-sm" id="btn-add-task">追加</button>
-        </div>
-        <details class="category-manager">
-          <summary>カテゴリ管理</summary>
-          <ul class="category-manage-list" id="category-manage-list">
-            ${getCategories().map((c) => `
-              <li class="category-manage-item">
-                <span class="task-category-badge" style="background:${c.color}">${escapeHTML(c.name)}</span>
-                <button class="category-remove-btn" data-remove-category="${escapeHTML(c.name)}" title="削除">✕</button>
-              </li>`).join("")}
-          </ul>
-          <div class="task-input-row">
-            <input type="text" id="new-category-input" placeholder="" />
-            <button class="btn btn-outline btn-sm" id="btn-add-category">追加</button>
-          </div>
-        </details>
-      </div>`;
+  // ── タスクページ: カテゴリ別カード（＋未分類） / 完了タスク / カテゴリ管理 ──
+  if (!isLog) {
+    for (const [name, list] of groupTasksByCategory(incompleteTasks)) {
+      cards[catCardId(name)] = buildCategoryCardHTML(name, list);
+    }
+  }
 
   if (!isLog) cards["card-completed"] = `
       <div class="card draggable-card completed-tasks-card" id="card-completed" draggable="false"
@@ -813,15 +836,11 @@ function buildFormHTML(date, record, tasks, isEdit, isRestDay = false, restReaso
         </ul>
       </div>`;
 
-  // localStorage のレイアウトに従ってカードを順序でソート
-  const layout = getLayoutPreference();
-  const sortedCards = Object.entries(cards)
-    .map(([cardId, cardHTML]) => ({
-      cardId,
-      cardHTML,
-      order: layout[cardId]?.order ?? DEFAULT_LAYOUT[cardId]?.order ?? 99,
-    }))
-    .sort((a, b) => a.order - b.order);
+  if (!isLog) cards["card-category-mgmt"] = buildCategoryMgmtCardHTML();
+
+  // カードの初期順序は上で組み立てた順（カテゴリ → 未分類 → 完了 → カテゴリ管理）。
+  // デスクトップの列配置はユーザーのドラッグ結果を masonry-layout-N に保存して復元する。
+  const cardsHTML = Object.values(cards).join("");
 
   // おやすみモード理由選択肢
   const REST_REASONS = ["残業", "体調不良", "出張", "予定あり", "その他"];
@@ -845,7 +864,7 @@ function buildFormHTML(date, record, tasks, isEdit, isRestDay = false, restReaso
     </div>
 
     <div class="input-grid" id="input-grid" data-columns="${getColumnCount()}">
-      ${sortedCards.map((c) => c.cardHTML).join("")}
+      ${cardsHTML}
     </div>
   `;
   }
@@ -895,7 +914,7 @@ function buildFormHTML(date, record, tasks, isEdit, isRestDay = false, restReaso
     </div>
 
     <div class="input-grid log-grid" id="input-grid" data-columns="1">
-      ${sortedCards.map((c) => c.cardHTML).join("")}
+      ${cardsHTML}
     </div>
   `;
 }
@@ -1009,8 +1028,6 @@ function attachColumnToggleEvents() {
 function attachFormEvents(date, isEdit, mode, initialTasks) {
   const isLog = mode === "log";
   if (!isLog) attachColumnToggleEvents();
-  const plannedList = document.getElementById("planned-list");
-  const plannedInput = document.getElementById("planned-input");
   const completedList = document.getElementById("completed-list");
 
   // バックグラウンド自動保存（排他制御付き）
@@ -1041,8 +1058,9 @@ function attachFormEvents(date, isEdit, mode, initialTasks) {
       completedTasks = [...(initialTasks?.completed || [])];
       incompleteTasks = planned.filter((t) => !completedTasks.includes(t));
     } else {
-      if (!document.getElementById("planned-list")) return; // ページ遷移後
-      incompleteTasks = [...document.querySelectorAll("#planned-list .task-item .task-remove")]
+      if (!document.getElementById("completed-list")) return; // ページ遷移後
+      // 各カテゴリカードのリストを DOM 順に集める（保存形式は従来どおりフラットな配列）
+      incompleteTasks = [...document.querySelectorAll(".planned-list .task-item .task-remove")]
         .map((el) => el.dataset.remove)
         .filter(Boolean);
       completedTasks = [...document.querySelectorAll("#completed-list .task-item .task-remove")]
@@ -1339,53 +1357,36 @@ function attachFormEvents(date, isEdit, mode, initialTasks) {
   // ── ここからタスクページ専用のイベント ──
   if (isLog) return;
 
-  // カテゴリ選択時の新規作成ハンドリング
-  function handleCategorySelect(selectEl) {
-    if (selectEl.value === "__new__") {
-      const name = prompt("新しいカテゴリ名を入力してください:");
-      if (name && name.trim()) {
-        const cats = getCategories();
-        const trimmed = name.trim();
-        if (!cats.find((c) => c.name === trimmed)) {
-          const color = DEFAULT_COLORS[cats.length % DEFAULT_COLORS.length];
-          cats.push({ name: trimmed, color });
-          saveCategories(cats);
-          renderCategoryManageList();
-        }
-        refreshCategoryDropdowns();
-        selectEl.value = trimmed;
-        setLastCategory(trimmed);
-      } else {
-        selectEl.value = getLastCategory();
-      }
-    } else {
-      setLastCategory(selectEl.value);
-    }
-  }
+  const grid = document.getElementById("input-grid");
+  if (!grid || !completedList) return;
 
-  const plannedCategorySel = document.getElementById("planned-category");
-  plannedCategorySel.addEventListener("change", () => handleCategorySelect(plannedCategorySel));
-
-  // タスク追加
-  function addTask() {
-    const text = plannedInput.value.trim();
+  // タスク追加（各カテゴリカードの入力欄。カテゴリはカードで決まる）
+  function addTaskFromCard(card) {
+    const input = card?.querySelector(".planned-input");
+    const list = card?.querySelector(".planned-list");
+    if (!input || !list) return;
+    const text = input.value.trim();
     if (!text) return;
-    const category = plannedCategorySel.value;
-    const fullText = formatTaskWithCategory(text, category);
-    plannedList.insertAdjacentHTML("beforeend", buildTaskItem(fullText, false));
-    plannedInput.value = "";
-    plannedInput.focus();
+    const fullText = formatTaskWithCategory(text, card.dataset.category || "");
+    list.insertAdjacentHTML("beforeend", buildTaskItem(fullText, false));
+    input.value = "";
+    input.focus();
+    syncCategoryCounts();
     saveDataQuietly();
   }
-
-  document.getElementById("btn-add-task").addEventListener("click", addTask);
   // Enter での自動登録は廃止（追加ボタンクリックでのみ登録）
 
-  // タスク削除 & チェックボックス切り替え（イベント委任）
-  function handleTaskClick(e) {
+  // タスク追加 / 削除 / 編集 / チェック切替
+  // グリッド全体でイベント委任しておくと、カテゴリ追加で後から差し込んだカードでもそのまま動く
+  grid.addEventListener("click", (e) => {
+    const addBtn = e.target.closest(".btn-add-task");
+    if (addBtn) { addTaskFromCard(addBtn.closest(".category-card")); return; }
+    if (!e.target.closest(".task-list")) return;
+
     if (e.target.dataset.remove !== undefined) {
       e.target.closest("li").remove();
       syncCompletedCard();
+      syncCategoryCounts();
       saveDataQuietly();
       return;
     }
@@ -1408,27 +1409,44 @@ function attachFormEvents(date, isEdit, mode, initialTasks) {
         completedList.appendChild(li);
         showTaskCompleteAnimation(e.target);
       } else {
-        li.classList.remove("completed");
-        plannedList.appendChild(li);
+        // 完了 → 予定へ戻す: 元のカテゴリカードへ（受け皿が無ければ未分類へ付け替え）
+        const { category } = parseTaskCategory(e.target.dataset.task);
+        const target = getPlannedListFor(category);
+        if (target) {
+          const targetCat = target.dataset.category || "";
+          const full = formatTaskWithCategory(parseTaskCategory(e.target.dataset.task).text, targetCat);
+          li.remove();
+          // 並べ替えハンドル付きの予定タスク行として作り直す
+          target.insertAdjacentHTML("beforeend", buildTaskItem(full, false));
+        } else {
+          li.classList.remove("completed");
+        }
       }
       syncCompletedCard();
+      syncCategoryCounts();
       saveDataQuietly();
     }
-  }
+  });
 
-  plannedList.addEventListener("click", handleTaskClick);
-  completedList.addEventListener("click", handleTaskClick);
-
-  // カテゴリ管理
+  // ── カテゴリ管理 ──
   function renderCategoryManageList() {
     const list = document.getElementById("category-manage-list");
-    if (!list) return;
-    const cats = getCategories();
-    list.innerHTML = cats.map((c) => `
-      <li class="category-manage-item">
-        <span class="task-category-badge" style="background:${c.color}">${escapeHTML(c.name)}</span>
-        <button class="category-remove-btn" data-remove-category="${escapeHTML(c.name)}" title="削除">✕</button>
-      </li>`).join("");
+    if (list) list.innerHTML = buildCategoryManageListHTML();
+  }
+
+  /** 新しいカテゴリのカードをグリッドに差し込み、デスクトップでは列配置に組み込む */
+  function insertCategoryCard(name) {
+    if (document.getElementById(catCardId(name))) return;
+    const html = buildCategoryCardHTML(name, []);
+    const completedCard = document.getElementById("card-completed");
+    if (completedCard && completedCard.parentNode === grid) {
+      completedCard.insertAdjacentHTML("beforebegin", html); // モバイル（フラット表示）: 完了タスクの手前
+    } else {
+      grid.insertAdjacentHTML("beforeend", html); // デスクトップ: distributeMasonry が最短列へ配置する
+    }
+    const card = document.getElementById(catCardId(name));
+    bindTaskSort(card.querySelector(".planned-list"));
+    distributeMasonry();
   }
 
   const categoryManageList = document.getElementById("category-manage-list");
@@ -1439,7 +1457,12 @@ function attachFormEvents(date, isEdit, mode, initialTasks) {
         const cats = getCategories().filter((c) => c.name !== name);
         saveCategories(cats);
         renderCategoryManageList();
-        refreshCategoryDropdowns();
+        // タスクが残っていなければカードも消す（残っていれば次回描画まではそのまま）
+        const card = document.getElementById(catCardId(name));
+        if (card && card.querySelectorAll(".task-item").length === 0) {
+          card.remove();
+          distributeMasonry();
+        }
       }
     });
   }
@@ -1460,7 +1483,7 @@ function attachFormEvents(date, isEdit, mode, initialTasks) {
       saveCategories(cats);
       newCategoryInput.value = "";
       renderCategoryManageList();
-      refreshCategoryDropdowns();
+      insertCategoryCard(name);
       showToast(`カテゴリ「${name}」を追加しました`, "success");
     }
     btnAddCategory.addEventListener("click", addCategory);
@@ -1470,26 +1493,50 @@ function attachFormEvents(date, isEdit, mode, initialTasks) {
   // カードのドラッグ&ドロップ（デスクトップのみ）
   attachDragDropEvents();
 
-  // タスク並べ替え（デスクトップ＋モバイル）
-  attachTaskSortEvents(saveDataQuietly);
+  // タスク並べ替え（デスクトップ＋モバイル）。デスクトップでは別カテゴリのカードへドラッグするとカテゴリを付け替える
+  const bindTaskSort = attachTaskSortEvents(saveDataQuietly);
+  document.querySelectorAll(".planned-list").forEach(bindTaskSort);
 }
 
-/* ── タスク並べ替え（リスト内ドラッグ&ドロップ） ── */
+/* ── タスク並べ替え（リスト内 & カード間ドラッグ&ドロップ） ──
+ * attachTaskSortEvents(save) は共有状態を持つ bindList(list) を返す。
+ * 描画時の全リストに加え、カテゴリ追加で後から差し込んだリストにも同じ関数でバインドする。
+ * デスクトップ: 別カードのリストへドロップするとカテゴリを付け替える。
+ * モバイル（タッチ）: 同じリスト内の並べ替えのみ。
+ */
+
+let _taskSortMouseupBound = false;
 
 function attachTaskSortEvents(saveDataQuietly) {
-  const lists = [
-    document.getElementById("planned-list"),
-  ];
-
   let draggedItem = null;
   let touchClone = null;
   let touchList = null;
   let touchScrollInterval = null;
 
-  // --- デスクトップ: HTML5 Drag & Drop ---
-  for (const list of lists) {
-    if (!list) continue;
+  // mouseup でリセット（document には 1 回だけ登録）
+  if (!_taskSortMouseupBound) {
+    _taskSortMouseupBound = true;
+    document.addEventListener("mouseup", () => {
+      document.querySelectorAll(".task-item[draggable='true']").forEach((el) => {
+        el.setAttribute("draggable", "false");
+      });
+    });
+  }
 
+  /** ドロップ先リストへ移動。別カードなら data-* とバッジのカテゴリを付け替える */
+  function dropInto(list, afterItem) {
+    const fromList = draggedItem.closest("ul");
+    if (afterItem) list.insertBefore(draggedItem, afterItem);
+    else list.appendChild(draggedItem);
+    if (fromList !== list) setTaskCategory(draggedItem, list.dataset.category || "");
+    syncCategoryCounts();
+    saveDataQuietly();
+  }
+
+  return function bindList(list) {
+    if (!list) return;
+
+    // --- デスクトップ: HTML5 Drag & Drop ---
     // ハンドル mousedown で draggable 有効化
     list.addEventListener("mousedown", (e) => {
       const handle = e.target.closest(".task-drag-handle");
@@ -1511,7 +1558,7 @@ function attachTaskSortEvents(saveDataQuietly) {
     list.addEventListener("dragover", (e) => {
       e.preventDefault();
       e.dataTransfer.dropEffect = "move";
-      if (!draggedItem || draggedItem.closest("ul") !== list) return;
+      if (!draggedItem) return;
 
       const items = [...list.querySelectorAll(".task-item:not(.task-dragging)")];
       const afterItem = getTaskInsertPoint(list, e.clientY, items);
@@ -1519,26 +1566,23 @@ function attachTaskSortEvents(saveDataQuietly) {
       // 視覚フィードバック
       items.forEach((it) => it.classList.remove("task-drop-above"));
       if (afterItem) afterItem.classList.add("task-drop-above");
+      list.classList.add("task-drop-target");
     });
 
     list.addEventListener("dragleave", () => {
       list.querySelectorAll(".task-drop-above").forEach((el) => el.classList.remove("task-drop-above"));
+      list.classList.remove("task-drop-target");
     });
 
     list.addEventListener("drop", (e) => {
       e.preventDefault();
       list.querySelectorAll(".task-drop-above").forEach((el) => el.classList.remove("task-drop-above"));
-      if (!draggedItem || draggedItem.closest("ul") !== list) return;
+      list.classList.remove("task-drop-target");
+      if (!draggedItem) return;
 
       const items = [...list.querySelectorAll(".task-item:not(.task-dragging)")];
       const afterItem = getTaskInsertPoint(list, e.clientY, items);
-
-      if (afterItem) {
-        list.insertBefore(draggedItem, afterItem);
-      } else {
-        list.appendChild(draggedItem);
-      }
-      saveDataQuietly();
+      dropInto(list, afterItem);
     });
 
     list.addEventListener("dragend", () => {
@@ -1548,10 +1592,11 @@ function attachTaskSortEvents(saveDataQuietly) {
         draggedItem.setAttribute("draggable", "false");
         draggedItem = null;
       }
-      list.querySelectorAll(".task-drop-above").forEach((el) => el.classList.remove("task-drop-above"));
+      document.querySelectorAll(".task-drop-above").forEach((el) => el.classList.remove("task-drop-above"));
+      document.querySelectorAll(".task-drop-target").forEach((el) => el.classList.remove("task-drop-target"));
     });
 
-    // --- モバイル: Touch Events ---
+    // --- モバイル: Touch Events（同じリスト内の並べ替えのみ） ---
     list.addEventListener("touchstart", (e) => {
       const handle = e.target.closest(".task-drag-handle");
       if (!handle) return;
@@ -1639,14 +1684,7 @@ function attachTaskSortEvents(saveDataQuietly) {
       touchList = null;
       list.querySelectorAll(".task-drop-above").forEach((el) => el.classList.remove("task-drop-above"));
     });
-  }
-
-  // mouseup でリセット
-  document.addEventListener("mouseup", () => {
-    document.querySelectorAll(".task-item[draggable='true']").forEach((el) => {
-      el.setAttribute("draggable", "false");
-    });
-  });
+  };
 }
 
 function getTaskInsertPoint(list, mouseY, items) {
@@ -1670,11 +1708,12 @@ function attachDragDropEvents() {
   let draggedCard = null;
 
   // ハンドルの mousedown で一時的に draggable を有効化（textarea の選択と干渉しない）
-  grid.querySelectorAll(".card-drag-handle").forEach((handle) => {
-    handle.addEventListener("mousedown", () => {
-      const card = handle.closest(".draggable-card");
-      if (card) card.setAttribute("draggable", "true");
-    });
+  // グリッドで委任しておくと、カテゴリ追加で後から差し込んだカードもそのままドラッグできる
+  grid.addEventListener("mousedown", (e) => {
+    const handle = e.target.closest(".card-drag-handle");
+    if (!handle) return;
+    const card = handle.closest(".draggable-card");
+    if (card) card.setAttribute("draggable", "true");
   });
 
   document.addEventListener("mouseup", () => {
@@ -1788,15 +1827,6 @@ function getInsertAfterCard(container, mouseY, cards) {
     if (mouseY < midY) return card;
   }
   return null;
-}
-
-function persistCurrentLayout(grid) {
-  const layout = {};
-  const cards = grid.querySelectorAll(".draggable-card");
-  cards.forEach((card, orderIndex) => {
-    layout[card.id] = { order: orderIndex };
-  });
-  saveLayoutPreference(layout);
 }
 
 /* ── ユーティリティ ── */

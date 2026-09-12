@@ -1264,6 +1264,56 @@ textarea {
   font-weight: 700;
 }
 
+/* ===== タスクページ: カテゴリ別カード =====
+ * 予定タスクをカテゴリごとのカードに分け、列切替（1〜4列）で並べる。
+ * カード見出しでカテゴリが分かるので、項目内のカテゴリバッジは隠す。 */
+.category-card .planned-list .task-category-badge {
+  display: none;
+}
+.category-card .card-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.category-card-badge {
+  font-size: 0.85rem;
+  letter-spacing: normal;
+  text-transform: none;
+}
+.category-task-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 10px;
+  background: var(--bg-input);
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+/* 空のカードにもドロップ先として最低限の高さと案内を出す */
+.category-card .planned-list {
+  min-height: 34px;
+  border-radius: 8px;
+  transition: background 0.15s, box-shadow 0.15s;
+}
+.category-card.is-empty .planned-list {
+  border: 1px dashed var(--border);
+}
+.category-card.is-empty .planned-list::before {
+  content: "タスクなし";
+  display: block;
+  padding: 7px 10px;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+/* 別カードへドラッグ中のドロップ先ハイライト */
+.planned-list.task-drop-target {
+  box-shadow: 0 0 0 2px var(--accent) inset;
+}
+
 /* ===== カラム切り替えバー ===== */
 
 .col-toggle-bar {
