@@ -10,9 +10,9 @@
  * デスクトップ: タスクページはカードのドラッグ&ドロップ（masonry）レイアウト。
  */
 
-import { recordsApi, categoriesApi, taskMetaApi } from "../api.js?v=20260912g";
-import { showToast } from "../app.js?v=20260912g";
-import { showTaskCompleteAnimation } from "./task-stats.js?v=20260912g";
+import { recordsApi, categoriesApi, taskMetaApi } from "../api.js?v=20261010a";
+import { showToast } from "../app.js?v=20261010a";
+import { showTaskCompleteAnimation } from "./task-stats.js?v=20261010a";
 
 /* ── カテゴリ管理 ── */
 

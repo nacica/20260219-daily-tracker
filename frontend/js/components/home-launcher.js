@@ -4,7 +4,10 @@
  * 上部ナビ（.nav-links）に並んでいるアイコン＋ラベルをそのまま複製し、
  * スマホのホーム画面風の大きなタイル（3列）として表示する。
  * アイコン定義を二重管理しないため、index.html のナビ DOM を唯一のソースとする。
+ * タイルは長押し→ドラッグで並び替えでき、順番はサイドバーと共通（nav-order.js）。
  */
+
+import { enableLauncherSort } from "../nav-order.js?v=20261010a";
 
 /** 現在日時のテキスト（例: 9月12日（土））*/
 function todayLabel() {
@@ -47,7 +50,11 @@ export function renderHomeLauncher() {
         </button>
       </header>
       <div class="launcher-grid">${tiles}</div>
+      <p class="launcher-hint">アイコンを長押しすると並び替えられます</p>
+      <button class="launcher-reset" type="button" hidden>並び順を初期状態に戻す</button>
     </section>`;
+
+  enableLauncherSort(main.querySelector(".launcher-grid"), main.querySelector(".launcher-reset"));
 
   // テーマ切替はナビ内の既存ボタン（インラインスクリプトが処理）を代理クリックする
   main.querySelector(".launcher-theme-btn")?.addEventListener("click", () => {

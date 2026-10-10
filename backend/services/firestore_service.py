@@ -766,6 +766,24 @@ def save_categories(categories: list[dict]) -> list[dict]:
     return categories
 
 
+# ---- nav_order (メニューの並び順) ----
+
+def get_nav_order() -> list[str]:
+    """メニューの並び順（ルートの配列）を取得。未設定なら空配列"""
+    db = get_db()
+    doc = db.collection("ui_settings").document("nav_order").get()
+    if doc.exists:
+        return doc.to_dict().get("routes", [])
+    return []
+
+
+def save_nav_order(routes: list[str]) -> list[str]:
+    """メニューの並び順を保存（全件上書き）"""
+    db = get_db()
+    db.collection("ui_settings").document("nav_order").set({"routes": routes})
+    return routes
+
+
 # ---- task_meta (タスクの追加日時・完了日時) ----
 # ドキュメント ID はタスク名の SHA-1（名前に "/" や "." が含まれても安全に扱うため）。
 

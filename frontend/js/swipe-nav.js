@@ -3,8 +3,10 @@
  * モバイルで左右スワイプによるタブ切り替えを実現する
  */
 
-/** ナビタブの順序（data-route と一致） */
-const TAB_ORDER = [
+import { getNavOrder } from "./nav-order.js?v=20261010a";
+
+/** スワイプで行き来するタブ（data-route と一致）。順番はメニューの並び順に従う（tabOrder） */
+const SWIPE_TABS = [
   "/",
   "/log",
   "/history",
@@ -25,10 +27,16 @@ function getCurrentBase() {
   return "/" + hash.split("/")[1];
 }
 
+/** スワイプで行き来するタブを、メニュー（ドラッグで並び替え可）の順に並べたもの */
+function tabOrder() {
+  const order = getNavOrder();
+  const pos = (r) => (order.indexOf(r) < 0 ? Infinity : order.indexOf(r));
+  return SWIPE_TABS.slice().sort((a, b) => pos(a) - pos(b));
+}
+
 /** 現在のタブインデックスを取得 */
-function getCurrentTabIndex() {
-  const base = getCurrentBase();
-  const idx = TAB_ORDER.indexOf(base);
+function getCurrentTabIndex(tabs) {
+  const idx = tabs.indexOf(getCurrentBase());
   return idx >= 0 ? idx : 0;
 }
 
@@ -83,7 +91,8 @@ export function initSwipeNav() {
       return;
     }
 
-    const currentIdx = getCurrentTabIndex();
+    const TAB_ORDER = tabOrder();
+    const currentIdx = getCurrentTabIndex(TAB_ORDER);
     let nextIdx;
 
     if (dx < 0) {

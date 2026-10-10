@@ -410,6 +410,15 @@ export const categoriesApi = {
     apiFetch("/categories", { method: "PUT", body: { categories } }),
 };
 
+/* ── メニューの並び順（サイドバー／ホーム画面） ── */
+export const navOrderApi = {
+  /** 取得 → { routes: ["/", "/log", ...] }（未設定なら空配列） */
+  get: () => apiFetch("/nav-order"),
+
+  /** 保存（全件上書き。空配列で初期順に戻す） */
+  save: (routes) => apiFetch("/nav-order", { method: "PUT", body: { routes } }),
+};
+
 /* ── タスクメタ情報（追加日時・完了日時） ── */
 export const taskMetaApi = {
   /** 全件取得 → { items: [{ name, created_at, completed_at, approx }] } */

@@ -24,15 +24,16 @@
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Klee+One&display=swap" /></noscript>
 
   <link rel="manifest" href="/manifest.json" />
-  <link rel="stylesheet" href="/css/style.css?v=20260912g" />
+  <link rel="stylesheet" href="/css/style.css?v=20261010a" />
 
   <!-- トップ表示に必要なコアモジュールを先読み（並列 fetch で TTI を短縮） -->
-  <link rel="modulepreload" href="/js/app.js?v=20260912g" />
-  <link rel="modulepreload" href="/js/router.js?v=20260912g" />
-  <link rel="modulepreload" href="/js/api.js?v=20260912g" />
-  <link rel="modulepreload" href="/js/swipe-nav.js?v=20260912g" />
-  <link rel="modulepreload" href="/js/floating-toolbar.js?v=20260912g" />
-  <link rel="modulepreload" href="/js/sidebar-resize.js?v=20260912g" />
+  <link rel="modulepreload" href="/js/app.js?v=20261010a" />
+  <link rel="modulepreload" href="/js/router.js?v=20261010a" />
+  <link rel="modulepreload" href="/js/api.js?v=20261010a" />
+  <link rel="modulepreload" href="/js/swipe-nav.js?v=20261010a" />
+  <link rel="modulepreload" href="/js/floating-toolbar.js?v=20261010a" />
+  <link rel="modulepreload" href="/js/sidebar-resize.js?v=20261010a" />
+  <link rel="modulepreload" href="/js/nav-order.js?v=20261010a" />
 
   <!-- FOUC防止: JSモジュール読み込み前にテーマを適用 -->
   <script>
@@ -253,6 +254,23 @@
     </div>
   </nav>
 
+  <!-- ドラッグで並び替えたメニュー順を、最初の描画前に反映する（ちらつき防止）。本体は js/nav-order.js -->
+  <script>
+    (function () {
+      var box = document.querySelector('.nav-links');
+      if (!box) return;
+      var links = Array.prototype.slice.call(box.children);
+      window.__navDefaultOrder = links.map(function (a) { return a.getAttribute('data-route'); });
+      try {
+        var c = JSON.parse(localStorage.getItem('navOrder') || 'null');
+        if (!c || !c.routes) return;
+        var map = {};
+        links.forEach(function (a) { map[a.getAttribute('data-route')] = a; });
+        c.routes.forEach(function (r) { if (map[r]) box.appendChild(map[r]); });
+      } catch (e) {}
+    })();
+  </script>
+
   <!-- サイドバー幅リサイズ用ドラッグハンドル（デスクトップのみ表示） -->
   <div id="navResizeHandle" class="nav-resize-handle" role="separator" aria-orientation="vertical" aria-label="サイドバーの幅を調整" title="ドラッグで幅調整 / ダブルクリックでリセット"></div>
 
@@ -309,6 +327,6 @@
   -->
 
   <!-- アプリのメインスクリプト（ES Modules） -->
-  <script type="module" src="/js/app.js?v=20260912g"></script>
+  <script type="module" src="/js/app.js?v=20261010a"></script>
 </body>
 </html>

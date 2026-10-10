@@ -9089,3 +9089,112 @@ div.gr-add-input.is-empty::before {
     grid-template-columns: 1fr;
   }
 }
+
+/* ===== メニューの並び替え（ドラッグ。js/nav-order.js） ===== */
+.nav-links > [data-route],
+.launcher-grid > [data-route] {
+  -webkit-touch-callout: none;   /* iOS の長押しリンクメニューを出さない */
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.nav-sort-dragging {
+  position: relative;
+  z-index: 5;
+  transition: none !important;
+  color: var(--cyan) !important;
+  background: rgba(0, 212, 255, 0.16) !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(0, 212, 255, 0.5);
+}
+
+body.nav-sorting,
+body.nav-sorting * {
+  cursor: grabbing !important;
+  -webkit-user-select: none !important;
+  user-select: none !important;
+}
+
+[data-theme="light"] .nav-sort-dragging {
+  color: #0284c7 !important;
+  background: #e0f2fe !important;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(2, 132, 199, 0.45);
+}
+
+/* 右クリックメニュー（初期順に戻す） */
+.nav-order-menu {
+  position: fixed;
+  z-index: 1000;
+  min-width: 220px;
+  padding: 6px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-bright);
+  background: var(--bg-secondary);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  font-size: 0.82rem;
+}
+
+.nav-order-menu-hint {
+  padding: 6px 10px 8px;
+  color: var(--text-secondary);
+  font-size: 0.74rem;
+}
+
+.nav-order-menu-item {
+  display: block;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  border-radius: var(--radius-xs);
+  background: none;
+  color: var(--text-primary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.nav-order-menu-item:hover:not(:disabled) {
+  background: rgba(0, 212, 255, 0.1);
+  color: var(--cyan);
+}
+
+.nav-order-menu-item:disabled {
+  color: var(--text-muted);
+  cursor: default;
+}
+
+[data-theme="light"] .nav-order-menu {
+  background: #ffffff;
+  border-color: rgba(0, 0, 0, 0.1);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+}
+
+[data-theme="light"] .nav-order-menu-item {
+  color: #1f2937;
+}
+
+[data-theme="light"] .nav-order-menu-item:hover:not(:disabled) {
+  background: rgba(2, 132, 199, 0.08);
+  color: #0284c7;
+}
+
+/* ホーム画面: 並び替えの案内と「初期順に戻す」 */
+.launcher-hint {
+  margin: 16px 0 0;
+  text-align: center;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.launcher-reset {
+  display: block;
+  margin: 10px auto 0;
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: none;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 0.78rem;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
