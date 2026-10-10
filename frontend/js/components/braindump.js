@@ -12,7 +12,7 @@ import {
   appendMarkdownToEditor,
   serializeEditorMarkdown,
   SIZE_SPAN_STRIP,
-} from "../floating-toolbar.js?v=20261010a";
+} from "../floating-toolbar.js?v=20261010b";
 
 // ===== ユーティリティ =====
 
@@ -127,7 +127,7 @@ const BOARDS = {
 let currentBoard = null; // null = ブレインダンプ本体
 
 function boardTitle() {
-  return currentBoard && BOARDS[currentBoard] ? BOARDS[currentBoard].title : "ブレインダンプ";
+  return currentBoard && BOARDS[currentBoard] ? BOARDS[currentBoard].title : "自由帳";
 }
 
 /** localStorage キーのボード別サフィックス（本体は従来キーを維持） */

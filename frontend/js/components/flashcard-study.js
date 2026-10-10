@@ -10,7 +10,7 @@ import {
   attachFloatingToolbar,
   appendMarkdownToEditor,
   serializeEditorMarkdown,
-} from "../floating-toolbar.js?v=20261010a";
+} from "../floating-toolbar.js?v=20261010b";
 
 const ORDER_STORAGE_KEY = "flashcard-study-order";
 
