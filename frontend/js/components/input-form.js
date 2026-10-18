@@ -10,9 +10,9 @@
  * デスクトップ: タスクページはカードのドラッグ&ドロップ（masonry）レイアウト。
  */
 
-import { recordsApi, categoriesApi, taskMetaApi } from "../api.js?v=20261010b";
-import { showToast } from "../app.js?v=20261010b";
-import { showTaskCompleteAnimation } from "./task-stats.js?v=20261010b";
+import { recordsApi, categoriesApi, taskMetaApi } from "../api.js?v=20261018a";
+import { showToast } from "../app.js?v=20261018a";
+import { showTaskCompleteAnimation } from "./task-stats.js?v=20261018a";
 
 /* ── カテゴリ管理 ── */
 
@@ -506,6 +506,67 @@ function buildTaskMetaHTML(fullText) {
   return `<span class="task-meta">${_fmtMetaDate(c, withTime)}追加 → ${_fmtMetaDate(d, withTime)}完了（${dur}）</span>`;
 }
 
+/* ── 行動ログの保存耐障害性 ──
+ * 障害事例: 端末が古いキャッシュを表示したまま追記 → 保存が "Load failed"（iOS の通信中断）で失敗 →
+ * 入力が画面にしか無く、しかも成功していればサーバーの新しい行を古い内容で上書きするところだった。
+ * 対策:
+ *   1. 下書き（log_draft）: 入力のたびに端末へ保存。次回表示時にサーバー内容へマージして再送する。
+ *   2. 3-way マージ: 「表示時点の内容(base)」「この端末の内容(local)」「サーバーの最新(server)」から、
+ *      この端末で追加した行だけ足し、削除した行だけ消す。他端末で増えた行は残す。
+ *   3. 表示時にサーバーへ繋がらなかった場合は、保存前に最新を取り直してからマージする。
+ *   4. 失敗時は 2→5→12 秒で再試行し、オンライン復帰・前面復帰時にも再送。
+ *      バックグラウンドに回る直前は keepalive 付きで即時送信する。
+ */
+const LOG_DRAFT_KEY_PREFIX = "log_draft_v1_";
+
+function loadLogDraft(date) {
+  try {
+    const d = JSON.parse(localStorage.getItem(LOG_DRAFT_KEY_PREFIX + date));
+    return d && typeof d.raw_input === "string" ? d : null;
+  } catch { return null; }
+}
+function saveLogDraft(date, draft) {
+  try { localStorage.setItem(LOG_DRAFT_KEY_PREFIX + date, JSON.stringify({ ...draft, ts: Date.now() })); } catch {}
+}
+function clearLogDraft(date) {
+  try { localStorage.removeItem(LOG_DRAFT_KEY_PREFIX + date); } catch {}
+}
+
+function _splitLines(raw) {
+  return (raw || "").split("\n").map((l) => l.trim()).filter(Boolean);
+}
+
+/**
+ * 行単位の 3-way マージ。
+ * server から「この端末で消した行（base にあって local に無い）」を除き、
+ * 「この端末で足した行（local にあって base に無い）」を末尾に加える。
+ */
+function threeWayMergeLines(base, local, server) {
+  const b = _splitLines(base), l = _splitLines(local), s = _splitLines(server);
+  const lSet = new Set(l), bSet = new Set(b);
+  const deleted = new Set(b.filter((x) => !lSet.has(x)));
+  const out = s.filter((x) => !deleted.has(x));
+  const seen = new Set(out);
+  for (const x of l) if (!bSet.has(x) && !seen.has(x)) { out.push(x); seen.add(x); }
+  return out.join("\n");
+}
+
+/** 行動ログ画面の現在の入力内容（タイムライン or 自由入力）。画面が無ければ null */
+function currentLogRawFromDOM() {
+  const rawEl = document.getElementById("raw-input");
+  if (!rawEl) return null;
+  const timelineMode = document.getElementById("timeline-mode");
+  if (timelineMode && timelineMode.style.display !== "none") return timelineToRawInput();
+  return rawEl.value;
+}
+
+/** 直近の描画で「サーバーにあると信じている」raw_input（3-way マージの base） */
+let _logPaintedRaw = "";
+/** 描画時にサーバーの最新を取得できなかった（保存前に取り直してマージが必要） */
+let _logUnverified = false;
+/** 行動ログ画面のライフサイクルハンドラ（再描画のたびに付け替える） */
+let _logLifecycle = [];
+
 /** 日付文字列の前日を返す */
 function _prevDateStr(date, daysAgo) {
   const d = new Date(date + "T00:00:00");
@@ -551,8 +612,9 @@ function _mergeTasks(existingRecord, prevRecords, date) {
 function _paintForm(main, date, existingRecord, tasks, isRestDay, restReason, mode) {
   const isEdit = !!existingRecord;
   main.innerHTML = buildFormHTML(date, existingRecord, tasks, isEdit, isRestDay, restReason, mode);
-  attachFormEvents(date, isEdit, mode, tasks);
+  const api = attachFormEvents(date, isEdit, mode, tasks);
   if (mode === "log") attachRestDayEvents(date, isRestDay);
+  return api;
 }
 
 /**
@@ -623,7 +685,7 @@ async function _renderPage(date, mode) {
     recordsApi.list(startStr, endStr),
   ]);
 
-  const existingRecord = recordResult.status === "fulfilled" ? recordResult.value : null;
+  let existingRecord = recordResult.status === "fulfilled" ? recordResult.value : null;
   const prevRecords = prevResult.status === "fulfilled" ? (prevResult.value || []) : [];
 
   const tasks = _mergeTasks(existingRecord, prevRecords, date);
@@ -633,10 +695,53 @@ async function _renderPage(date, mode) {
   const restReason = existingRecord?.rest_reason || "";
 
   // ── 3. フレッシュデータで再描画 ──
-  _paintForm(main, date, existingRecord, tasks, isRestDay, restReason, mode);
+  let restoredRaw = null; // 未保存だった入力を復元した場合、その内容（直後に保存する）
+  if (isLog) {
+    const fetchOk = recordResult.status === "fulfilled";
+    const paintedRaw = cached ? (cached.existingRecord?.raw_input || "") : "";
+    const domRaw = cached ? (currentLogRawFromDOM() ?? paintedRaw) : "";
+    const draft = loadLogDraft(date);
+
+    if (!fetchOk) {
+      // サーバーに繋がらない: 手元の表示を壊さず、保存時に最新を取り直してマージする
+      _logUnverified = true;
+      if (!cached) {
+        const rec = draft ? { raw_input: draft.raw_input, available_hours: draft.available_hours ?? null } : null;
+        _logPaintedRaw = "";
+        _paintForm(main, date, rec, tasks, false, "", mode);
+      } else {
+        _logPaintedRaw = paintedRaw;
+      }
+      showToast("サーバーに接続できません。表示は前回の内容です。入力は端末に保持し、接続が戻ると自動で保存します", "error");
+      return;
+    }
+    _logUnverified = false;
+
+    const serverRaw = existingRecord?.raw_input || "";
+    let merged = serverRaw;
+    // 描画の切り替わり中に入力があれば、その追加・削除だけをサーバー内容へ反映（上書きで消さない）
+    if (cached && domRaw.trim() !== paintedRaw.trim()) merged = threeWayMergeLines(paintedRaw, domRaw, merged);
+    // 前回保存できずに残った下書きも同様にマージ
+    if (draft) merged = threeWayMergeLines(draft.base || "", draft.raw_input || "", merged);
+
+    if (merged !== serverRaw) {
+      restoredRaw = merged;
+      existingRecord = existingRecord ? { ...existingRecord, raw_input: merged } : { raw_input: merged };
+      if (draft?.available_hours != null && existingRecord.available_hours == null) {
+        existingRecord.available_hours = draft.available_hours;
+      }
+    }
+    _logPaintedRaw = serverRaw;
+  }
+
+  const formApi = _paintForm(main, date, existingRecord, tasks, isRestDay, restReason, mode);
   // キャッシュからの初回描画でフォーカス済みなら、再描画ではスキップ（カーソル位置を奪わない）
   if (isLog && !didAutofocus && !isRestDay) {
     focusFirstActivityInput();
+  }
+  if (restoredRaw !== null) {
+    showToast("未保存だった入力を復元して保存します", "success");
+    formApi?.saveNow?.();
   }
 
   // ── 4. キャッシュを更新（次回の楽観描画用）──
@@ -1186,15 +1291,45 @@ function attachFormEvents(date, isEdit, mode, initialTasks) {
   if (!isLog) attachColumnToggleEvents();
   const completedList = document.getElementById("completed-list");
 
-  // バックグラウンド自動保存（排他制御付き）
+  // バックグラウンド自動保存（排他制御・再試行付き）
   let isSaving = false;
   let pendingSave = false;
+  let retryTimer = null;
+  let retryAttempt = 0;
+  let needsResend = false; // 失敗したまま未送信の内容がある
+  const RETRY_DELAYS = [2000, 5000, 12000];
+  const api = { saveNow: () => saveDataQuietly() };
+  const is404 = (e) => /404|見つかりません/.test(String(e?.message || ""));
 
-  async function saveDataQuietly() {
+  /** マージ結果などを画面へ反映し直す（タイムライン行と自由入力の両方） */
+  function applyRawInputToForm(raw) {
+    const rawEl = document.getElementById("raw-input");
+    if (!rawEl) return;
+    rawEl.value = raw;
+    const rows = document.getElementById("timeline-rows");
+    if (rows) rows.innerHTML = buildTimelineRowsFromRawInput(raw);
+  }
+
+  /** 入力のたびに端末へ下書きを残す（通信失敗・アプリ終了・画面遷移で入力が消えないように） */
+  function persistDraft() {
+    if (!isLog) return;
+    const raw = currentLogRawFromDOM();
+    if (raw == null) return;
+    const availEl = document.getElementById("available-hours");
+    saveLogDraft(date, {
+      raw_input: raw.trim(),
+      base: _logPaintedRaw,
+      available_hours: availEl?.value ? parseFloat(availEl.value) : null,
+    });
+  }
+
+  async function saveDataQuietly(opts = {}) {
     if (isSaving) {
       pendingSave = true;
       return;
     }
+    clearTimeout(retryTimer);
+    retryTimer = null;
 
     let rawInput = "";
     let availHoursVal = null;
@@ -1213,6 +1348,7 @@ function attachFormEvents(date, isEdit, mode, initialTasks) {
       const planned = initialTasks?.planned || [];
       completedTasks = [...(initialTasks?.completed || [])];
       incompleteTasks = planned.filter((t) => !completedTasks.includes(t));
+      persistDraft();
     } else {
       if (!document.getElementById("completed-list")) return; // ページ遷移後
       // 各カテゴリカードのリストを DOM 順に集める（保存形式は従来どおりフラットな配列）
@@ -1240,27 +1376,81 @@ function attachFormEvents(date, isEdit, mode, initialTasks) {
 
     isSaving = true;
     try {
+      if (isLog && _logUnverified) {
+        // 描画時にサーバーの最新を取れていない: 最新を取り直し、この端末での追加・削除だけを反映する
+        // （古い表示をそのまま送ると、他端末や前回セッションで増えた行を消してしまう）
+        const latest = await recordsApi.get(date).catch((e) => { if (is404(e)) return null; throw e; });
+        const merged = threeWayMergeLines(_logPaintedRaw, rawInput, latest?.raw_input || "");
+        if (merged !== rawInput) {
+          rawInput = merged;
+          updateData.raw_input = merged;
+          applyRawInputToForm(merged);
+        }
+        isEdit = !!latest;
+        _logUnverified = false;
+      }
+
+      const createThenHours = async () => {
+        await recordsApi.create(date, rawInput, plannedTasks, completedTasks, opts);
+        // create は活動可能時間を受け付けないので、入力済みなら続けて反映する
+        if (isLog && availHoursVal !== null) {
+          await recordsApi.update(date, { available_hours: availHoursVal }, opts);
+        }
+      };
+
       if (isEdit) {
-        await recordsApi.update(date, updateData);
+        try {
+          await recordsApi.update(date, updateData, opts);
+        } catch (updErr) {
+          // 404（下書き復元などでレコードが実在しない）なら作成にフォールバック
+          if (is404(updErr)) await createThenHours();
+          else throw updErr;
+        }
       } else {
         try {
-          await recordsApi.create(date, rawInput, plannedTasks, completedTasks);
-          // create は活動可能時間を受け付けないので、入力済みなら続けて反映する
-          if (isLog && availHoursVal !== null) {
-            await recordsApi.update(date, { available_hours: availHoursVal });
-          }
+          await createThenHours();
         } catch (createErr) {
           // 409 (既に存在 = もう一方のページが先に作成済み) の場合は update にフォールバック
           if (createErr.message.includes("409") || createErr.message.includes("すでに存在")) {
-            await recordsApi.update(date, updateData);
+            await recordsApi.update(date, updateData, opts);
           } else {
             throw createErr;
           }
         }
         isEdit = true;
       }
+
+      // ── 成功: 再試行状態をリセットし、下書きとキャッシュをサーバーの状態に揃える ──
+      retryAttempt = 0;
+      needsResend = false;
+      if (isLog) {
+        _logPaintedRaw = rawInput;
+        const d = loadLogDraft(date);
+        if (d && d.raw_input === rawInput) clearLogDraft(date); // それより新しい入力があれば次の保存で消す
+        const c = loadInputCache(date);
+        saveInputCache(date, {
+          existingRecord: {
+            ...(c?.existingRecord || {}),
+            raw_input: rawInput,
+            ...(availHoursVal !== null ? { available_hours: availHoursVal } : {}),
+          },
+        });
+      } else {
+        saveInputCache(date, { tasks: { planned: incompleteTasks, completed: completedTasks } });
+      }
     } catch (err) {
-      showToast("自動保存に失敗しました: " + err.message, "error");
+      needsResend = true;
+      if (retryAttempt < RETRY_DELAYS.length) {
+        const delay = RETRY_DELAYS[retryAttempt++];
+        console.warn(`自動保存に失敗（${delay / 1000}秒後に再試行）:`, err.message);
+        retryTimer = setTimeout(() => saveDataQuietly(), delay);
+      } else {
+        showToast(
+          "自動保存に失敗しました: " + err.message +
+          (isLog ? "（入力は端末に保持しています。接続が戻ると自動で再送します）" : ""),
+          "error",
+        );
+      }
     } finally {
       isSaving = false;
       if (pendingSave) {
@@ -1277,8 +1467,9 @@ function attachFormEvents(date, isEdit, mode, initialTasks) {
   const rawInputEl = document.getElementById("raw-input");
   if (rawInputEl) {
     rawInputEl.addEventListener("input", () => {
+      persistDraft();
       clearTimeout(rawInputTimer);
-      rawInputTimer = setTimeout(saveDataQuietly, 1500);
+      rawInputTimer = setTimeout(() => saveDataQuietly(), 1500);
     });
   }
 
@@ -1292,8 +1483,32 @@ function attachFormEvents(date, isEdit, mode, initialTasks) {
   }
 
   function debounceTimelineSave() {
+    persistDraft();
     clearTimeout(rawInputTimer);
-    rawInputTimer = setTimeout(saveDataQuietly, 1500);
+    rawInputTimer = setTimeout(() => saveDataQuietly(), 1500);
+  }
+
+  // ── ライフサイクル: バックグラウンド直前に即時送信、復帰・オンライン復帰時に未送信分を再送 ──
+  if (isLog) {
+    const alive = () => !!document.getElementById("raw-input"); // 画面が切り替わっていたら何もしない
+    const flush = () => {
+      if (!alive()) return;
+      if (rawInputTimer) {
+        clearTimeout(rawInputTimer);
+        rawInputTimer = null;
+        // iOS はバックグラウンドで通常の fetch を打ち切るので keepalive で送る
+        saveDataQuietly({ keepalive: true });
+      }
+    };
+    const resend = () => { if (alive() && needsResend) saveDataQuietly(); };
+    const onVis = () => (document.visibilityState === "hidden" ? flush() : resend());
+    for (const [type, target, h] of _logLifecycle) target.removeEventListener(type, h);
+    _logLifecycle = [
+      ["visibilitychange", document, onVis],
+      ["pagehide", window, flush],
+      ["online", window, resend],
+    ];
+    for (const [type, target, h] of _logLifecycle) target.addEventListener(type, h);
   }
 
   // タイムライン行の入力変更（イベント委任）
@@ -1511,7 +1726,7 @@ function attachFormEvents(date, isEdit, mode, initialTasks) {
   }
 
   // ── ここからタスクページ専用のイベント ──
-  if (isLog) return;
+  if (isLog) return api;
 
   const grid = document.getElementById("input-grid");
   if (!grid || !completedList) return;
@@ -1659,6 +1874,7 @@ function attachFormEvents(date, isEdit, mode, initialTasks) {
   // タスク並べ替え（デスクトップ＋モバイル）。デスクトップでは別カテゴリのカードへドラッグするとカテゴリを付け替える
   const bindTaskSort = attachTaskSortEvents(saveDataQuietly);
   document.querySelectorAll(".planned-list").forEach(bindTaskSort);
+  return api;
 }
 
 /* ── タスク並べ替え（リスト内 & カード間ドラッグ&ドロップ） ──

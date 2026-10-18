@@ -12,7 +12,7 @@
  * - 初期順に戻す: サイドバーの右クリックメニュー／ホーム画面下のボタン
  */
 
-import { navOrderApi } from "./api.js?v=20261010b";
+import { navOrderApi } from "./api.js?v=20261018a";
 
 const CACHE_KEY = "navOrder";      // { routes: string[], dirty: boolean }
 const LONG_PRESS_MS = 380;         // タッチでドラッグを始めるまでの長押し時間

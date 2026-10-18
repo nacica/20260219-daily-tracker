@@ -12,7 +12,7 @@ import {
   appendMarkdownToEditor,
   serializeEditorMarkdown,
   SIZE_SPAN_STRIP,
-} from "../floating-toolbar.js?v=20261010b";
+} from "../floating-toolbar.js?v=20261018a";
 
 // ===== ユーティリティ =====
 

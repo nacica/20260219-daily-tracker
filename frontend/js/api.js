@@ -46,10 +46,11 @@ async function apiFetch(path, options = {}) {
 
 export const recordsApi = {
   /** 行動記録を作成 */
-  create: (date, rawInput, tasksPlanned = [], tasksCompleted = []) =>
+  create: (date, rawInput, tasksPlanned = [], tasksCompleted = [], opts = {}) =>
     apiFetch("/records", {
       method: "POST",
       body: { date, raw_input: rawInput, tasks_planned: tasksPlanned, tasks_completed: tasksCompleted },
+      ...opts,
     }),
 
   /** 行動記録一覧を取得 */
@@ -63,9 +64,9 @@ export const recordsApi = {
   /** 指定日の行動記録を取得 */
   get: (date) => apiFetch(`/records/${date}`),
 
-  /** 行動記録を更新 */
-  update: (date, data) =>
-    apiFetch(`/records/${date}`, { method: "PUT", body: data }),
+  /** 行動記録を更新（opts: keepalive などの fetch オプション） */
+  update: (date, data, opts = {}) =>
+    apiFetch(`/records/${date}`, { method: "PUT", body: data, ...opts }),
 
   /** 行動記録を削除 */
   delete: (date) => apiFetch(`/records/${date}`, { method: "DELETE" }),
