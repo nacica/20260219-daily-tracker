@@ -4,12 +4,13 @@
  */
 
 import { journalApi, diaryDialogueApi } from "../api.js?v=20260725b";
+import { lockButtonHTML, bindLockToggles, setLockState, lockLabel } from "../privacy-toggle.js?v=20261021a";
 import { showToast } from "../app.js?v=20260725b";
 import {
   attachFloatingToolbar,
   appendMarkdownToEditor,
   serializeEditorMarkdown,
-} from "../floating-toolbar.js?v=20261018a";
+} from "../floating-toolbar.js?v=20261021a";
 
 /** 旧 textarea 互換: contenteditable / textarea どちらでも markdown を読む */
 function readEditorMarkdown(el) {
@@ -313,7 +314,8 @@ function buildEntryListHTML(entries, isFuture) {
             <span class="badge" style="background:var(--bg-secondary);color:var(--text-primary);font-weight:600">${label}</span>
             ${mood != null ? `<div class="mood-score ${rank}" style="width:32px;height:32px;font-size:0.8rem">${mood}</div>` : ""}
           </div>
-          <div style="display:flex;gap:4px">
+          <div style="display:flex;gap:4px;align-items:center">
+            ${lockButtonHTML(!!entry.is_private, entryId)}
             <button class="btn btn-ghost btn-sm entry-toggle-btn" data-entry-id="${escapeHTML(entryId)}" title="展開/折りたたみ">
               &#9660;
             </button>
@@ -802,6 +804,19 @@ function attachJournalEvents(date, entries) {
       showToast(err.message, "error");
       btn.disabled = false;
       btn.textContent = "保存する";
+    }
+  });
+
+  // 🔒 非公開（Claude に渡さない）の切替
+  bindLockToggles(document, async (id, next) => {
+    try {
+      await journalApi.setPrivate(id, next);
+      const target = entries.find((x) => x.id === id);
+      if (target) target.is_private = next;
+      showToast(next ? "この日記は Claude に渡しません" : "この日記を Claude に渡します", "success");
+    } catch (err) {
+      showToast(`切替に失敗: ${err.message}`, "error");
+      throw err;
     }
   });
 

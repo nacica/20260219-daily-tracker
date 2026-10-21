@@ -93,6 +93,8 @@ async def update_flashcard(card_id: str, body: FlashcardUpdate):
         update_data["front"] = body.front
     if body.back is not None:
         update_data["back"] = body.back
+    if body.is_private is not None:
+        update_data["is_private"] = body.is_private
 
     result = firestore_service.update_flashcard(card_id, update_data)
     if not result:

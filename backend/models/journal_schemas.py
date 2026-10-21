@@ -49,6 +49,7 @@ class JournalCreate(BaseModel):
 class JournalUpdate(BaseModel):
     """ジャーナル更新リクエスト"""
     content: Optional[str] = Field(None, min_length=1, max_length=10000)
+    is_private: Optional[bool] = Field(None, description="true: Claude（MCP）に渡さない")
 
 
 # ---- API レスポンス ----
@@ -62,6 +63,7 @@ class JournalEntry(BaseModel):
     ai_analysis: Optional[JournalAnalysis] = None
     is_analyzed: bool = False
     md_summary: Optional[str] = None
+    is_private: bool = False
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
 

@@ -36,6 +36,7 @@ class WishlistUpdate(BaseModel):
     notes: Optional[str] = Field(None, max_length=2000)
     image_url: Optional[str] = Field(None, max_length=950_000)
     reference_url: Optional[str] = Field(None, max_length=2000)
+    is_private: Optional[bool] = Field(None, description="true: Claude（MCP）に渡さない")
 
 
 class WishlistComplete(BaseModel):
@@ -58,5 +59,6 @@ class WishlistEntry(BaseModel):
     reference_url: Optional[str] = None
     completed: bool = False
     completed_at: Optional[str] = None
+    is_private: bool = False
     created_at: Optional[str] = None
     updated_at: Optional[str] = None

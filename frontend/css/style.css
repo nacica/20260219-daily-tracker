@@ -1351,6 +1351,40 @@ textarea {
   box-shadow: 0 0 0 2px var(--accent) inset;
 }
 
+/* ===== 🔒 非公開トグル（Claude に渡さない） ===== */
+.lock-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.lock-toggle:hover { color: var(--text-primary); border-color: var(--border-bright, var(--border)); }
+.lock-toggle.is-private {
+  color: #f59e0b;
+  border-color: #f59e0b;
+  background: rgba(245, 158, 11, 0.12);
+}
+.lock-toggle:disabled { opacity: 0.5; cursor: wait; }
+.lock-toggle-labeled {
+  width: auto;
+  padding: 4px 10px;
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+.fc-row-lock { font-size: 0.8rem; margin-right: 4px; }
+.bd-labels-modal-hint { font-size: 0.8rem; color: var(--text-muted); margin: 0 0 10px; }
+
 /* ===== カラム切り替えバー ===== */
 
 .col-toggle-bar {
@@ -3431,7 +3465,8 @@ textarea {
 .sticky-edit,
 .sticky-delete,
 .sticky-archive,
-.sticky-restore {
+.sticky-restore,
+.sticky-private {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -3467,6 +3502,13 @@ textarea {
 
 .sticky-archive {
   font-size: 0.95rem;
+}
+
+.sticky-private { font-size: 0.9rem; }
+.sticky-private.is-private {
+  color: #f59e0b;
+  border-color: #f59e0b;
+  background: rgba(245, 158, 11, 0.12);
 }
 
 .sticky-archive:hover {

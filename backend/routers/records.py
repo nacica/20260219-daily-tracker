@@ -110,6 +110,8 @@ async def update_record(date: str, body: RecordUpdate):
         update_data["rest_reason"] = body.rest_reason
     if body.available_hours is not None:
         update_data["available_hours"] = body.available_hours
+    if body.is_private is not None:
+        update_data["is_private"] = body.is_private
 
     if body.tasks_planned is not None or body.tasks_completed is not None:
         planned = body.tasks_planned if body.tasks_planned is not None else existing.get("tasks", {}).get("planned", [])

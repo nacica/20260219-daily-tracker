@@ -12,7 +12,7 @@ import {
   appendMarkdownToEditor,
   serializeEditorMarkdown,
   SIZE_SPAN_STRIP,
-} from "../floating-toolbar.js?v=20261018a";
+} from "../floating-toolbar.js?v=20261021a";
 
 // ===== ユーティリティ =====
 
@@ -1504,8 +1504,8 @@ async function openLabelsManager() {
     ? `<div class="bd-labels-modal-empty">まだラベルがありません。メモの「＋ ラベル」から追加してください。</div>`
     : allLabels.map(l => `
         <div class="bd-labels-modal-row" data-name="${escapeHTML(l.name)}">
-          <span class="bd-label-chip" style="${labelChipStyle(l.name)}">${escapeHTML(l.name)}</span>
-          <span class="bd-labels-modal-count">${l.count}件</span>
+          <span class="bd-label-chip" style="${labelChipStyle(l.name)}">${l.name === "非公開" ? "🔒 " : ""}${escapeHTML(l.name)}</span>
+          <span class="bd-labels-modal-count">${l.count}件${l.name === "非公開" ? "・Claude に渡しません" : ""}</span>
           <div class="bd-labels-modal-actions">
             <button class="btn btn-outline btn-sm bd-label-rename-btn" data-name="${escapeHTML(l.name)}">リネーム</button>
             <button class="btn btn-danger btn-sm bd-label-delete-btn" data-name="${escapeHTML(l.name)}">削除</button>
@@ -1523,6 +1523,7 @@ async function openLabelsManager() {
         <button class="bd-modal-close" type="button" title="閉じる">×</button>
       </div>
       <div class="bd-modal-body">
+        <p class="bd-labels-modal-hint">🔒 ラベル「非公開」を付けたメモは Claude（MCP 連携）に渡しません。</p>
         ${rows}
       </div>
       <div class="bd-modal-footer">

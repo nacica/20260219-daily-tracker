@@ -19,6 +19,7 @@ class FlashcardUpdate(BaseModel):
     """カード更新リクエスト"""
     front: Optional[str] = Field(None, min_length=1, max_length=5000)
     back: Optional[str] = Field(None, min_length=1, max_length=5000)
+    is_private: Optional[bool] = Field(None, description="true: Claude（MCP）に渡さない")
 
 
 class FlashcardMark(BaseModel):
@@ -34,5 +35,6 @@ class FlashcardEntry(BaseModel):
     front: str
     back: str
     remembered: bool = False
+    is_private: bool = False
     created_at: Optional[str] = None
     updated_at: Optional[str] = None

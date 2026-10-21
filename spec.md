@@ -166,11 +166,21 @@ claude.ai / Claude アプリのカスタムコネクタとして PIS に接続�
   - トークン・認可コード・クライアントシークレットは HMAC-SHA256 のハッシュだけを Firestore に保存
   - ログイン失敗は IP 単位で 5 回 → 15 分ロック
   - `/mcp` はトークン無し・無効で `401` + `WWW-Authenticate: Bearer resource_metadata=...`
-- **ツール**（フェーズ 1）: `get_profile`（固定文のダミー。フェーズ 3 で本実装）。呼び出しは `mcp_access_logs` に記録（本文は記録しない、90 日で削除）
+- **ツール**（すべて読み取り専用の注釈付き。呼び出しは `mcp_access_logs` に記録。本文は記録しない、90 日で削除）
+  - `get_profile`: 取扱説明書（フェーズ 3 で本実装。今は固定文）
+  - `get_recent_context(days=7, 最大 30)`: 日次分析のスコアと要点、直近の週次分析、未完了タスク、道しるべ、直近の自由帳・トレードメモのタイトル
+  - `search_pis(query, sources?, start_date?, end_date?, board?, limit=20)`: スペース区切り AND のキーワード検索。NFKC・小文字化・カナ/かな同一視で照合し、一致数の多い順 → 新しい順。各ヒットに type / id / date / ラベル / 前後 200 文字のスニペット。期間省略時は直近 365 日（道しるべ・やりたいこと・ありがたいノート・単語帳は期間指定時のみ絞り込み）
+  - `get_entry(type, id)`: 1 件の全文。`get_day(date)`: その日の行動ログ・タスク・分析・日記・自由帳・トレードメモ
+  - 1 回の応答は約 8,000 文字まで。超過分は切り詰めて「条件を絞って再検索」を案内
+- **非公開（Claude に渡さない記録）**: 判定は `services/pis_context_service.is_private()` の 1 か所に集約し、全ツールが必ず通す
+  - 自由帳・トレードメモ・Udemy Tips: ラベル `非公開`（ラベル／タグ管理モーダルに 🔒 と説明を表示）
+  - 日記・行動記録・やりたいこと・ありがたいノート・単語帳・道しるべの各付箋: `is_private` フィールド（既定 false、既存データのマイグレーション不要）。各画面の 🔒 ボタンで切替（共通モジュール `js/privacy-toggle.js`）。行動ログページは「🔓 Claude に渡す / 🔒 Claude に渡さない」で、その日の記録・タスク・分析をまとめて除外
+  - 各更新 API（`PUT /records/{date}` `/journal/entry/{id}` `/wishlist/{id}` `/gratitude/{id}` `/flashcards/{id}` `/reminders`）が `is_private` を受け付ける
+- **実装ファイル（追加）**: `backend/services/pis_context_service.py`（取得・非公開除外・整形・文字数制限）、`backend/services/pis_search_service.py`（キーワード検索。将来の意味検索はここで差し替え）
 - **環境変数**: `MCP_PUBLIC_URL`（公開 URL）、`MCP_OWNER_PASSWORD_HASH`（bcrypt。`backend/scripts/make_password_hash.py`）、`MCP_TOKEN_SECRET`、`MCP_ALLOWED_REDIRECT_URIS`（任意）、`MCP_ALLOW_LOCALHOST_REDIRECT`（ローカル検証用）
 - **Firestore**: `mcp_oauth_clients` / `mcp_oauth_codes` / `mcp_oauth_tokens` / `mcp_login_attempts` / `mcp_access_logs`
 - **実装ファイル**: `backend/mcp_server.py`（MCP サーバーとツール）、`backend/routers/mcp_oauth.py`（OAuth エンドポイント）、`backend/services/mcp_auth_service.py`（検証・発行・ストア）
-- 未実装（次フェーズ）: 読み取りツール群と非公開除外、取扱説明書、自由帳への書き込み、意味検索、REST API への認証
+- 未実装（次フェーズ）: 取扱説明書（フェーズ 3）、自由帳への書き込み（フェーズ 4）、意味検索と REST API への認証（フェーズ 5）
 
 ### 18. PWA・キャッシュ
 

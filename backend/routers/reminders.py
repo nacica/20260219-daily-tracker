@@ -17,6 +17,7 @@ class ReminderItem(BaseModel):
     text: str
     createdAt: int  # Unix ms
     archived: bool = False
+    is_private: bool = False  # true: Claude（MCP）に渡さない
 
 
 class RemindersSaveRequest(BaseModel):

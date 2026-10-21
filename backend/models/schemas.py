@@ -57,6 +57,7 @@ class RecordUpdate(BaseModel):
     rest_day: Optional[bool] = None
     rest_reason: Optional[str] = None
     available_hours: Optional[float] = None
+    is_private: Optional[bool] = None   # true: この日の記録・タスク・分析を Claude（MCP）に渡さない
 
 
 class RestDayRequest(BaseModel):
@@ -78,6 +79,7 @@ class DailyRecord(BaseModel):
     rest_day: bool = False
     rest_reason: str = ""
     available_hours: Optional[float] = None
+    is_private: bool = False
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
 

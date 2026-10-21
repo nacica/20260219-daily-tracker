@@ -71,7 +71,7 @@ async def update_wishlist(item_id: str, body: WishlistUpdate):
     """項目を更新"""
     update_data = {"updated_at": now_jst()}
     for field in ("title", "estimated_cost", "category", "priority",
-                  "target_period", "notes", "image_url", "reference_url"):
+                  "target_period", "notes", "image_url", "reference_url", "is_private"):
         value = getattr(body, field)
         if value is not None:
             update_data[field] = value

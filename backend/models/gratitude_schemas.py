@@ -15,13 +15,15 @@ class GratitudeCreate(BaseModel):
 
 
 class GratitudeUpdate(BaseModel):
-    """ありがたいノート更新リクエスト"""
-    content: str = Field(..., min_length=1, max_length=2000)
+    """ありがたいノート更新リクエスト（content / is_private のどちらか、または両方）"""
+    content: Optional[str] = Field(None, min_length=1, max_length=2000)
+    is_private: Optional[bool] = Field(None, description="true: Claude（MCP）に渡さない")
 
 
 class GratitudeEntry(BaseModel):
     """ありがたいノートエントリ"""
     id: str
     content: str
+    is_private: bool = False
     created_at: Optional[str] = None
     updated_at: Optional[str] = None

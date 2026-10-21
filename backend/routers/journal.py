@@ -181,6 +181,8 @@ async def update_journal_entry(entry_id: str, body: JournalUpdate):
             update_data["is_analyzed"] = False
             update_data["ai_analysis"] = None
             update_data["md_summary"] = None
+    if body.is_private is not None:
+        update_data["is_private"] = body.is_private
 
     updated = firestore_service.update_journal(entry_id, update_data)
     return JournalEntry(**updated)

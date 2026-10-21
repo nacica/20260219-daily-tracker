@@ -1821,8 +1821,8 @@ async function openLabelsManager() {
     ? ""
     : allLabels.map(l => `
         <div class="ut-labels-manager-row">
-          <span class="bd-label-chip" style="${labelChipStyle(l.name)}">${escapeHTML(l.name)}</span>
-          <span class="ut-labels-manager-count">${l.count} 件</span>
+          <span class="bd-label-chip" style="${labelChipStyle(l.name)}">${l.name === "非公開" ? "🔒 " : ""}${escapeHTML(l.name)}</span>
+          <span class="ut-labels-manager-count">${l.count} 件${l.name === "非公開" ? "・Claude に渡しません" : ""}</span>
           <button class="btn btn-outline btn-sm ut-label-rename-btn" data-name="${escapeHTML(l.name)}">リネーム</button>
           <button class="btn btn-danger btn-sm ut-label-delete-btn" data-name="${escapeHTML(l.name)}">削除</button>
         </div>
@@ -1839,6 +1839,7 @@ async function openLabelsManager() {
         <button class="ut-modal-close" type="button" aria-label="閉じる">×</button>
       </div>
       <div class="ut-modal-body" style="min-height:auto;">
+        <p class="bd-labels-modal-hint">🔒 タグ「非公開」を付けた Tip は Claude（MCP 連携）に渡しません。</p>
         ${rows}
       </div>
       <div class="ut-modal-footer">

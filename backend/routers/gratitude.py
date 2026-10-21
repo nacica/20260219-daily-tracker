@@ -54,7 +54,11 @@ async def get_gratitude(entry_id: str):
 
 @router.put("/gratitude/{entry_id}", response_model=GratitudeEntry)
 async def update_gratitude(entry_id: str, body: GratitudeUpdate):
-    update_data = {"content": body.content, "updated_at": now_jst()}
+    update_data = {"updated_at": now_jst()}
+    if body.content is not None:
+        update_data["content"] = body.content
+    if body.is_private is not None:
+        update_data["is_private"] = body.is_private
     result = firestore_service.update_gratitude(entry_id, update_data)
     if not result:
         raise HTTPException(status_code=404, detail="ありがたいノートが見つかりません")

@@ -13,7 +13,7 @@ import {
   attachFloatingToolbar,
   appendMarkdownToEditor,
   serializeEditorMarkdown,
-} from "../floating-toolbar.js?v=20261018a";
+} from "../floating-toolbar.js?v=20261021a";
 
 /** contenteditable div / textarea いずれでも markdown を読み書きするヘルパ */
 function readEditableMarkdown(el) {
@@ -357,10 +357,14 @@ function buildMichNoteHTML(r) {
   const archiveActionHTML = r.archived
     ? `<button class="sticky-restore" title="アクティブに戻す">&#x21a9;&#xfe0f;</button>`
     : `<button class="sticky-archive" title="アーカイブ">&#x1f4e5;</button>`;
+  const privateBtnHTML = r.is_private
+    ? `<button class="sticky-private is-private" title="Claude に渡しません（クリックで公開に戻す）">&#x1f512;</button>`
+    : `<button class="sticky-private" title="Claude に渡します（クリックで非公開にする）">&#x1f513;</button>`;
   return `<div class="mich-note" data-id="${escapeHTML(r.id)}">
     <div class="mich-note-head">
       ${dateStr ? `<span class="sticky-note-date">${dateStr}</span>` : "<span></span>"}
       <div class="mich-note-actions">
+        ${privateBtnHTML}
         <button class="sticky-edit" title="編集">&#9998;</button>
         ${archiveActionHTML}
         <button class="sticky-delete" title="削除">&times;</button>
@@ -592,6 +596,17 @@ function attachMichPageEvents() {
         if (!confirm("このメモを完全に削除しますか？\n（アーカイブで残したい場合はキャンセルして 📥 ボタンを使ってください）")) return;
         saveReminders(getReminders().filter((r) => r.id !== id));
         refreshMichGrid();
+        return;
+      }
+
+      // 🔒 非公開（Claude に渡さない）の切替
+      if (e.target.closest(".sticky-private")) {
+        const target = getReminders().find((r) => r.id === id);
+        if (!target) return;
+        target.is_private = !target.is_private;
+        saveReminders(getReminders());
+        refreshMichGrid();
+        showToast(target.is_private ? "Claude に渡しません" : "Claude に渡します", "success");
         return;
       }
 

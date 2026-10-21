@@ -9,12 +9,13 @@
  */
 
 import { wishlistApi } from "../api.js?v=20260725b";
+import { lockButtonHTML, bindLockToggles, setLockState, lockLabel } from "../privacy-toggle.js?v=20261021a";
 import { showToast } from "../app.js?v=20260725b";
 import {
   attachFloatingToolbar,
   appendMarkdownToEditor,
   serializeEditorMarkdown,
-} from "../floating-toolbar.js?v=20261018a";
+} from "../floating-toolbar.js?v=20261021a";
 
 /** **bold** + <span style="font-size:Xem"> を保ったまま、テキスト部分はエスケープ + 改行→<br> */
 function renderWishlistNotes(text) {
@@ -327,6 +328,7 @@ function buildCardHTML(item) {
         ${notes}
         <div class="wl-card-actions">
           ${refLink}
+          ${lockButtonHTML(!!item.is_private, item.id, { action: "toggle-private" })}
           <button class="wl-action-btn" data-action="edit" data-id="${escapeAttr(item.id)}" type="button">編集</button>
           <button class="wl-action-btn wl-action-danger" data-action="delete" data-id="${escapeAttr(item.id)}" type="button">削除</button>
         </div>
@@ -364,6 +366,7 @@ function buildRowHTML(item) {
         </div>
       </div>
       <div class="wl-row-actions">
+        ${lockButtonHTML(!!item.is_private, item.id, { action: "toggle-private" })}
         <button class="wl-action-btn" data-action="edit" data-id="${escapeAttr(item.id)}" type="button">編集</button>
         <button class="wl-action-btn wl-action-danger" data-action="delete" data-id="${escapeAttr(item.id)}" type="button">削除</button>
       </div>
@@ -861,6 +864,18 @@ function attachEvents() {
         renderList();
       } catch (err) {
         showToast(`削除に失敗: ${err.message}`, "error");
+      }
+    } else if (action === "toggle-private") {
+      const item = state.items.find((x) => x.id === id);
+      if (!item) return;
+      const next = !item.is_private;
+      try {
+        await wishlistApi.update(id, { is_private: next });
+        item.is_private = next;
+        setLockState(actionBtn, next);
+        showToast(next ? "Claude に渡しません" : "Claude に渡します", "success");
+      } catch (err) {
+        showToast(`切替に失敗: ${err.message}`, "error");
       }
     } else if (action === "toggle-complete") {
       const item = state.items.find((x) => x.id === id);

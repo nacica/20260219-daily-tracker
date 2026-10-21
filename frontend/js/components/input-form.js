@@ -10,9 +10,10 @@
  * デスクトップ: タスクページはカードのドラッグ&ドロップ（masonry）レイアウト。
  */
 
-import { recordsApi, categoriesApi, taskMetaApi } from "../api.js?v=20261018a";
-import { showToast } from "../app.js?v=20261018a";
-import { showTaskCompleteAnimation } from "./task-stats.js?v=20261018a";
+import { recordsApi, categoriesApi, taskMetaApi } from "../api.js?v=20261021a";
+import { lockButtonHTML, bindLockToggles, setLockState, lockLabel } from "../privacy-toggle.js?v=20261021a";
+import { showToast } from "../app.js?v=20261021a";
+import { showTaskCompleteAnimation } from "./task-stats.js?v=20261021a";
 
 /* ── カテゴリ管理 ── */
 
@@ -1131,10 +1132,13 @@ function buildFormHTML(date, record, tasks, isEdit, isRestDay = false, restReaso
     <div class="input-page-header">
       <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
         <h2 style="margin: 0; font-size: 1.2rem;">${isEdit ? "記録を編集" : "行動を記録"}</h2>
-        ${isRestDay ? `` : `
-        <button class="btn btn-outline btn-sm rest-day-btn" id="btn-rest-day" style="white-space: nowrap;">
-          🌙 今日はおやすみ
-        </button>`}
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end">
+          ${lockButtonHTML(!!record?.is_private, date, { cls: "log-private-toggle", labeled: true })}
+          ${isRestDay ? `` : `
+          <button class="btn btn-outline btn-sm rest-day-btn" id="btn-rest-day" style="white-space: nowrap;">
+            🌙 今日はおやすみ
+          </button>`}
+        </div>
       </div>
       <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: var(--gap);">${dateLabel}</p>
     </div>
@@ -1470,6 +1474,29 @@ function attachFormEvents(date, isEdit, mode, initialTasks) {
       persistDraft();
       clearTimeout(rawInputTimer);
       rawInputTimer = setTimeout(() => saveDataQuietly(), 1500);
+    });
+  }
+
+  // 「この日を Claude に渡さない」トグル（記録が無ければ空の記録を作ってから設定する）
+  if (isLog) {
+    bindLockToggles(document.querySelector(".input-page-header"), async (_id, next) => {
+      try {
+        if (!isEdit) {
+          try {
+            await recordsApi.create(date, "", [], []);
+          } catch (e) {
+            if (!(e.message.includes("409") || e.message.includes("すでに存在"))) throw e;
+          }
+          isEdit = true;
+        }
+        await recordsApi.update(date, { is_private: next });
+        const c = loadInputCache(date);
+        saveInputCache(date, { existingRecord: { ...(c?.existingRecord || {}), is_private: next } });
+        showToast(next ? "この日の記録は Claude に渡しません" : "この日の記録を Claude に渡します", "success");
+      } catch (err) {
+        showToast(`切替に失敗: ${err.message}`, "error");
+        throw err;
+      }
     });
   }
 

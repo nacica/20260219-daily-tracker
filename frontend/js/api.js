@@ -176,6 +176,10 @@ export const journalApi = {
   update: (entryId, content) =>
     apiFetch(`/journal/entry/${encodeURIComponent(entryId)}`, { method: "PUT", body: { content } }),
 
+  /** 非公開（Claude に渡さない）の切替 */
+  setPrivate: (entryId, isPrivate) =>
+    apiFetch(`/journal/entry/${encodeURIComponent(entryId)}`, { method: "PUT", body: { is_private: !!isPrivate } }),
+
   /** エントリ削除 */
   delete: (entryId) =>
     apiFetch(`/journal/entry/${encodeURIComponent(entryId)}`, { method: "DELETE" }),
@@ -498,6 +502,10 @@ export const gratitudeApi = {
   /** 更新 */
   update: (entryId, content) =>
     apiFetch(`/gratitude/${entryId}`, { method: "PUT", body: { content } }),
+
+  /** 非公開（Claude に渡さない）の切替 */
+  setPrivate: (entryId, isPrivate) =>
+    apiFetch(`/gratitude/${entryId}`, { method: "PUT", body: { is_private: !!isPrivate } }),
 
   /** 削除 */
   delete: (entryId) => apiFetch(`/gratitude/${entryId}`, { method: "DELETE" }),

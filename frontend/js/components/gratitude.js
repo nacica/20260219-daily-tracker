@@ -7,12 +7,13 @@
  */
 
 import { gratitudeApi } from "../api.js?v=20260725b";
+import { lockButtonHTML, bindLockToggles, setLockState, lockLabel } from "../privacy-toggle.js?v=20261021a";
 import { showToast } from "../app.js?v=20260725b";
 import {
   attachFloatingToolbar,
   appendMarkdownToEditor,
   serializeEditorMarkdown,
-} from "../floating-toolbar.js?v=20261018a";
+} from "../floating-toolbar.js?v=20261021a";
 
 /** contenteditable から markdown を読む（textarea にも対応） */
 function readEditorMd(el) {
@@ -205,6 +206,7 @@ function buildEntryHTML(item) {
       <div class="gr-entry-meta">
         ${dateBadge}<span class="gr-time">${timeOnly}</span>
         <span class="gr-spacer"></span>
+        ${lockButtonHTML(!!item.is_private, item.id, { action: "toggle-private" })}
         <button type="button" class="gr-icon-btn" data-action="edit" data-id="${escapeAttr(item.id)}" title="編集" aria-label="編集">✎</button>
         <button type="button" class="gr-icon-btn gr-icon-danger" data-action="delete" data-id="${escapeAttr(item.id)}" title="削除" aria-label="削除">×</button>
       </div>
@@ -342,6 +344,18 @@ function attachEvents() {
         const sel = window.getSelection();
         sel.removeAllRanges();
         sel.addRange(range);
+      }
+    } else if (action === "toggle-private") {
+      const item = state.items.find((x) => x.id === id);
+      if (!item) return;
+      const next = !item.is_private;
+      try {
+        await gratitudeApi.setPrivate(id, next);
+        item.is_private = next;
+        setLockState(actionBtn, next);
+        showToast(next ? "Claude に渡しません" : "Claude に渡します", "success");
+      } catch (err) {
+        showToast(`切替に失敗: ${err.message}`, "error");
       }
     } else if (action === "cancel-edit") {
       state.editingId = null;

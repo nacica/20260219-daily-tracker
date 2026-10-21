@@ -969,3 +969,22 @@ def delete_gratitude(entry_id: str) -> bool:
         return False
     ref.delete()
     return True
+
+
+# ---- weekly_analyses（週次分析。生成・保存は routers/weekly.py）----
+
+def get_weekly_analysis(week_id: str) -> Optional[dict]:
+    db = get_db()
+    doc = db.collection("weekly_analyses").document(week_id).get()
+    return doc.to_dict() if doc.exists else None
+
+
+def list_weekly_analyses(limit: int = 10) -> list[dict]:
+    """週次分析を新しい順に取得"""
+    db = get_db()
+    query = (
+        db.collection("weekly_analyses")
+        .order_by("week_start", direction=firestore.Query.DESCENDING)
+        .limit(limit)
+    )
+    return [doc.to_dict() for doc in query.stream()]

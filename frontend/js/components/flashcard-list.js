@@ -6,12 +6,13 @@
  */
 
 import { flashcardsApi } from "../api.js?v=20260725b";
+import { lockButtonHTML, bindLockToggles, setLockState, lockLabel } from "../privacy-toggle.js?v=20261021a";
 import { showToast } from "../app.js?v=20260725b";
 import {
   attachFloatingToolbar,
   appendMarkdownToEditor,
   serializeEditorMarkdown,
-} from "../floating-toolbar.js?v=20261018a";
+} from "../floating-toolbar.js?v=20261021a";
 
 // モジュールロード時に読み込み確認ログを出す（キャッシュ診断用）
 const FLASHCARD_LIST_VERSION = "20260424b";
@@ -599,6 +600,7 @@ function buildListRow(card) {
     <div class="fc-row ${card.id === selectedId ? 'active' : ''}" data-id="${card.id}">
       <span class="fc-row-num">#${card._num}</span>
       <span class="fc-row-status ${statusClass}">${statusIcon}</span>
+      ${card.is_private ? '<span class="fc-row-lock" title="Claude に渡しません">🔒</span>' : ""}
       <span class="fc-row-front">${escapeHtml(frontText)}</span>
     </div>`;
 }
@@ -609,6 +611,7 @@ function buildDetailView(card) {
   return `
     <div class="fc-detail-actions-top">
       <button class="btn btn-outline btn-sm fc-detail-toggle-status" data-id="${card.id}" style="color: ${card.remembered ? 'var(--neon-red)' : 'var(--neon-green)'}; border-color: ${card.remembered ? 'rgba(255,51,102,0.3)' : 'rgba(0,255,148,0.3)'};">${card.remembered ? '「まだ」に戻す' : '「覚えた」にする'}</button>
+      ${lockButtonHTML(!!card.is_private, card.id, { cls: "fc-detail-toggle-private" })}
       <button class="btn btn-outline btn-sm fc-detail-edit" data-id="${card.id}">編集</button>
       <button class="btn btn-outline btn-sm fc-detail-delete" data-id="${card.id}" style="color: var(--neon-red); border-color: rgba(255,51,102,0.3);">削除</button>
     </div>
@@ -628,6 +631,7 @@ function buildDetailView(card) {
     </div>
     <div class="fc-detail-actions">
       <button class="btn btn-outline btn-sm fc-detail-toggle-status" data-id="${card.id}" style="color: ${card.remembered ? 'var(--neon-red)' : 'var(--neon-green)'}; border-color: ${card.remembered ? 'rgba(255,51,102,0.3)' : 'rgba(0,255,148,0.3)'};">${card.remembered ? '「まだ」に戻す' : '「覚えた」にする'}</button>
+      ${lockButtonHTML(!!card.is_private, card.id, { cls: "fc-detail-toggle-private" })}
       <button class="btn btn-outline btn-sm fc-detail-edit" data-id="${card.id}">編集</button>
       <button class="btn btn-outline btn-sm fc-detail-delete" data-id="${card.id}" style="color: var(--neon-red); border-color: rgba(255,51,102,0.3);">削除</button>
     </div>
@@ -852,6 +856,24 @@ function attachDetailEvents(container) {
         showToast(`変更に失敗: ${e.message}`, "error");
       }
     });
+  });
+
+  // 🔒 非公開（Claude に渡さない）の切替（上部・下部の両方）
+  bindLockToggles(root, async (id, next) => {
+    const card = cards.find((c) => c.id === id);
+    if (!card) return;
+    try {
+      await flashcardsApi.update(id, { is_private: next });
+      card.is_private = next;
+      root.querySelectorAll(`.lock-toggle[data-id="${id}"]`).forEach((b) => setLockState(b, next));
+      const row = root.querySelector(`.fc-row[data-id="${id}"] .fc-row-lock`);
+      if (row && !next) row.remove();
+      else if (!row && next) root.querySelector(`.fc-row[data-id="${id}"] .fc-row-status`)?.insertAdjacentHTML("afterend", '<span class="fc-row-lock" title="Claude に渡しません">🔒</span>');
+      showToast(next ? "Claude に渡しません" : "Claude に渡します", "success");
+    } catch (e) {
+      showToast(`切替に失敗: ${e.message}`, "error");
+      throw e;
+    }
   });
 
   // 削除ボタン（上部・下部の両方）
