@@ -556,3 +556,31 @@ def _extract_json(text: str) -> dict | list:
                 except json.JSONDecodeError:
                     continue
         raise ValueError(f"有効な JSON が見つかりません: {text[:200]}")
+
+
+def generate_profile(inputs: dict) -> str:
+    """
+    「自分の取扱説明書」の下書きを生成する（Markdown、2,000〜3,000 文字）
+    inputs は services/pis_context_service.build_profile_inputs() の戻り値
+    """
+    from prompts.profile_generation import PROFILE_SYSTEM_PROMPT, build_profile_prompt
+
+    client = get_client()
+    model = os.getenv("DAILY_ANALYSIS_MODEL", "claude-sonnet-4-6")
+    user_prompt = build_profile_prompt(
+        monthly_summaries=inputs.get("monthly_summaries", []),
+        weekly_analyses=inputs.get("weekly_analyses", []),
+        wishlist=inputs.get("wishlist", []),
+        reminders=inputs.get("reminders", []),
+        trade_labels=inputs.get("trade_labels", {}),
+        current_content=inputs.get("current_content"),
+        source_range=inputs.get("source_range", {}),
+    )
+    response = _call_claude_with_retry(
+        client,
+        model=model,
+        max_tokens=4096,
+        system=PROFILE_SYSTEM_PROMPT,
+        messages=[{"role": "user", "content": user_prompt}],
+    )
+    return response.content[0].text.strip()

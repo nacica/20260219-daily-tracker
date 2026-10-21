@@ -10,10 +10,10 @@
  * デスクトップ: タスクページはカードのドラッグ&ドロップ（masonry）レイアウト。
  */
 
-import { recordsApi, categoriesApi, taskMetaApi } from "../api.js?v=20261021a";
-import { lockButtonHTML, bindLockToggles, setLockState, lockLabel } from "../privacy-toggle.js?v=20261021a";
-import { showToast } from "../app.js?v=20261021a";
-import { showTaskCompleteAnimation } from "./task-stats.js?v=20261021a";
+import { recordsApi, categoriesApi, taskMetaApi, profileApi } from "../api.js?v=20261021b";
+import { lockButtonHTML, bindLockToggles, setLockState, lockLabel } from "../privacy-toggle.js?v=20261021b";
+import { showToast } from "../app.js?v=20261021b";
+import { showTaskCompleteAnimation } from "./task-stats.js?v=20261021b";
 
 /* ── カテゴリ管理 ── */
 
@@ -568,6 +568,51 @@ let _logUnverified = false;
 /** 行動ログ画面のライフサイクルハンドラ（再描画のたびに付け替える） */
 let _logLifecycle = [];
 
+/* ── 取扱説明書の更新バナー ──
+ * 月初（1〜7 日）に、AI 下書きの生成が 30 日以上前（または未生成）なら
+ * タスクページ上部で「取扱説明書を更新しませんか？」と案内する。閉じたら当月は出さない。 */
+const PROFILE_BANNER_DISMISS_KEY = "profile-banner-dismissed";
+let _profileMeta = null;          // { generated_at } | null（未取得）
+let _profileMetaFetchedAt = 0;
+
+async function syncProfileMeta() {
+  if (Date.now() - _profileMetaFetchedAt < SESSION_SYNC_TTL_MS) return;
+  try {
+    const res = await profileApi.get();
+    _profileMeta = { generated_at: res?.generated_at || null };
+    _profileMetaFetchedAt = Date.now();
+  } catch { /* 取れなければバナーは出さない */ }
+}
+
+function shouldShowProfileBanner() {
+  if (!_profileMeta) return false;
+  const now = new Date();
+  if (now.getDate() > 7) return false;
+  const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  try { if (localStorage.getItem(PROFILE_BANNER_DISMISS_KEY) === ym) return false; } catch {}
+  const g = _profileMeta.generated_at ? new Date(_profileMeta.generated_at).getTime() : NaN;
+  return Number.isNaN(g) || Date.now() - g > 30 * 24 * 60 * 60 * 1000;
+}
+
+function buildProfileBannerHTML() {
+  if (!shouldShowProfileBanner()) return "";
+  return `
+    <div class="profile-banner profile-banner-tasks" id="profile-update-banner">
+      <span>📘 取扱説明書を更新しませんか？ 前回の AI 下書きから 30 日以上経っています。</span>
+      <a class="btn btn-primary btn-sm" href="#/profile">更新する</a>
+      <button type="button" class="profile-banner-close" id="profile-banner-close" title="今月は表示しない">×</button>
+    </div>`;
+}
+
+function attachProfileBannerEvents() {
+  document.getElementById("profile-banner-close")?.addEventListener("click", () => {
+    const now = new Date();
+    const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    try { localStorage.setItem(PROFILE_BANNER_DISMISS_KEY, ym); } catch {}
+    document.getElementById("profile-update-banner")?.remove();
+  });
+}
+
 /** 日付文字列の前日を返す */
 function _prevDateStr(date, daysAgo) {
   const d = new Date(date + "T00:00:00");
@@ -682,7 +727,7 @@ async function _renderPage(date, mode) {
 
   const [recordResult, , prevResult] = await Promise.allSettled([
     recordsApi.get(date),
-    isLog ? Promise.resolve() : Promise.all([syncCategoriesWithCache(), syncTaskMetaWithCache()]),
+    isLog ? Promise.resolve() : Promise.all([syncCategoriesWithCache(), syncTaskMetaWithCache(), syncProfileMeta()]),
     recordsApi.list(startStr, endStr),
   ]);
 
@@ -1110,6 +1155,7 @@ function buildFormHTML(date, record, tasks, isEdit, isRestDay = false, restReaso
   //    （日付ナビ・おやすみモードは行動ログページ側にある） ──
   if (!isLog) {
     return `
+    ${buildProfileBannerHTML()}
     <div class="input-page-header">
       <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
         <h2 style="margin: 0; font-size: 1.2rem;">タスク管理</h2>
@@ -1292,7 +1338,7 @@ function attachColumnToggleEvents() {
  */
 function attachFormEvents(date, isEdit, mode, initialTasks) {
   const isLog = mode === "log";
-  if (!isLog) attachColumnToggleEvents();
+  if (!isLog) { attachColumnToggleEvents(); attachProfileBannerEvents(); }
   const completedList = document.getElementById("completed-list");
 
   // バックグラウンド自動保存（排他制御・再試行付き）

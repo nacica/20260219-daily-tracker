@@ -10,7 +10,7 @@ PIS の MCP サーバー（claude.ai カスタムコネクタ向け）
   キーワード検索は services/pis_search_service に分離している（将来の意味検索はそこで差し替える）
 
 ツール:
-  get_profile          取扱説明書（フェーズ 3 で本実装。今は固定文）
+  get_profile          取扱説明書（user_profile の確定版 content）
   get_recent_context   直近 N 日の要約（分析・週次・未完了タスク・道しるべ・自由帳タイトル）
   search_pis           キーワード検索（AND、種類・期間・ボードで絞り込み）
   get_entry            1 件の全文
@@ -105,13 +105,8 @@ def get_profile() -> str:
     """ユーザーの「取扱説明書」（目標・強み・失敗パターン・判断基準・望む回答スタイル）を返す。
     ユーザー個人に関わる質問（仕事・投資・学習・生活習慣・目標・判断の相談など）では、
     最初にこのツールを呼んでから回答すること。"""
-    # フェーズ 1 はダミー。フェーズ 3 で user_profile コレクションの本実装に差し替える
-    text = (
-        "# 取扱説明書（未作成）\n\n"
-        "PIS との接続は成功しています。取扱説明書はまだ作成されていません。\n"
-        "PIS の「取扱説明書」画面で AI 下書きを生成して保存すると、ここに内容が表示されます。"
-    )
-    _log("get_profile", "", 1)
+    text = ctx.profile_text()
+    _log("get_profile", "", 0 if "未作成" in text[:40] else 1)
     return text
 
 

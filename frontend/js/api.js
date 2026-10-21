@@ -424,6 +424,18 @@ export const navOrderApi = {
   save: (routes) => apiFetch("/nav-order", { method: "PUT", body: { routes } }),
 };
 
+/* ── 自分の取扱説明書（プロフィール） ── */
+export const profileApi = {
+  /** 取得 → { content, draft, generated_at, edited_at, source_range } */
+  get: () => apiFetch("/profile"),
+
+  /** 確定版 content を保存 */
+  save: (content) => apiFetch("/profile", { method: "PUT", body: { content } }),
+
+  /** AI で下書きを生成（draft に保存。content は上書きしない） */
+  generate: () => apiFetch("/profile/generate", { method: "POST" }),
+};
+
 /* ── タスクメタ情報（追加日時・完了日時） ── */
 export const taskMetaApi = {
   /** 全件取得 → { items: [{ name, created_at, completed_at, approx }] } */

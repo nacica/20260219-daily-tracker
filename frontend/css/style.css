@@ -1351,6 +1351,33 @@ textarea {
   box-shadow: 0 0 0 2px var(--accent) inset;
 }
 
+/* ===== 取扱説明書ページ ===== */
+.profile-page { max-width: 1400px; }
+.profile-header { margin-bottom: 14px; }
+.profile-title { font-size: 1.3rem; margin: 0 0 4px; }
+.profile-subtitle { color: var(--text-muted); font-size: 0.85rem; margin: 0; }
+.profile-grid { display: grid; grid-template-columns: 1fr; gap: 16px; }
+@media (min-width: 1024px) {
+  .profile-grid { grid-template-columns: 1fr 1fr; align-items: start; }
+  main:has(.profile-page) { max-width: none; }
+}
+.profile-card .card-title { margin-bottom: 8px; }
+.profile-status { font-size: 0.78rem; color: var(--text-muted); margin-bottom: 8px; min-height: 1.2em; }
+.profile-editor { min-height: 480px; max-height: none; }
+.profile-editor:empty::before { content: attr(data-placeholder); color: var(--text-muted); pointer-events: none; }
+.profile-hint { font-size: 0.76rem; color: var(--text-muted); margin: 8px 0 0; }
+.profile-draft-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+.profile-draft { padding: 14px 16px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 10px; min-height: 200px; line-height: 1.7; font-size: 0.92rem; overflow-wrap: anywhere; }
+.profile-banner {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 10px 14px; margin-bottom: 14px; border-radius: 10px;
+  background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.5);
+  color: var(--text-primary); font-size: 0.86rem;
+}
+.profile-banner-tasks span { flex: 1; min-width: 200px; }
+.profile-banner-close { background: none; border: 0; color: var(--text-muted); font-size: 1.1rem; cursor: pointer; padding: 2px 6px; }
+.profile-banner-close:hover { color: var(--text-primary); }
+
 /* ===== 🔒 非公開トグル（Claude に渡さない） ===== */
 .lock-toggle {
   display: inline-flex;

@@ -5,14 +5,14 @@
  * カードの追加・編集・削除 + 学習画面への遷移
  */
 
-import { flashcardsApi } from "../api.js?v=20260725b";
-import { lockButtonHTML, bindLockToggles, setLockState, lockLabel } from "../privacy-toggle.js?v=20261021a";
-import { showToast } from "../app.js?v=20260725b";
+import { flashcardsApi } from "../api.js?v=20261021b";
+import { lockButtonHTML, bindLockToggles, setLockState, lockLabel } from "../privacy-toggle.js?v=20261021b";
+import { showToast } from "../app.js?v=20261021b";
 import {
   attachFloatingToolbar,
   appendMarkdownToEditor,
   serializeEditorMarkdown,
-} from "../floating-toolbar.js?v=20261021a";
+} from "../floating-toolbar.js?v=20261021b";
 
 // モジュールロード時に読み込み確認ログを出す（キャッシュ診断用）
 const FLASHCARD_LIST_VERSION = "20260424b";

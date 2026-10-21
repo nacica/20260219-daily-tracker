@@ -502,3 +502,52 @@ def recent_context_text(days: int = 7) -> str:
         out.append("## 直近の自由帳・トレードメモ\n" + "\n".join(lines))
 
     return truncate("\n\n".join(out))
+
+
+# ---- 取扱説明書（プロフィール） ----
+
+def build_profile_inputs(current_content: str = "") -> dict:
+    """取扱説明書の生成入力を集める（非公開は除外）。
+    月次サマリー 3 か月・週次分析 12 週・やりたいこと・道しるべ（アクティブ）・トレードメモのラベル集計。"""
+    monthly = fs.list_coaching_summaries(limit=3)
+    weekly = fs.list_weekly_analyses(limit=12)
+    wishlist = public(fs.list_wishlist())
+    reminders = [r for r in public(fs.get_reminders()) if not r.get("archived")]
+    trade_labels: dict[str, list[dict]] = {}
+    for board, name in BOARDS.items():
+        try:
+            labels = [l for l in fs.aggregate_braindump_labels(board=board) if l.get("name") != PRIVATE_LABEL]
+        except Exception as e:
+            logger.warning("ラベル集計に失敗 board=%s: %s", board, e)
+            labels = []
+        if labels:
+            trade_labels[name] = labels
+    start = min([days_ago(90)] + [w.get("week_start", "") for w in weekly if w.get("week_start")])
+    return {
+        "monthly_summaries": monthly,
+        "weekly_analyses": weekly,
+        "wishlist": wishlist,
+        "reminders": reminders,
+        "trade_labels": trade_labels,
+        "current_content": current_content or "",
+        "source_range": {"start": start, "end": today()},
+    }
+
+
+def profile_text() -> str:
+    """MCP の get_profile が返す本文（確定版 content のみ。下書きは返さない）"""
+    doc = fs.get_user_profile() or {}
+    content = (doc.get("content") or "").strip()
+    if not content:
+        return (
+            "# 取扱説明書（未作成）\n\n"
+            "取扱説明書はまだ作成されていません。PIS の「取扱説明書」画面で AI 下書きを生成し、"
+            "手直しして保存すると、ここに内容が表示されます。"
+        )
+    meta = []
+    if doc.get("edited_at"):
+        meta.append(f"最終編集: {str(doc['edited_at'])[:10]}")
+    if doc.get("generated_at"):
+        meta.append(f"AI 下書き生成: {str(doc['generated_at'])[:10]}")
+    head = f"（{' / '.join(meta)}）\n\n" if meta else ""
+    return truncate(head + content)

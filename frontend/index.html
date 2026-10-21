@@ -24,16 +24,16 @@
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Klee+One&display=swap" /></noscript>
 
   <link rel="manifest" href="/manifest.json" />
-  <link rel="stylesheet" href="/css/style.css?v=20261021a" />
+  <link rel="stylesheet" href="/css/style.css?v=20261021b" />
 
   <!-- トップ表示に必要なコアモジュールを先読み（並列 fetch で TTI を短縮） -->
-  <link rel="modulepreload" href="/js/app.js?v=20261021a" />
-  <link rel="modulepreload" href="/js/router.js?v=20261021a" />
-  <link rel="modulepreload" href="/js/api.js?v=20261021a" />
-  <link rel="modulepreload" href="/js/swipe-nav.js?v=20261021a" />
-  <link rel="modulepreload" href="/js/floating-toolbar.js?v=20261021a" />
-  <link rel="modulepreload" href="/js/sidebar-resize.js?v=20261021a" />
-  <link rel="modulepreload" href="/js/nav-order.js?v=20261021a" />
+  <link rel="modulepreload" href="/js/app.js?v=20261021b" />
+  <link rel="modulepreload" href="/js/router.js?v=20261021b" />
+  <link rel="modulepreload" href="/js/api.js?v=20261021b" />
+  <link rel="modulepreload" href="/js/swipe-nav.js?v=20261021b" />
+  <link rel="modulepreload" href="/js/floating-toolbar.js?v=20261021b" />
+  <link rel="modulepreload" href="/js/sidebar-resize.js?v=20261021b" />
+  <link rel="modulepreload" href="/js/nav-order.js?v=20261021b" />
 
   <!-- FOUC防止: JSモジュール読み込み前にテーマを適用 -->
   <script>
@@ -136,6 +136,16 @@
             <path d="M18 6a2 2 0 0 1 1.387.56l2.307 2.22a1 1 0 0 1 0 1.44l-2.307 2.22A2 2 0 0 1 18 13H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z"/>
           </svg>
           <span>道しるべ</span>
+        </a>
+        <a class="nav-link" href="#/profile" data-route="/profile">
+          <!-- Book / profile icon -->
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+            <path d="M9 7h7"/>
+            <path d="M9 11h5"/>
+          </svg>
+          <span>取扱説明書</span>
         </a>
         <a class="nav-link" href="#/braindump" data-route="/braindump">
           <!-- Brain dump / notepad icon -->
@@ -327,6 +337,6 @@
   -->
 
   <!-- アプリのメインスクリプト（ES Modules） -->
-  <script type="module" src="/js/app.js?v=20261021a"></script>
+  <script type="module" src="/js/app.js?v=20261021b"></script>
 </body>
 </html>

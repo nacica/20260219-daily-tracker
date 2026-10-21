@@ -177,10 +177,16 @@ claude.ai / Claude アプリのカスタムコネクタとして PIS に接続�
   - 日記・行動記録・やりたいこと・ありがたいノート・単語帳・道しるべの各付箋: `is_private` フィールド（既定 false、既存データのマイグレーション不要）。各画面の 🔒 ボタンで切替（共通モジュール `js/privacy-toggle.js`）。行動ログページは「🔓 Claude に渡す / 🔒 Claude に渡さない」で、その日の記録・タスク・分析をまとめて除外
   - 各更新 API（`PUT /records/{date}` `/journal/entry/{id}` `/wishlist/{id}` `/gratitude/{id}` `/flashcards/{id}` `/reminders`）が `is_private` を受け付ける
 - **実装ファイル（追加）**: `backend/services/pis_context_service.py`（取得・非公開除外・整形・文字数制限）、`backend/services/pis_search_service.py`（キーワード検索。将来の意味検索はここで差し替え）
+- **取扱説明書（`#/profile`、フェーズ 3）**: Claude が会話の最初に読む「自分の取扱説明書」
+  - Firestore `user_profile/global`: `content`（確定版）、`draft`（AI 下書き）、`generated_at`、`edited_at`、`source_range`
+  - `GET /api/v1/profile` / `PUT /api/v1/profile`（content 保存） / `POST /api/v1/profile/generate`（下書き生成。content は上書きしない）
+  - 生成入力: 直近 3 か月の月次サマリー、直近 12 週の週次分析、やりたいこと、道しるべ（アクティブ）、トレードメモのボード別ラベル集計、現在の content（差分更新）。非公開は除外。プロンプトは `prompts/profile_generation.py`（7 見出し、2,000〜3,000 文字）
+  - 画面: 左に確定版エディタ（書式ツールバー、1.5 秒で自動保存）、右に下書きと「AI で下書きを生成」「下書きを採用」。月初（1〜7 日）に前回生成から 30 日以上経っていればタスクページ上部にバナー
+  - MCP の `get_profile` は確定版 content だけを返す（下書きは渡さない）。未作成なら案内文
 - **環境変数**: `MCP_PUBLIC_URL`（公開 URL）、`MCP_OWNER_PASSWORD_HASH`（bcrypt。`backend/scripts/make_password_hash.py`）、`MCP_TOKEN_SECRET`、`MCP_ALLOWED_REDIRECT_URIS`（任意）、`MCP_ALLOW_LOCALHOST_REDIRECT`（ローカル検証用）
 - **Firestore**: `mcp_oauth_clients` / `mcp_oauth_codes` / `mcp_oauth_tokens` / `mcp_login_attempts` / `mcp_access_logs`
 - **実装ファイル**: `backend/mcp_server.py`（MCP サーバーとツール）、`backend/routers/mcp_oauth.py`（OAuth エンドポイント）、`backend/services/mcp_auth_service.py`（検証・発行・ストア）
-- 未実装（次フェーズ）: 取扱説明書（フェーズ 3）、自由帳への書き込み（フェーズ 4）、意味検索と REST API への認証（フェーズ 5）
+- 未実装（次フェーズ）: 自由帳への書き込み（フェーズ 4）、意味検索と REST API への認証（フェーズ 5）
 
 ### 18. PWA・キャッシュ
 

@@ -988,3 +988,29 @@ def list_weekly_analyses(limit: int = 10) -> list[dict]:
         .limit(limit)
     )
     return [doc.to_dict() for doc in query.stream()]
+
+
+def list_coaching_summaries(limit: int = 3, user_id: str = DEFAULT_USER_ID) -> list[dict]:
+    """月次コーチングサマリーを新しい順に取得"""
+    query = (
+        _user_ref(user_id).collection("coaching_summaries")
+        .order_by("period", direction=firestore.Query.DESCENDING)
+        .limit(limit)
+    )
+    return [doc.to_dict() for doc in query.stream()]
+
+
+# ---- user_profile（自分の取扱説明書）----
+
+def get_user_profile() -> Optional[dict]:
+    db = get_db()
+    doc = db.collection("user_profile").document("global").get()
+    return doc.to_dict() if doc.exists else None
+
+
+def update_user_profile(data: dict) -> dict:
+    """指定フィールドだけをマージ保存して全体を返す"""
+    db = get_db()
+    ref = db.collection("user_profile").document("global")
+    ref.set(data, merge=True)
+    return ref.get().to_dict() or {}

@@ -14,7 +14,7 @@ import os
 load_dotenv()
 
 from routers import records, analysis, weekly, dialogue, summaries, journal, diary_dialogue, braindump, reminders, categories, flashcards, wishlist, gratitude, udemy_tips, task_meta, nav_order
-from routers import mcp_oauth
+from routers import mcp_oauth, profile
 from mcp_server import mcp, build_mcp_app
 
 
@@ -78,6 +78,8 @@ app.include_router(gratitude.router,     prefix="/api/v1", tags=["gratitude"])
 app.include_router(udemy_tips.router,    prefix="/api/v1", tags=["udemy-tips"])
 app.include_router(task_meta.router,     prefix="/api/v1", tags=["task-meta"])
 app.include_router(nav_order.router,     prefix="/api/v1", tags=["nav-order"])
+
+app.include_router(profile.router,       prefix="/api/v1", tags=["profile"])
 
 # MCP 連携用 OAuth（/.well-known/*, /oauth/*）
 app.include_router(mcp_oauth.router, tags=["mcp-oauth"])

@@ -10,11 +10,11 @@
  *     リダイレクトのみ提供する。
  */
 
-import { addRoute, navigate, updateNavActive } from "./router.js?v=20261021a";
-import { recordsApi } from "./api.js?v=20261021a";
-import { initSwipeNav } from "./swipe-nav.js?v=20261021a";
-import { initSidebarResize } from "./sidebar-resize.js?v=20261021a";
-import { initNavOrder } from "./nav-order.js?v=20261021a";
+import { addRoute, navigate, updateNavActive } from "./router.js?v=20261021b";
+import { recordsApi } from "./api.js?v=20261021b";
+import { initSwipeNav } from "./swipe-nav.js?v=20261021b";
+import { initSidebarResize } from "./sidebar-resize.js?v=20261021b";
+import { initNavOrder } from "./nav-order.js?v=20261021b";
 
 // ===== バックエンドのウォームアップ（コールドスタート対策） =====
 // Cloud Run は min-instances 0 で運用しているため、久しぶりのアクセスでは
@@ -34,21 +34,22 @@ import { initNavOrder } from "./nav-order.js?v=20261021a";
 
 // ===== 動的 import ヘルパー =====
 // 各コンポーネントは初回訪問時に初めてネットワーク取得（以降は SW キャッシュから即応答）
-const loadInputForm       = () => import("./components/input-form.js?v=20261021a");
-const loadAnalysisView    = () => import("./components/analysis-view.js?v=20261021a");
-const loadHistoryList     = () => import("./components/history-list.js?v=20261021a");
-const loadWeeklyReport    = () => import("./components/weekly-report.js?v=20261021a");
-const loadMonthlyReport   = () => import("./components/monthly-report.js?v=20261021a");
-const loadJournal         = () => import("./components/journal.js?v=20261021a");
-const loadBraindump       = () => import("./components/braindump.js?v=20261021a");
-const loadTaskStats       = () => import("./components/task-stats.js?v=20261021a");
-const loadFlashcardList   = () => import("./components/flashcard-list.js?v=20261021a");
-const loadFlashcardStudy  = () => import("./components/flashcard-study.js?v=20261021a");
-const loadWishlist        = () => import("./components/wishlist.js?v=20261021a");
-const loadGratitude       = () => import("./components/gratitude.js?v=20261021a");
-const loadUdemyTips       = () => import("./components/udemy-tips.js?v=20261021a");
-const loadMichishirube    = () => import("./components/michishirube.js?v=20261021a");
-const loadHomeLauncher    = () => import("./components/home-launcher.js?v=20261021a");
+const loadInputForm       = () => import("./components/input-form.js?v=20261021b");
+const loadAnalysisView    = () => import("./components/analysis-view.js?v=20261021b");
+const loadHistoryList     = () => import("./components/history-list.js?v=20261021b");
+const loadWeeklyReport    = () => import("./components/weekly-report.js?v=20261021b");
+const loadMonthlyReport   = () => import("./components/monthly-report.js?v=20261021b");
+const loadJournal         = () => import("./components/journal.js?v=20261021b");
+const loadBraindump       = () => import("./components/braindump.js?v=20261021b");
+const loadTaskStats       = () => import("./components/task-stats.js?v=20261021b");
+const loadFlashcardList   = () => import("./components/flashcard-list.js?v=20261021b");
+const loadFlashcardStudy  = () => import("./components/flashcard-study.js?v=20261021b");
+const loadWishlist        = () => import("./components/wishlist.js?v=20261021b");
+const loadGratitude       = () => import("./components/gratitude.js?v=20261021b");
+const loadUdemyTips       = () => import("./components/udemy-tips.js?v=20261021b");
+const loadMichishirube    = () => import("./components/michishirube.js?v=20261021b");
+const loadHomeLauncher    = () => import("./components/home-launcher.js?v=20261021b");
+const loadProfile         = () => import("./components/profile.js?v=20261021b");
 
 // ===== ユーティリティ =====
 
@@ -87,6 +88,7 @@ const ROUTE_TITLES = {
   "/udemy-tips": { title: "Udemy 制作 Tips", breadcrumb: "コース制作の小技集" },
   "/home": { title: "ホーム", breadcrumb: "メニュー" },
   "/michishirube": { title: "道しるべ", breadcrumb: "今日意識すること" },
+  "/profile": { title: "取扱説明書", breadcrumb: "Claude に渡す自分の説明" },
 };
 
 /** デスクトップヘッダーのタイトルと日付を更新 */
@@ -479,6 +481,7 @@ addRoute("/gratitude", async () => (await loadGratitude()).renderGratitude());
 addRoute("/udemy-tips", async () => (await loadUdemyTips()).renderUdemyTips());
 addRoute("/michishirube", async () => (await loadMichishirube()).renderMichishirube());
 addRoute("/home", async () => (await loadHomeLauncher()).renderHomeLauncher());
+addRoute("/profile", async () => (await loadProfile()).renderProfile());
 
 // ===== モバイル用 ホームランチャー制御 =====
 //   - モバイル（<1024px）では起動時に必ず #/home（アイコン集だけの画面）から始める
