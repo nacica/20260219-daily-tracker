@@ -501,6 +501,17 @@ def recent_context_text(days: int = 7) -> str:
             lines.append(f"- {d.date} [{d.type_label}{('/' + BOARDS.get(b.get('board'), '')) if b.get('board') else ''}] {d.title}　(id: {d.id})")
         out.append("## 直近の自由帳・トレードメモ\n" + "\n".join(lines))
 
+    # 単語帳（ユーザーが学んだ知識）: 総数と直近に追加したカードの題名。本文は search_pis(sources=["flashcards"]) で
+    cards = public(fs.list_flashcards())
+    if cards:
+        recent_cards = [c for c in cards if _in_range(_date_of(c.get("created_at")), start, end)][:10]
+        lines = [f"カード {len(cards)} 枚（覚えた {sum(1 for c in cards if c.get('remembered'))}）。"
+                 "用語や仕組みの質問では search_pis(sources=[\"flashcards\"]) で該当カードを探し、学んだ内容を踏まえて答えること。"]
+        if recent_cards:
+            lines.append("直近に追加:")
+            lines += [f"- {_date_of(c.get('created_at'))} {_first_line(c.get('front', ''), 60)}　(id: {c.get('id')})" for c in recent_cards]
+        out.append("## 単語帳（学んだ知識）\n" + "\n".join(lines))
+
     return truncate("\n\n".join(out))
 
 

@@ -71,6 +71,10 @@ mcp = MCPServer(
         "ユーザー個人に関わる質問では、最初に get_profile でユーザーの取扱説明書を読み、"
         "必要に応じて get_recent_context や search_pis で関連記録を探してから回答してください。"
         "記録を根拠にした部分は、どの日付の記録か（種類と日付）を示してください。"
+        "単語帳（flashcards）にはユーザーが学んで自分の言葉で記録した知識が入っています。"
+        "用語の意味・仕組み・学習内容・健康や集中力など、ユーザーが学んできた分野の質問では、"
+        "一般知識だけで答える前に必ず search_pis(sources=[\"flashcards\"]) で該当カードを探し、"
+        "見つかればその内容を踏まえ、どのカードを参照したかを示して回答してください。"
     ),
     token_verifier=PisTokenVerifier(),
     auth=AuthSettings(
@@ -131,6 +135,8 @@ def search_pis(
     limit: int = 20,
 ) -> str:
     """キーワードで記録を検索する（スペース区切りで AND）。
+    用語・仕組み・学習内容に関する質問では、まず sources=["flashcards"]（単語帳 = ユーザーが学んだ知識）で
+    検索し、ヒットがあればその内容を踏まえて回答すること。
     sources: 省略時は全部。activity_log（行動ログ） tasks（タスク） analysis（日次分析） journal（日記）
     braindump（自由帳） trade（トレードメモ） michishirube（道しるべ） wishlist（やりたいこと）
     gratitude（ありがたいノート） udemy_tips flashcards（単語帳）。
