@@ -65,15 +65,32 @@ jobs:
           docker push "$IMAGE"
           echo "IMAGE=$IMAGE" >> "$GITHUB_ENV"
 
+      - name: Smoke test backend image (import check)
+        run: |
+          # 依存更新や import エラーでコンテナが起動しないのをデプロイ前に検知する
+          docker run --rm -e GOOGLE_CLOUD_PROJECT=${{ env.PROJECT_ID }} "${{ env.IMAGE }}" \
+            python -c "import main; print('import OK')"
+
       - name: Deploy to Cloud Run
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           GCS_BUCKET: ${{ secrets.GCS_BUCKET }}
           ALLOWED_ORIGINS: ${{ secrets.ALLOWED_ORIGINS }}
+          MCP_OWNER_PASSWORD_HASH: ${{ secrets.MCP_OWNER_PASSWORD_HASH }}
+          MCP_TOKEN_SECRET: ${{ secrets.MCP_TOKEN_SECRET }}
         run: |
+          # MCP の公開 URL（issuer / resource）。既存サービスの URL を使う（初回デプロイ時は空）
+          MCP_PUBLIC_URL=$(gcloud run services describe ${{ env.SERVICE_NAME }} \
+            --region ${{ env.REGION }} --project ${{ env.PROJECT_ID }} \
+            --format 'value(status.url)' 2>/dev/null || true)
+          echo "MCP_PUBLIC_URL: ${MCP_PUBLIC_URL}"
+
           # --set-env-vars はカンマを区切り文字と解釈するため ALLOWED_ORIGINS の複数 URL が壊れる
           # --env-vars-file (YAML) を使用して特殊文字の問題を回避する
           printf 'ANTHROPIC_API_KEY: "%s"\n'    "${ANTHROPIC_API_KEY}"      >  /tmp/env.yaml
+          printf 'MCP_PUBLIC_URL: "%s"\n'       "${MCP_PUBLIC_URL}"         >> /tmp/env.yaml
+          printf 'MCP_OWNER_PASSWORD_HASH: "%s"\n' "${MCP_OWNER_PASSWORD_HASH}" >> /tmp/env.yaml
+          printf 'MCP_TOKEN_SECRET: "%s"\n'     "${MCP_TOKEN_SECRET}"       >> /tmp/env.yaml
           printf 'GOOGLE_CLOUD_PROJECT: "%s"\n' "${{ env.PROJECT_ID }}"    >> /tmp/env.yaml
           printf 'FIRESTORE_DATABASE: "(default)"\n'                        >> /tmp/env.yaml
           printf 'CLOUD_STORAGE_BUCKET: "%s"\n' "${GCS_BUCKET}"            >> /tmp/env.yaml

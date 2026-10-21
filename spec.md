@@ -153,7 +153,26 @@
 - **テーマ**: ダーク（サイバーパンク調、シアンのネオン）/ ライト切り替え
 - **旧 URL の互換**: `#/edit/:date` `#/input` `#/input/:date` は新 URL へリダイレクト
 
-### 17. PWA・キャッシュ
+### 17. Claude 連携（リモート MCP サーバー）— フェーズ 1
+
+claude.ai / Claude アプリのカスタムコネクタとして PIS に接続するための土台。詳細な計画は `PIS_MCP_指示書.md`。
+
+- **エンドポイント**: 既存の Cloud Run（FastAPI）に同居。`/mcp`（Streamable HTTP、stateless + JSON 応答）
+- **認証**: OAuth 2.1（認可コード + PKCE S256、`state`、`resource` 検証）。単一ユーザーのパスワードログイン
+  - `GET /.well-known/oauth-authorization-server`（RFC 8414）/ `GET /.well-known/oauth-protected-resource[/mcp]`（RFC 9728）
+  - `POST /oauth/register`（動的クライアント登録。redirect_uri は claude.ai / claude.com のコールバックのみ許可）
+  - `GET/POST /oauth/authorize`（サーバー描画のログイン画面。認可コードは 5 分・1 回限り）
+  - `POST /oauth/token`（`authorization_code` / `refresh_token`。アクセス 1 時間、リフレッシュ 90 日でローテーション。再利用検知で同系統を一括失効）
+  - トークン・認可コード・クライアントシークレットは HMAC-SHA256 のハッシュだけを Firestore に保存
+  - ログイン失敗は IP 単位で 5 回 → 15 分ロック
+  - `/mcp` はトークン無し・無効で `401` + `WWW-Authenticate: Bearer resource_metadata=...`
+- **ツール**（フェーズ 1）: `get_profile`（固定文のダミー。フェーズ 3 で本実装）。呼び出しは `mcp_access_logs` に記録（本文は記録しない、90 日で削除）
+- **環境変数**: `MCP_PUBLIC_URL`（公開 URL）、`MCP_OWNER_PASSWORD_HASH`（bcrypt。`backend/scripts/make_password_hash.py`）、`MCP_TOKEN_SECRET`、`MCP_ALLOWED_REDIRECT_URIS`（任意）、`MCP_ALLOW_LOCALHOST_REDIRECT`（ローカル検証用）
+- **Firestore**: `mcp_oauth_clients` / `mcp_oauth_codes` / `mcp_oauth_tokens` / `mcp_login_attempts` / `mcp_access_logs`
+- **実装ファイル**: `backend/mcp_server.py`（MCP サーバーとツール）、`backend/routers/mcp_oauth.py`（OAuth エンドポイント）、`backend/services/mcp_auth_service.py`（検証・発行・ストア）
+- 未実装（次フェーズ）: 読み取りツール群と非公開除外、取扱説明書、自由帳への書き込み、意味検索、REST API への認証
+
+### 18. PWA・キャッシュ
 
 - ホーム画面へのインストール、Service Worker によるオフライン表示
 - 静的アセットは Stale-While-Revalidate、API と index.html / sw.js は Network First
