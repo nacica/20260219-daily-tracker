@@ -562,3 +562,83 @@ def profile_text() -> str:
         meta.append(f"AI 下書き生成: {str(doc['generated_at'])[:10]}")
     head = f"（{' / '.join(meta)}）\n\n" if meta else ""
     return truncate(head + content)
+
+
+# ---- 書き込み（唯一）: 自由帳へのメモ追記 ----
+
+CLAUDE_LABEL = "from-claude"
+
+
+def _normalize_labels(labels) -> list[str]:
+    if not labels:
+        return []
+    seen: set[str] = set()
+    out: list[str] = []
+    for lbl in labels:
+        if not isinstance(lbl, str):
+            continue
+        name = lbl.strip()
+        if name and name not in seen:
+            seen.add(name)
+            out.append(name)
+    return out
+
+
+def create_claude_note(body: str, title: Optional[str] = None, labels: Optional[list[str]] = None,
+                       board: Optional[str] = None) -> dict:
+    """Claude からのメモを今日（Asia/Tokyo）の自由帳に追記する。
+    routers/braindump.py の作成処理と同じドキュメント形状。ラベル `from-claude` を必ず付ける。
+    タイトル未指定なら既存の AI タイトル生成を使い、失敗時は本文の先頭 30 文字。"""
+    from services import claude_service
+    from utils.helpers import now_jst
+
+    text = (body or "").strip()
+    if not text:
+        raise ValueError("body（本文）を指定してください")
+    if len(text) > 20000:
+        raise ValueError("本文は 20,000 文字以内にしてください")
+    if board is not None and board not in BOARDS:
+        raise ValueError(f"board に不明な値があります: {board}。指定できる値: {', '.join(BOARDS)}")
+
+    date = today()
+    entry_number = fs.get_next_braindump_entry_number(date)
+    entry_id = f"braindump#{date}#{entry_number}"
+
+    manual = (title or "").strip()
+    if manual:
+        final_title, title_custom = manual[:200], True
+    else:
+        title_custom = False
+        try:
+            final_title = claude_service.generate_braindump_title(text)[:200]
+        except Exception as e:
+            logger.warning("AI タイトル生成に失敗（先頭 30 文字で代替）: %s", e)
+            final_title = text[:30].replace("\n", " ") + ("..." if len(text) > 30 else "")
+
+    existing_today = fs.list_braindumps_for_date(date)
+    max_order = 0.0
+    for e in existing_today:
+        order = e.get("sort_order")
+        if order is None:
+            order = float(e.get("entry_number", 1))
+        max_order = max(max_order, float(order))
+
+    labels_out = _normalize_labels(labels)
+    if CLAUDE_LABEL not in labels_out:
+        labels_out.append(CLAUDE_LABEL)
+
+    now = now_jst()
+    data = {
+        "id": entry_id,
+        "date": date,
+        "entry_number": entry_number,
+        "content": text,
+        "title": final_title,
+        "title_custom": title_custom,
+        "labels": labels_out,
+        "board": board or None,
+        "sort_order": max_order + 1.0,
+        "created_at": now,
+        "updated_at": now,
+    }
+    return fs.create_braindump(entry_id, data)

@@ -183,10 +183,14 @@ claude.ai / Claude アプリのカスタムコネクタとして PIS に接続�
   - 生成入力: 直近 3 か月の月次サマリー、直近 12 週の週次分析、やりたいこと、道しるべ（アクティブ）、トレードメモのボード別ラベル集計、現在の content（差分更新）。非公開は除外。プロンプトは `prompts/profile_generation.py`（7 見出し、2,000〜3,000 文字）
   - 画面: 左に確定版エディタ（書式ツールバー、1.5 秒で自動保存）、右に下書きと「AI で下書きを生成」「下書きを採用」。月初（1〜7 日）に前回生成から 30 日以上経っていればタスクページ上部にバナー
   - MCP の `get_profile` は確定版 content だけを返す（下書きは渡さない）。未作成なら案内文
+- **書き込み（フェーズ 4）**: `add_braindump_note(body, title?, labels?, board?)` が唯一の書き込みツール
+  - 今日（Asia/Tokyo）の自由帳に 1 件追加。`board` 指定でトレードメモのボードへ。ラベル `from-claude` を必ず自動付与
+  - タイトル省略時は既存の AI タイトル生成（失敗時は本文の先頭 30 文字）。更新・削除ツールは無い
+  - スコープ `pis:write` が無いトークンでは拒否。ツール説明に「ユーザーが『PIS に保存して』と明示したときだけ使う」と明記
 - **環境変数**: `MCP_PUBLIC_URL`（公開 URL）、`MCP_OWNER_PASSWORD_HASH`（bcrypt。`backend/scripts/make_password_hash.py`）、`MCP_TOKEN_SECRET`、`MCP_ALLOWED_REDIRECT_URIS`（任意）、`MCP_ALLOW_LOCALHOST_REDIRECT`（ローカル検証用）
 - **Firestore**: `mcp_oauth_clients` / `mcp_oauth_codes` / `mcp_oauth_tokens` / `mcp_login_attempts` / `mcp_access_logs`
 - **実装ファイル**: `backend/mcp_server.py`（MCP サーバーとツール）、`backend/routers/mcp_oauth.py`（OAuth エンドポイント）、`backend/services/mcp_auth_service.py`（検証・発行・ストア）
-- 未実装（次フェーズ）: 自由帳への書き込み（フェーズ 4）、意味検索と REST API への認証（フェーズ 5）
+- 未実装（次フェーズ）: 意味検索と REST API への認証（フェーズ 5）
 
 ### 18. PWA・キャッシュ
 

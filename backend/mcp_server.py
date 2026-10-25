@@ -183,6 +183,38 @@ def get_day(date: str) -> str:
     return text
 
 
+@mcp.tool(
+    title="自由帳にメモを追記する",
+    annotations=ToolAnnotations(read_only_hint=False, destructive_hint=False, idempotent_hint=False, open_world_hint=False),
+)
+def add_braindump_note(
+    body: str,
+    title: Optional[str] = None,
+    labels: Optional[list[str]] = None,
+    board: Optional[str] = None,
+) -> str:
+    """PIS の自由帳に新しいメモを 1 件追加する（唯一の書き込みツール。更新・削除はできない）。
+    ユーザーが「PIS に保存して」「メモしておいて」と明示したときだけ使う。それ以外で勝手に書き込まない。
+    body: 本文（必須）。title: 省略時は AI が自動生成。labels: 任意（`from-claude` は自動で付く）。
+    board: トレードメモに入れたいときのボード（stocks, cfd-silver, sumco, breakout, crude-oil, natural-gas）。
+    保存先は今日（日本時間）の日付。"""
+    tok = get_access_token()
+    if tok and "pis:write" not in (tok.scopes or []):
+        return "このトークンには書き込み権限（pis:write）がありません。コネクタを再接続してください。"
+    try:
+        saved = ctx.create_claude_note(body, title, labels, board)
+    except ValueError as e:
+        return str(e)
+    except Exception as e:
+        logger.exception("自由帳への追記に失敗")
+        return f"保存に失敗しました: {e}"
+    _log("add_braindump_note", f"title={saved.get('title', '')[:40]} labels={saved.get('labels')} board={board}", 1)
+    where = f"トレードメモ（{ctx.BOARDS.get(board)}）" if board else "自由帳"
+    return (f"{where}に保存しました。\n"
+            f"- 日付: {saved['date']}\n- タイトル: {saved.get('title')}\n- ラベル: {', '.join(saved.get('labels', []))}\n"
+            f"- id: {saved['id']}（type: {'trade' if board else 'braindump'}）")
+
+
 # ---- アプリ構築 ----
 
 def _allowed_hosts() -> list[str]:
