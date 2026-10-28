@@ -3,14 +3,14 @@
  * 1日に複数エントリ作成可能。各エントリに独立した分析・MD要約。
  */
 
-import { journalApi, diaryDialogueApi } from "../api.js?v=20261021b";
-import { lockButtonHTML, bindLockToggles, setLockState, lockLabel } from "../privacy-toggle.js?v=20261021b";
-import { showToast } from "../app.js?v=20261021b";
+import { journalApi, diaryDialogueApi } from "../api.js?v=20261028a";
+import { lockButtonHTML, bindLockToggles, setLockState, lockLabel } from "../privacy-toggle.js?v=20261028a";
+import { showToast } from "../app.js?v=20261028a";
 import {
   attachFloatingToolbar,
   appendMarkdownToEditor,
   serializeEditorMarkdown,
-} from "../floating-toolbar.js?v=20261021b";
+} from "../floating-toolbar.js?v=20261028a";
 
 /** 旧 textarea 互換: contenteditable / textarea どちらでも markdown を読む */
 function readEditorMarkdown(el) {

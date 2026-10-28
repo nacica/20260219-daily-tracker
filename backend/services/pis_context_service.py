@@ -14,10 +14,15 @@ MCP ツール（get_recent_context / search_pis / get_entry / get_day、将来�
 
 from __future__ import annotations
 
+import base64
+import binascii
 import logging
+import os
+import re
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import Any, Iterable, Optional
+from urllib.parse import quote
 
 from services import firestore_service as fs
 
@@ -584,11 +589,120 @@ def _normalize_labels(labels) -> list[str]:
     return out
 
 
+# ---- Claude からの画像添付 ----
+# 保存先・形式はアプリの「📷 写真を追加」/ 貼り付けと同じ:
+# Cloud Storage の braindump-images/ に公開 URL で置き、本文中に ![キャプション](URL) で埋め込む。
+
+CLAUDE_IMAGE_MAX_COUNT = 4
+CLAUDE_IMAGE_MAX_BYTES = 5 * 1024 * 1024  # 1 枚 5MB（デコード後）
+_IMAGE_PLACEHOLDER_RE = re.compile(r"\{\{\s*image(\d+)\s*\}\}", re.IGNORECASE)
+
+
+def _sniff_image_type(data: bytes) -> Optional[str]:
+    """先頭バイトから画像形式を判定する（申告された MIME は信用しない）"""
+    if data.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "image/png"
+    if data.startswith(b"\xff\xd8\xff"):
+        return "image/jpeg"
+    if data.startswith(b"GIF87a") or data.startswith(b"GIF89a"):
+        return "image/gif"
+    if data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+        return "image/webp"
+    return None
+
+
+def _decode_images(images: Optional[list[dict]]) -> list[tuple[bytes, str, str]]:
+    """images 引数（[{data, caption}]）を検証・デコードして (bytes, content_type, caption) のリストにする"""
+    if not images:
+        return []
+    if len(images) > CLAUDE_IMAGE_MAX_COUNT:
+        raise ValueError(f"画像は 1 回 {CLAUDE_IMAGE_MAX_COUNT} 枚までです")
+    out = []
+    for i, img in enumerate(images, 1):
+        raw = str((img or {}).get("data") or "").strip()
+        if raw.startswith("data:") and "," in raw:
+            raw = raw.split(",", 1)[1]  # data URI の頭（data:image/png;base64,）を外す
+        raw = re.sub(r"\s+", "", raw)
+        if not raw:
+            raise ValueError(f"画像{i}: data（base64）が空です")
+        if len(raw) > CLAUDE_IMAGE_MAX_BYTES * 4 // 3 + 4:
+            raise ValueError(f"画像{i}: サイズが大きすぎます（上限 {CLAUDE_IMAGE_MAX_BYTES // 1024 // 1024}MB）")
+        try:
+            data = base64.b64decode(raw + "=" * (-len(raw) % 4), validate=True)
+        except (binascii.Error, ValueError):
+            raise ValueError(f"画像{i}: data が base64 として読めません")
+        content_type = _sniff_image_type(data)
+        if not content_type:
+            raise ValueError(f"画像{i}: PNG / JPEG / GIF / WebP のいずれかにしてください")
+        caption = str((img or {}).get("caption") or "").strip()
+        caption = re.sub(r"[\[\]\(\)\n]", " ", caption)[:100].strip() or "画像"
+        out.append((data, content_type, caption))
+    return out
+
+
+def _embed_images(text: str, decoded: list[tuple[bytes, str, str]]) -> tuple[str, list[str], list[str]]:
+    """画像をアップロードし、本文の {{imageN}} を ![キャプション](URL) に置き換える。
+    プレースホルダーの無い画像は本文末尾に並べる。戻り値: (本文, URL 一覧, エラー一覧)"""
+    from services import storage_service
+
+    if not decoded:
+        return text, [], []
+    if not os.getenv("CLOUD_STORAGE_BUCKET"):
+        return text, [], ["Cloud Storage が設定されていないため画像を保存できませんでした"]
+
+    urls, errors, md = [], [], {}
+    for i, (data, content_type, caption) in enumerate(decoded, 1):
+        try:
+            url = storage_service.upload_braindump_image(data, content_type)
+            urls.append(url)
+            md[i] = f"![{caption}]({url})"
+        except Exception as e:
+            logger.exception("Claude からの画像 %d のアップロードに失敗", i)
+            errors.append(f"画像{i}: アップロードに失敗しました（{str(e)[:120]}）")
+            md[i] = f"（画像{i}は保存できませんでした）"
+
+    used: set[int] = set()
+
+    def _sub(m):
+        n = int(m.group(1))
+        if n in md:
+            used.add(n)
+            return md[n]
+        return m.group(0)
+
+    text = _IMAGE_PLACEHOLDER_RE.sub(_sub, text)
+    rest = [md[n] for n in sorted(md) if n not in used]
+    if rest:
+        text = text.rstrip() + "\n\n" + "\n".join(rest)
+    return text, urls, errors
+
+
+def frontend_url() -> str:
+    """PIS フロントエンド（Firebase Hosting）の公開 URL。
+    PIS_FRONTEND_URL → ALLOWED_ORIGINS の先頭の https オリジン → 既定値 の順に決める。"""
+    url = os.getenv("PIS_FRONTEND_URL", "").strip()
+    if not url:
+        for o in os.getenv("ALLOWED_ORIGINS", "").split(","):
+            o = o.strip()
+            if o.startswith("https://"):
+                url = o
+                break
+    return (url or "https://daily-tracker-487904.web.app").rstrip("/")
+
+
+def note_url(entry: dict) -> str:
+    """そのメモを PIS で直接開く URL（スマホで開いて「📷 写真を追加」から画像を足せる）"""
+    route = entry.get("board") or "braindump"
+    return f"{frontend_url()}/#/{route}/entry/{quote(entry['id'], safe='')}"
+
+
 def create_claude_note(body: str, title: Optional[str] = None, labels: Optional[list[str]] = None,
-                       board: Optional[str] = None) -> dict:
+                       board: Optional[str] = None, images: Optional[list[dict]] = None) -> dict:
     """Claude からのメモを今日（Asia/Tokyo）の自由帳に追記する。
     routers/braindump.py の作成処理と同じドキュメント形状。ラベル `from-claude` を必ず付ける。
-    タイトル未指定なら既存の AI タイトル生成を使い、失敗時は本文の先頭 30 文字。"""
+    タイトル未指定なら既存の AI タイトル生成を使い、失敗時は本文の先頭 30 文字。
+    images（[{data: base64, caption}]）があれば Cloud Storage に保存して本文に埋め込む。
+    戻り値には保存したドキュメントに加えて image_urls / image_errors / url（メモを開くリンク）を付ける。"""
     from services import claude_service
     from utils.helpers import now_jst
 
@@ -599,6 +713,11 @@ def create_claude_note(body: str, title: Optional[str] = None, labels: Optional[
         raise ValueError("本文は 20,000 文字以内にしてください")
     if board is not None and board not in BOARDS:
         raise ValueError(f"board に不明な値があります: {board}。指定できる値: {', '.join(BOARDS)}")
+    decoded = _decode_images(images)  # 不正な画像はメモを作る前にはじく
+
+    # タイトル生成には画像プレースホルダーを除いた本文を使う
+    title_source = _IMAGE_PLACEHOLDER_RE.sub("", text).strip() or text
+    text, image_urls, image_errors = _embed_images(text, decoded)
 
     date = today()
     entry_number = fs.get_next_braindump_entry_number(date)
@@ -610,10 +729,10 @@ def create_claude_note(body: str, title: Optional[str] = None, labels: Optional[
     else:
         title_custom = False
         try:
-            final_title = claude_service.generate_braindump_title(text)[:200]
+            final_title = claude_service.generate_braindump_title(title_source)[:200]
         except Exception as e:
             logger.warning("AI タイトル生成に失敗（先頭 30 文字で代替）: %s", e)
-            final_title = text[:30].replace("\n", " ") + ("..." if len(text) > 30 else "")
+            final_title = title_source[:30].replace("\n", " ") + ("..." if len(title_source) > 30 else "")
 
     existing_today = fs.list_braindumps_for_date(date)
     max_order = 0.0
@@ -641,4 +760,8 @@ def create_claude_note(body: str, title: Optional[str] = None, labels: Optional[
         "created_at": now,
         "updated_at": now,
     }
-    return fs.create_braindump(entry_id, data)
+    saved = dict(fs.create_braindump(entry_id, data))
+    saved["image_urls"] = image_urls
+    saved["image_errors"] = image_errors
+    saved["url"] = note_url(saved)
+    return saved

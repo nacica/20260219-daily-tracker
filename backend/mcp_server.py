@@ -28,7 +28,7 @@ import re
 from typing import Optional
 from urllib.parse import urlparse
 
-from pydantic import AnyHttpUrl
+from pydantic import AnyHttpUrl, BaseModel, Field
 from mcp.server import MCPServer
 from mcp.server.auth.middleware.auth_context import get_access_token
 from mcp.server.auth.provider import AccessToken, TokenVerifier
@@ -100,6 +100,12 @@ def _valid_date(s: Optional[str]) -> Optional[str]:
         return None
     s = s.strip()
     return s if _DATE_RE.match(s) else None
+
+
+class NoteImage(BaseModel):
+    """add_braindump_note に添える画像 1 枚"""
+    data: str = Field(..., description="画像のバイト列を base64 にした文字列（data:image/png;base64,... 形式も可）")
+    caption: Optional[str] = Field(None, description="画像の説明（代替テキスト。省略時は「画像」）")
 
 
 # ---- ツール ----
@@ -192,27 +198,41 @@ def add_braindump_note(
     title: Optional[str] = None,
     labels: Optional[list[str]] = None,
     board: Optional[str] = None,
+    images: Optional[list[NoteImage]] = None,
 ) -> str:
     """PIS の自由帳に新しいメモを 1 件追加する（唯一の書き込みツール。更新・削除はできない）。
     ユーザーが「PIS に保存して」「メモしておいて」と明示したときだけ使う。それ以外で勝手に書き込まない。
     body: 本文（必須）。title: 省略時は AI が自動生成。labels: 任意（`from-claude` は自動で付く）。
     board: トレードメモに入れたいときのボード（stocks, cfd-silver, sumco, breakout, crude-oil, natural-gas）。
+    images: 画像のバイト列を base64 で持っている場合だけ渡す（最大 4 枚・1 枚 5MB。PNG/JPEG/GIF/WebP）。
+    本文に {{image1}} のように書くとその位置に、書かなければ本文末尾に入る。
+    会話に添付された画像は base64 を取り出せないことが多い。その場合は images を省略して保存し、
+    戻り値の「画像を追加するリンク」をユーザーに伝えること（スマホで開いて 📷 から画像を足せる）。
     保存先は今日（日本時間）の日付。"""
     tok = get_access_token()
     if tok and "pis:write" not in (tok.scopes or []):
         return "このトークンには書き込み権限（pis:write）がありません。コネクタを再接続してください。"
     try:
-        saved = ctx.create_claude_note(body, title, labels, board)
+        saved = ctx.create_claude_note(body, title, labels, board,
+                                       [i.model_dump() for i in images] if images else None)
     except ValueError as e:
         return str(e)
     except Exception as e:
         logger.exception("自由帳への追記に失敗")
         return f"保存に失敗しました: {e}"
-    _log("add_braindump_note", f"title={saved.get('title', '')[:40]} labels={saved.get('labels')} board={board}", 1)
+    n_img = len(saved.get("image_urls") or [])
+    _log("add_braindump_note",
+         f"title={saved.get('title', '')[:40]} labels={saved.get('labels')} board={board} images={n_img}", 1)
     where = f"トレードメモ（{ctx.BOARDS.get(board)}）" if board else "自由帳"
-    return (f"{where}に保存しました。\n"
-            f"- 日付: {saved['date']}\n- タイトル: {saved.get('title')}\n- ラベル: {', '.join(saved.get('labels', []))}\n"
-            f"- id: {saved['id']}（type: {'trade' if board else 'braindump'}）")
+    lines = [f"{where}に保存しました。",
+             f"- 日付: {saved['date']}", f"- タイトル: {saved.get('title')}",
+             f"- ラベル: {', '.join(saved.get('labels', []))}",
+             f"- id: {saved['id']}（type: {'trade' if board else 'braindump'}）"]
+    if images:
+        lines.append(f"- 画像: {n_img} 枚保存")
+    lines += [f"  - {e}" for e in saved.get("image_errors") or []]
+    lines.append(f"- 画像を追加するリンク（スマホで開いて「📷 写真を追加」）: {saved['url']}")
+    return "\n".join(lines)
 
 
 # ---- アプリ構築 ----

@@ -5572,6 +5572,58 @@ div.journal-textarea.is-empty::before {
   white-space: nowrap;
 }
 
+/* 直リンク（Claude から保存したメモ）で開いたときに写真追加ボタンを目立たせる */
+.braindump-photo-btn-attention {
+  animation: bd-photo-pulse 1.2s ease-in-out 4;
+}
+
+@keyframes bd-photo-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+  50% { box-shadow: 0 0 0 6px rgba(59, 130, 246, 0.45); }
+}
+
+/* インライン画像の拡大表示 */
+.bd-image-viewer {
+  position: fixed;
+  inset: 0;
+  z-index: 10001;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 12px;
+  background: rgba(0, 0, 0, 0.88);
+  cursor: zoom-out;
+}
+
+.bd-image-viewer img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: 4px;
+}
+
+.bd-image-viewer-close {
+  position: absolute;
+  top: calc(8px + env(safe-area-inset-top, 0px));
+  right: 12px;
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  font-size: 18px;
+  cursor: pointer;
+}
+
+.bd-image-viewer-open {
+  position: absolute;
+  bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 13px;
+  text-decoration: underline;
+}
+
 /* エントリ一覧 — ガラス質モノリスカード */
 
 .braindump-entries {

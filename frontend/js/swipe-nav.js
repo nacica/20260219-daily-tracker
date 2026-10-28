@@ -3,7 +3,7 @@
  * モバイルで左右スワイプによるタブ切り替えを実現する
  */
 
-import { getNavOrder } from "./nav-order.js?v=20261021b";
+import { getNavOrder } from "./nav-order.js?v=20261028a";
 
 /** スワイプで行き来するタブ（data-route と一致）。順番はメニューの並び順に従う（tabOrder） */
 const SWIPE_TABS = [

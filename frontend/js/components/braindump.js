@@ -5,14 +5,14 @@
  * ラベル機能: メモごとに複数ラベル付与可、ラベルOR検索、専用管理モーダル。
  */
 
-import { braindumpApi } from "../api.js?v=20261021b";
-import { showToast } from "../app.js?v=20261021b";
+import { braindumpApi } from "../api.js?v=20261028a";
+import { showToast } from "../app.js?v=20261028a";
 import {
   attachFloatingToolbar,
   appendMarkdownToEditor,
   serializeEditorMarkdown,
   SIZE_SPAN_STRIP,
-} from "../floating-toolbar.js?v=20261021b";
+} from "../floating-toolbar.js?v=20261028a";
 
 // ===== ユーティリティ =====
 
@@ -300,7 +300,11 @@ function insertPlainTextAtCursor(text) {
 
 // ===== メインレンダー =====
 
-export async function renderBraindump(board = null) {
+/**
+ * @param {string|null} board - ボードID（null=自由帳本体）
+ * @param {string|null} openEntryId - 直リンク（#/braindump/entry/:id）で開くメモID。Claude からの保存結果のリンク用
+ */
+export async function renderBraindump(board = null, openEntryId = null) {
   currentBoard = board && BOARDS[board] ? board : null;
   currentDate = today();
   newEntryId = null; // ページ遷移時にリセット
@@ -389,8 +393,12 @@ export async function renderBraindump(board = null) {
 
   attachEvents();
 
-  // 直前に開いていたノートを復元（リロード／再訪問時も同じノートを表示する）
-  const lastId = getRememberedEntryId();
+  // 直リンク指定のメモ → なければ直前に開いていたノートを復元（リロード／再訪問時も同じノートを表示する）
+  if (openEntryId) {
+    // URL をボードの通常ルートに戻す（replaceState なので再描画は起きない。以後のリロードは記憶から復元）
+    history.replaceState(null, "", `#/${currentBoard || "braindump"}`);
+  }
+  const lastId = openEntryId || getRememberedEntryId();
   if (lastId) {
     const entry = recentEntries.find(e => e.id === lastId);
     if (entry) {
@@ -401,6 +409,8 @@ export async function renderBraindump(board = null) {
         const fetched = await braindumpApi.getEntry(lastId);
         if (fetched && fetched.id) {
           loadEntryIntoEditor(fetched);
+        } else if (openEntryId) {
+          showToast("リンク先のメモが見つかりませんでした", "error");
         } else {
           // 既に存在しないノートなら記憶をクリア
           rememberOpenEntry(null);
@@ -409,6 +419,17 @@ export async function renderBraindump(board = null) {
         rememberOpenEntry(null);
       }
     }
+  }
+
+  // 直リンクで開いたときは画像追加ボタンを目立たせる（Claude から保存したメモに画像を足す導線）
+  if (openEntryId && editingEntryId === openEntryId) {
+    const photoBtn = document.getElementById("bd-photo-btn");
+    if (photoBtn) {
+      photoBtn.classList.add("braindump-photo-btn-attention");
+      photoBtn.scrollIntoView({ block: "nearest" });
+      setTimeout(() => photoBtn.classList.remove("braindump-photo-btn-attention"), 6000);
+    }
+    showToast("「📷 写真を追加」から画像を追加できます");
   }
 }
 
@@ -1021,13 +1042,14 @@ function attachEvents() {
   installEditorSelectionTracker();
   // Tab キーでフォーカス移動を抑止し、タブ文字を挿入
   editorEl?.addEventListener("keydown", handleTabInsert);
-  // インライン画像クリックで新しいタブに原寸表示
+  // インライン画像タップで画面内に拡大表示
   editorEl?.addEventListener("click", (e) => {
     const img = e.target.closest && e.target.closest("img.bd-inline-img");
     if (!img) return;
     if (img.classList.contains("bd-inline-img-uploading")) return;
     if (!img.src) return;
-    window.open(img.src, "_blank");
+    editorEl.blur(); // スマホでキーボードが開かないように
+    openImageViewer(img.src, img.alt);
   });
 
   // タイトル入力（手動タイトル）の編集
@@ -1826,4 +1848,32 @@ async function pasteImageAtCursor(file) {
   } finally {
     URL.revokeObjectURL(tempUrl);
   }
+}
+
+// ===== 画像の拡大表示（タップで開き、背景タップ / ✕ / Esc で閉じる） =====
+
+function openImageViewer(src, alt = "") {
+  document.querySelector(".bd-image-viewer")?.remove();
+  const overlay = document.createElement("div");
+  overlay.className = "bd-image-viewer";
+  overlay.innerHTML = `
+    <button type="button" class="bd-image-viewer-close" aria-label="閉じる">✕</button>
+    <img alt="" />
+    <a class="bd-image-viewer-open" target="_blank" rel="noopener">原寸で開く ↗</a>`;
+  const img = overlay.querySelector("img");
+  img.src = src;
+  img.alt = alt || "画像";
+  overlay.querySelector(".bd-image-viewer-open").href = src;
+
+  const close = () => {
+    overlay.remove();
+    document.removeEventListener("keydown", onKey);
+  };
+  const onKey = (e) => { if (e.key === "Escape") close(); };
+  overlay.addEventListener("click", (e) => {
+    if (e.target.closest(".bd-image-viewer-open")) return;
+    close();
+  });
+  document.addEventListener("keydown", onKey);
+  document.body.appendChild(overlay);
 }

@@ -8,14 +8,14 @@
  * - 編集・削除メニュー(各項目)
  */
 
-import { wishlistApi } from "../api.js?v=20261021b";
-import { lockButtonHTML, bindLockToggles, setLockState, lockLabel } from "../privacy-toggle.js?v=20261021b";
-import { showToast } from "../app.js?v=20261021b";
+import { wishlistApi } from "../api.js?v=20261028a";
+import { lockButtonHTML, bindLockToggles, setLockState, lockLabel } from "../privacy-toggle.js?v=20261028a";
+import { showToast } from "../app.js?v=20261028a";
 import {
   attachFloatingToolbar,
   appendMarkdownToEditor,
   serializeEditorMarkdown,
-} from "../floating-toolbar.js?v=20261021b";
+} from "../floating-toolbar.js?v=20261028a";
 
 /** **bold** + <span style="font-size:Xem"> を保ったまま、テキスト部分はエスケープ + 改行→<br> */
 function renderWishlistNotes(text) {

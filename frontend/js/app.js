@@ -10,11 +10,11 @@
  *     リダイレクトのみ提供する。
  */
 
-import { addRoute, navigate, updateNavActive } from "./router.js?v=20261021b";
-import { recordsApi } from "./api.js?v=20261021b";
-import { initSwipeNav } from "./swipe-nav.js?v=20261021b";
-import { initSidebarResize } from "./sidebar-resize.js?v=20261021b";
-import { initNavOrder } from "./nav-order.js?v=20261021b";
+import { addRoute, navigate, updateNavActive } from "./router.js?v=20261028a";
+import { recordsApi } from "./api.js?v=20261028a";
+import { initSwipeNav } from "./swipe-nav.js?v=20261028a";
+import { initSidebarResize } from "./sidebar-resize.js?v=20261028a";
+import { initNavOrder } from "./nav-order.js?v=20261028a";
 
 // ===== バックエンドのウォームアップ（コールドスタート対策） =====
 // Cloud Run は min-instances 0 で運用しているため、久しぶりのアクセスでは
@@ -34,22 +34,22 @@ import { initNavOrder } from "./nav-order.js?v=20261021b";
 
 // ===== 動的 import ヘルパー =====
 // 各コンポーネントは初回訪問時に初めてネットワーク取得（以降は SW キャッシュから即応答）
-const loadInputForm       = () => import("./components/input-form.js?v=20261021b");
-const loadAnalysisView    = () => import("./components/analysis-view.js?v=20261021b");
-const loadHistoryList     = () => import("./components/history-list.js?v=20261021b");
-const loadWeeklyReport    = () => import("./components/weekly-report.js?v=20261021b");
-const loadMonthlyReport   = () => import("./components/monthly-report.js?v=20261021b");
-const loadJournal         = () => import("./components/journal.js?v=20261021b");
-const loadBraindump       = () => import("./components/braindump.js?v=20261021b");
-const loadTaskStats       = () => import("./components/task-stats.js?v=20261021b");
-const loadFlashcardList   = () => import("./components/flashcard-list.js?v=20261021b");
-const loadFlashcardStudy  = () => import("./components/flashcard-study.js?v=20261021b");
-const loadWishlist        = () => import("./components/wishlist.js?v=20261021b");
-const loadGratitude       = () => import("./components/gratitude.js?v=20261021b");
-const loadUdemyTips       = () => import("./components/udemy-tips.js?v=20261021b");
-const loadMichishirube    = () => import("./components/michishirube.js?v=20261021b");
-const loadHomeLauncher    = () => import("./components/home-launcher.js?v=20261021b");
-const loadProfile         = () => import("./components/profile.js?v=20261021b");
+const loadInputForm       = () => import("./components/input-form.js?v=20261028a");
+const loadAnalysisView    = () => import("./components/analysis-view.js?v=20261028a");
+const loadHistoryList     = () => import("./components/history-list.js?v=20261028a");
+const loadWeeklyReport    = () => import("./components/weekly-report.js?v=20261028a");
+const loadMonthlyReport   = () => import("./components/monthly-report.js?v=20261028a");
+const loadJournal         = () => import("./components/journal.js?v=20261028a");
+const loadBraindump       = () => import("./components/braindump.js?v=20261028a");
+const loadTaskStats       = () => import("./components/task-stats.js?v=20261028a");
+const loadFlashcardList   = () => import("./components/flashcard-list.js?v=20261028a");
+const loadFlashcardStudy  = () => import("./components/flashcard-study.js?v=20261028a");
+const loadWishlist        = () => import("./components/wishlist.js?v=20261028a");
+const loadGratitude       = () => import("./components/gratitude.js?v=20261028a");
+const loadUdemyTips       = () => import("./components/udemy-tips.js?v=20261028a");
+const loadMichishirube    = () => import("./components/michishirube.js?v=20261028a");
+const loadHomeLauncher    = () => import("./components/home-launcher.js?v=20261028a");
+const loadProfile         = () => import("./components/profile.js?v=20261028a");
 
 // ===== ユーティリティ =====
 
@@ -473,6 +473,11 @@ addRoute("/sumco", async () => (await loadBraindump()).renderBraindump("sumco"))
 addRoute("/breakout", async () => (await loadBraindump()).renderBraindump("breakout"));
 addRoute("/crude-oil", async () => (await loadBraindump()).renderBraindump("crude-oil"));
 addRoute("/natural-gas", async () => (await loadBraindump()).renderBraindump("natural-gas"));
+// メモへの直リンク（MCP の add_braindump_note が返す「画像を追加するリンク」）
+addRoute("/braindump/entry/:id", async ({ id }) => (await loadBraindump()).renderBraindump(null, decodeURIComponent(id)));
+for (const board of ["stocks", "cfd-silver", "sumco", "breakout", "crude-oil", "natural-gas"]) {
+  addRoute(`/${board}/entry/:id`, async ({ id }) => (await loadBraindump()).renderBraindump(board, decodeURIComponent(id)));
+}
 addRoute("/task-stats", async () => (await loadTaskStats()).renderTaskStats());
 addRoute("/flashcards", async () => (await loadFlashcardList()).renderFlashcardList());
 addRoute("/flashcards/study", async () => (await loadFlashcardStudy()).renderFlashcardStudy());

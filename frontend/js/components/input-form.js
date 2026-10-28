@@ -10,10 +10,10 @@
  * デスクトップ: タスクページはカードのドラッグ&ドロップ（masonry）レイアウト。
  */
 
-import { recordsApi, categoriesApi, taskMetaApi, profileApi } from "../api.js?v=20261021b";
-import { lockButtonHTML, bindLockToggles, setLockState, lockLabel } from "../privacy-toggle.js?v=20261021b";
-import { showToast } from "../app.js?v=20261021b";
-import { showTaskCompleteAnimation } from "./task-stats.js?v=20261021b";
+import { recordsApi, categoriesApi, taskMetaApi, profileApi } from "../api.js?v=20261028a";
+import { lockButtonHTML, bindLockToggles, setLockState, lockLabel } from "../privacy-toggle.js?v=20261028a";
+import { showToast } from "../app.js?v=20261028a";
+import { showTaskCompleteAnimation } from "./task-stats.js?v=20261028a";
 
 /* ── カテゴリ管理 ── */
 
