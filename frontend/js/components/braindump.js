@@ -5,14 +5,14 @@
  * ラベル機能: メモごとに複数ラベル付与可、ラベルOR検索、専用管理モーダル。
  */
 
-import { braindumpApi } from "../api.js?v=20261028a";
-import { showToast } from "../app.js?v=20261028a";
+import { braindumpApi } from "../api.js?v=20261107a";
+import { showToast } from "../app.js?v=20261107a";
 import {
   attachFloatingToolbar,
   appendMarkdownToEditor,
   serializeEditorMarkdown,
   SIZE_SPAN_STRIP,
-} from "../floating-toolbar.js?v=20261028a";
+} from "../floating-toolbar.js?v=20261107a";
 
 // ===== ユーティリティ =====
 
@@ -345,7 +345,12 @@ export async function renderBraindump(board = null, openEntryId = null) {
   }
 
   main.innerHTML = `
-    <div class="braindump-container">
+    <div class="braindump-container bd-mobile-list" id="bd-container">
+      <!-- スマホ専用: 一覧 / 書く の切替タブ（PC では非表示。初期表示は一覧） -->
+      <div class="braindump-mobile-tabs" role="tablist">
+        <button type="button" class="bd-mobile-tab active" data-view="list" role="tab">一覧</button>
+        <button type="button" class="bd-mobile-tab" data-view="write" role="tab">書く</button>
+      </div>
       <!-- 左カラム: 入力エリア (7) -->
       <div class="braindump-left">
         <div class="braindump-header">
@@ -398,7 +403,9 @@ export async function renderBraindump(board = null, openEntryId = null) {
     // URL をボードの通常ルートに戻す（replaceState なので再描画は起きない。以後のリロードは記憶から復元）
     history.replaceState(null, "", `#/${currentBoard || "braindump"}`);
   }
-  const lastId = openEntryId || getRememberedEntryId();
+  // スマホは常に一覧から始めるため、前回ノートの復元は PC のみ
+  const lastId = openEntryId || (isMobileLayout() ? null : getRememberedEntryId());
+  if (openEntryId) setMobileView("write");
   if (lastId) {
     const entry = recentEntries.find(e => e.id === lastId);
     if (entry) {
@@ -431,6 +438,24 @@ export async function renderBraindump(board = null, openEntryId = null) {
     }
     showToast("「📷 写真を追加」から画像を追加できます");
   }
+}
+
+// ===== スマホの 一覧 / 書く 切替 =====
+// 表示の出し分けは CSS（max-width: 767px）でのみ効くため、PC でクラスが付いても影響しない
+
+const MOBILE_LAYOUT_MQ = "(max-width: 767px)";
+
+function isMobileLayout() {
+  return window.matchMedia(MOBILE_LAYOUT_MQ).matches;
+}
+
+function setMobileView(view) {
+  const container = document.getElementById("bd-container");
+  if (!container) return;
+  container.classList.toggle("bd-mobile-list", view === "list");
+  container.classList.toggle("bd-mobile-write", view === "write");
+  container.querySelectorAll(".bd-mobile-tab").forEach((b) => b.classList.toggle("active", b.dataset.view === view));
+  if (isMobileLayout()) window.scrollTo(0, 0);
 }
 
 // ===== 表示期間（最近30日 / 全期間 / 月別） =====
@@ -1036,6 +1061,10 @@ function attachEvents() {
   editorEl?.addEventListener("input", handleNewTextareaInput);
   // クリップボードの貼り付け対応（画像はインライン挿入、テキストはプレーン化）
   editorEl?.addEventListener("paste", handlePasteEvent);
+  // スマホの 一覧 / 書く 切替タブ
+  document.querySelectorAll(".bd-mobile-tab").forEach((btn) => {
+    btn.addEventListener("click", () => setMobileView(btn.dataset.view));
+  });
   // 写真追加（スマホのアルバム / カメラ、PC のファイル選択）
   document.getElementById("bd-photo-btn")?.addEventListener("click", openPhotoPicker);
   document.getElementById("bd-photo-input")?.addEventListener("change", handlePhotoInputChange);
@@ -1166,6 +1195,7 @@ function attachEvents() {
     if (!entry) return;
 
     loadEntryIntoEditor(entry);
+    setMobileView("write");
   });
 
   // カード選択（フォーカス）状態でのキーボード操作
@@ -1180,7 +1210,10 @@ function attachEvents() {
     } else if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
       const entry = recentEntries.find(en => en.id === entryEl.dataset.id);
-      if (entry) loadEntryIntoEditor(entry);
+      if (entry) {
+        loadEntryIntoEditor(entry);
+        setMobileView("write");
+      }
     }
   });
 }
@@ -1344,6 +1377,7 @@ async function startNewMemo() {
   }
   resetToNewMode();
   insertDateTimeHeader();
+  setMobileView("write");
 }
 
 function resetToNewMode() {

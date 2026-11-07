@@ -5272,6 +5272,56 @@ div.journal-textarea.is-empty::before {
   }
 }
 
+/* スマホ: 一覧 / 書く の切替タブ（PC では非表示） */
+.braindump-mobile-tabs {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .braindump-mobile-tabs {
+    display: flex;
+    gap: 4px;
+    padding: 4px;
+    border: 1px solid var(--border-bright);
+    border-radius: 10px;
+    background: var(--bg-card);
+  }
+  .bd-mobile-tab {
+    flex: 1;
+    padding: 8px 0;
+    border: none;
+    border-radius: 7px;
+    background: transparent;
+    color: var(--text-secondary);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .bd-mobile-tab.active {
+    background: rgba(0, 212, 255, 0.16);
+    color: var(--cyan);
+  }
+  .braindump-container.bd-mobile-list .braindump-left,
+  .braindump-container.bd-mobile-write .braindump-right {
+    display: none;
+  }
+  /* 一覧はタイトル＋時刻＋本文冒頭 2 行（ラベルは出さない） */
+  .braindump-container .bd-entry-labels {
+    display: none;
+  }
+  .braindump-container .braindump-entry-preview {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    white-space: normal;
+  }
+}
+
+[data-theme="light"] .bd-mobile-tab.active {
+  background: rgba(59, 130, 246, 0.12);
+  color: var(--blue);
+}
+
 .braindump-header {
   display: flex;
   justify-content: space-between;
