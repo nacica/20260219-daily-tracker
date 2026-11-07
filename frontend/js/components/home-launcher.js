@@ -7,7 +7,7 @@
  * タイルは長押し→ドラッグで並び替えでき、順番はサイドバーと共通（nav-order.js）。
  */
 
-import { enableLauncherSort } from "../nav-order.js?v=20261107b";
+import { enableLauncherSort } from "../nav-order.js?v=20261107c";
 
 /** 現在日時のテキスト（例: 9月12日（土））*/
 function todayLabel() {

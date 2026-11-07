@@ -6,14 +6,14 @@
  * 各エントリは編集・削除可能。
  */
 
-import { gratitudeApi } from "../api.js?v=20261107b";
-import { lockButtonHTML, bindLockToggles, setLockState, lockLabel } from "../privacy-toggle.js?v=20261107b";
-import { showToast } from "../app.js?v=20261107b";
+import { gratitudeApi } from "../api.js?v=20261107c";
+import { lockButtonHTML, bindLockToggles, setLockState, lockLabel } from "../privacy-toggle.js?v=20261107c";
+import { showToast } from "../app.js?v=20261107c";
 import {
   attachFloatingToolbar,
   appendMarkdownToEditor,
   serializeEditorMarkdown,
-} from "../floating-toolbar.js?v=20261107b";
+} from "../floating-toolbar.js?v=20261107c";
 
 /** contenteditable から markdown を読む（textarea にも対応） */
 function readEditorMd(el) {

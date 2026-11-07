@@ -7,13 +7,13 @@
  * トップページのコンパクトカードは export されたヘルパ経由で参照する。
  */
 
-import { remindersApi } from "../api.js?v=20261107b";
-import { showToast } from "../app.js?v=20261107b";
+import { remindersApi } from "../api.js?v=20261107c";
+import { showToast } from "../app.js?v=20261107c";
 import {
   attachFloatingToolbar,
   appendMarkdownToEditor,
   serializeEditorMarkdown,
-} from "../floating-toolbar.js?v=20261107b";
+} from "../floating-toolbar.js?v=20261107c";
 
 /** contenteditable div / textarea いずれでも markdown を読み書きするヘルパ */
 function readEditableMarkdown(el) {

@@ -5,14 +5,14 @@
  * ラベル機能: メモごとに複数ラベル付与可、ラベルOR検索、専用管理モーダル。
  */
 
-import { braindumpApi } from "../api.js?v=20261107b";
-import { showToast } from "../app.js?v=20261107b";
+import { braindumpApi } from "../api.js?v=20261107c";
+import { showToast } from "../app.js?v=20261107c";
 import {
   attachFloatingToolbar,
   appendMarkdownToEditor,
   serializeEditorMarkdown,
   SIZE_SPAN_STRIP,
-} from "../floating-toolbar.js?v=20261107b";
+} from "../floating-toolbar.js?v=20261107c";
 
 // ===== ユーティリティ =====
 
@@ -373,8 +373,8 @@ export async function renderBraindump(board = null, openEntryId = null) {
           </div>
         </div>
         <div class="braindump-new-form" id="bd-new-form">
-          <input type="text" class="braindump-title-input" id="bd-title-input" maxlength="200"
-                 placeholder="タイトル（空欄ならAIが自動生成）" autocomplete="off" />
+          <textarea class="braindump-title-input" id="bd-title-input" maxlength="200" rows="1"
+                    placeholder="タイトル（空欄ならAIが自動生成）" autocomplete="off"></textarea>
           <div class="braindump-labels-editor" id="bd-labels-editor">
             ${renderLabelsEditor()}
           </div>
@@ -468,8 +468,21 @@ function setMobileView(view) {
   container.classList.toggle("bd-mobile-list", view === "list");
   container.classList.toggle("bd-mobile-write", view === "write");
   container.querySelectorAll(".bd-mobile-tab").forEach((b) => b.classList.toggle("active", b.dataset.view === view));
+  // 非表示中は高さを測れないため、書くタブを表示したタイミングでタイトル欄の高さを合わせ直す
+  if (view === "write") autosizeTitleInput();
   if (isMobileLayout()) window.scrollTo(0, 0);
 }
+
+// ===== タイトル欄の高さ自動調整（長いタイトルも折り返して全文表示） =====
+
+function autosizeTitleInput() {
+  const el = document.getElementById("bd-title-input");
+  if (!el || !el.offsetParent) return; // 非表示中は測れないので表示時に再計算する
+  el.style.height = "auto";
+  el.style.height = `${el.scrollHeight + (el.offsetHeight - el.clientHeight)}px`;
+}
+
+window.addEventListener("resize", autosizeTitleInput);
 
 // ===== スマホの絞り込みパネル（期間・ラベル・並び順） =====
 // 各バーは id 指定で再描画されるため、DOM ごとパネルへ移せば既存の処理がそのまま動く。
@@ -1168,6 +1181,9 @@ function attachEvents() {
   const titleEl = document.getElementById("bd-title-input");
   if (titleEl) {
     titleEl.addEventListener("input", () => {
+      // タイトルは 1 行の文字列として扱う（貼り付けで入った改行は空白に置き換える）
+      if (/[\r\n]/.test(titleEl.value)) titleEl.value = titleEl.value.replace(/[\r\n]+/g, " ");
+      autosizeTitleInput();
       currentTitle = titleEl.value;
       if (titleSaveTimer) clearTimeout(titleSaveTimer);
       titleSaveTimer = setTimeout(saveTitle, 800);
@@ -1359,6 +1375,7 @@ function loadEntryIntoEditor(entry) {
   lastSavedTitle = currentTitle;
   const titleEl = document.getElementById("bd-title-input");
   if (titleEl) titleEl.value = currentTitle;
+  autosizeTitleInput();
   editingEntryId = entry.id;
   newEntryId = null; // 新規メモのIDをリセット
   rememberOpenEntry(entry.id); // リロード後も同じノートを表示できるよう記憶
@@ -1480,6 +1497,7 @@ function resetToNewMode() {
   if (titleSaveTimer) { clearTimeout(titleSaveTimer); titleSaveTimer = null; }
   const titleEl = document.getElementById("bd-title-input");
   if (titleEl) titleEl.value = "";
+  autosizeTitleInput();
   refreshLabelsEditor();
 
   // ヘッダーを元に戻す

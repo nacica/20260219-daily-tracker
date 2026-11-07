@@ -5425,6 +5425,13 @@ div.journal-textarea.is-empty::before {
   font-weight: 600;
   line-height: 1.4;
   transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+  /* 長いタイトルは折り返して全文表示（高さは JS で内容に合わせる） */
+  display: block;
+  min-height: 0; /* 共通 textarea の min-height: 180px を打ち消す */
+  resize: none;
+  overflow: hidden;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .braindump-title-input::placeholder {
