@@ -5,7 +5,7 @@
  * - タスク完了時 +1 フローティングアニメーション
  */
 
-import { recordsApi } from "../api.js?v=20261107a";
+import { recordsApi } from "../api.js?v=20261107b";
 
 // ===== ユーティリティ =====
 

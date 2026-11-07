@@ -7,6 +7,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from dotenv import load_dotenv
 import os
 
@@ -60,6 +61,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# レスポンス圧縮（自由帳の全期間一覧など大きな JSON を約 1/5 に縮める。SSE は対象外）
+app.add_middleware(GZipMiddleware, minimum_size=1024)
 
 # ルーターの登録
 app.include_router(records.router,     prefix="/api/v1", tags=["records"])

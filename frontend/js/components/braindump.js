@@ -5,14 +5,14 @@
  * ラベル機能: メモごとに複数ラベル付与可、ラベルOR検索、専用管理モーダル。
  */
 
-import { braindumpApi } from "../api.js?v=20261107a";
-import { showToast } from "../app.js?v=20261107a";
+import { braindumpApi } from "../api.js?v=20261107b";
+import { showToast } from "../app.js?v=20261107b";
 import {
   attachFloatingToolbar,
   appendMarkdownToEditor,
   serializeEditorMarkdown,
   SIZE_SPAN_STRIP,
-} from "../floating-toolbar.js?v=20261107a";
+} from "../floating-toolbar.js?v=20261107b";
 
 // ===== ユーティリティ =====
 
@@ -321,7 +321,8 @@ export async function renderBraindump(board = null, openEntryId = null) {
     entries = [];
   }
 
-  periodMode = "recent";
+  // スマホは全期間をさかのぼれるよう既定を全期間にする（PC は最近30日）
+  periodMode = isMobileLayout() ? "all" : "recent";
   allEntriesCache = null;
 
   // 表示期間分のメモを取得（初期は最近30日）
@@ -350,6 +351,17 @@ export async function renderBraindump(board = null, openEntryId = null) {
       <div class="braindump-mobile-tabs" role="tablist">
         <button type="button" class="bd-mobile-tab active" data-view="list" role="tab">一覧</button>
         <button type="button" class="bd-mobile-tab" data-view="write" role="tab">書く</button>
+        <button type="button" class="bd-mobile-filter-btn" id="bd-mobile-filter-btn" aria-expanded="false">
+          ⚙ 絞込<span class="bd-mobile-filter-badge" id="bd-mobile-filter-badge" hidden></span>
+        </button>
+      </div>
+      <!-- スマホ専用: 絞り込みパネル（期間・ラベル・並び順の各バーをここへ移して表示する） -->
+      <div class="bd-mobile-filter-panel" id="bd-mobile-filter-panel" hidden>
+        <div id="bd-mobile-filter-slot"></div>
+        <div class="bd-mobile-filter-actions">
+          <button type="button" class="btn btn-outline btn-sm" id="bd-mobile-filter-reset">クリア</button>
+          <button type="button" class="btn btn-primary btn-sm" id="bd-mobile-filter-close">閉じる</button>
+        </div>
       </div>
       <!-- 左カラム: 入力エリア (7) -->
       <div class="braindump-left">
@@ -452,10 +464,79 @@ function isMobileLayout() {
 function setMobileView(view) {
   const container = document.getElementById("bd-container");
   if (!container) return;
+  if (view === "write") toggleMobileFilterPanel(false);
   container.classList.toggle("bd-mobile-list", view === "list");
   container.classList.toggle("bd-mobile-write", view === "write");
   container.querySelectorAll(".bd-mobile-tab").forEach((b) => b.classList.toggle("active", b.dataset.view === view));
   if (isMobileLayout()) window.scrollTo(0, 0);
+}
+
+// ===== スマホの絞り込みパネル（期間・ラベル・並び順） =====
+// 各バーは id 指定で再描画されるため、DOM ごとパネルへ移せば既存の処理がそのまま動く。
+// PC 幅に戻ったら一覧カラムの元の位置へ戻す。
+
+const FILTER_BAR_IDS = ["bd-period-bar", "bd-filter-bar", "bd-sort-bar"];
+let mobileFilterMql = null;
+
+function placeFilterBars() {
+  const slot = document.getElementById("bd-mobile-filter-slot");
+  const entries = document.getElementById("bd-entries");
+  if (!slot || !entries) return;
+  const mobile = isMobileLayout();
+  for (const id of FILTER_BAR_IDS) {
+    const bar = document.getElementById(id);
+    if (!bar) continue;
+    if (mobile) slot.appendChild(bar);
+    else entries.parentNode.insertBefore(bar, entries);
+  }
+  if (!mobile) toggleMobileFilterPanel(false);
+}
+
+function toggleMobileFilterPanel(open) {
+  const panel = document.getElementById("bd-mobile-filter-panel");
+  const btn = document.getElementById("bd-mobile-filter-btn");
+  if (!panel) return;
+  const next = typeof open === "boolean" ? open : panel.hidden;
+  panel.hidden = !next;
+  btn?.setAttribute("aria-expanded", String(next));
+  btn?.classList.toggle("active", next);
+}
+
+/** 既定（スマホ: 全期間・ラベルなし）から外れている条件の数をボタンに表示する */
+function updateMobileFilterBadge() {
+  const badge = document.getElementById("bd-mobile-filter-badge");
+  if (!badge) return;
+  const n = filterLabels.length + (periodMode !== "all" ? 1 : 0);
+  badge.hidden = n === 0;
+  badge.textContent = n > 0 ? String(n) : "";
+}
+
+function attachMobileFilterEvents() {
+  placeFilterBars();
+  updateMobileFilterBadge();
+  if (mobileFilterMql) mobileFilterMql.removeEventListener("change", placeFilterBars);
+  mobileFilterMql = window.matchMedia(MOBILE_LAYOUT_MQ);
+  mobileFilterMql.addEventListener("change", placeFilterBars);
+
+  document.getElementById("bd-mobile-filter-btn")?.addEventListener("click", () => {
+    // 書くタブで開いたら、結果が見えるよう一覧タブへ切り替える
+    if (document.getElementById("bd-container")?.classList.contains("bd-mobile-write")) {
+      setMobileView("list");
+      toggleMobileFilterPanel(true);
+    } else {
+      toggleMobileFilterPanel();
+    }
+  });
+  document.getElementById("bd-mobile-filter-close")?.addEventListener("click", () => toggleMobileFilterPanel(false));
+  document.getElementById("bd-mobile-filter-reset")?.addEventListener("click", async () => {
+    filterLabels = [];
+    periodMode = "all";
+    const sel = document.getElementById("bd-period-select");
+    if (sel) sel.value = "all";
+    refreshFilterBar();
+    await loadEntriesForCurrentPeriod();
+    refreshEntriesList();
+  });
 }
 
 // ===== 表示期間（最近30日 / 全期間 / 月別） =====
@@ -893,6 +974,7 @@ function renderRecentEntries() {
 }
 
 function refreshEntriesList(activeId) {
+  updateMobileFilterBadge();
   const container = document.getElementById("bd-entries");
   if (container) {
     // 再描画でフォーカス中のカードが破棄されると ↑↓ ナビゲーションが途切れるため、退避して復元する
@@ -1061,10 +1143,11 @@ function attachEvents() {
   editorEl?.addEventListener("input", handleNewTextareaInput);
   // クリップボードの貼り付け対応（画像はインライン挿入、テキストはプレーン化）
   editorEl?.addEventListener("paste", handlePasteEvent);
-  // スマホの 一覧 / 書く 切替タブ
+  // スマホの 一覧 / 書く 切替タブと絞り込みパネル
   document.querySelectorAll(".bd-mobile-tab").forEach((btn) => {
     btn.addEventListener("click", () => setMobileView(btn.dataset.view));
   });
+  attachMobileFilterEvents();
   // 写真追加（スマホのアルバム / カメラ、PC のファイル選択）
   document.getElementById("bd-photo-btn")?.addEventListener("click", openPhotoPicker);
   document.getElementById("bd-photo-input")?.addEventListener("change", handlePhotoInputChange);

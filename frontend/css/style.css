@@ -5272,8 +5272,9 @@ div.journal-textarea.is-empty::before {
   }
 }
 
-/* スマホ: 一覧 / 書く の切替タブ（PC では非表示） */
-.braindump-mobile-tabs {
+/* スマホ: 一覧 / 書く の切替タブと絞り込みパネル（PC では非表示） */
+.braindump-mobile-tabs,
+.bd-mobile-filter-panel {
   display: none;
 }
 
@@ -5300,6 +5301,55 @@ div.journal-textarea.is-empty::before {
   .bd-mobile-tab.active {
     background: rgba(0, 212, 255, 0.16);
     color: var(--cyan);
+  }
+  .bd-mobile-filter-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 8px 10px;
+    border: 1px solid var(--border-bright);
+    border-radius: 7px;
+    background: transparent;
+    color: var(--text-secondary);
+    font: inherit;
+    font-size: 0.85rem;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+  .bd-mobile-filter-btn.active {
+    color: var(--cyan);
+    border-color: var(--cyan-dim);
+  }
+  .bd-mobile-filter-badge {
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: 9px;
+    background: var(--cyan);
+    color: var(--bg-primary);
+    font-size: 0.72rem;
+    font-weight: 700;
+    line-height: 18px;
+    text-align: center;
+  }
+  .bd-mobile-filter-panel:not([hidden]) {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 12px;
+    border: 1px solid var(--border-bright);
+    border-radius: 10px;
+    background: var(--bg-card);
+  }
+  #bd-mobile-filter-slot {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .bd-mobile-filter-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
   }
   .braindump-container.bd-mobile-list .braindump-left,
   .braindump-container.bd-mobile-write .braindump-right {
