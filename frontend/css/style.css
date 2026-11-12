@@ -8091,6 +8091,14 @@ div.journal-textarea.is-empty::before {
 .reminder-fontsize-btn#reminder-modal-font-dec { font-size: 0.78rem; }
 .reminder-fontsize-btn#reminder-modal-font-inc { font-size: 1rem; }
 
+/* 道しるべモーダルの前へ/次へボタン（押しやすいよう通常の 2 倍サイズ） */
+#reminder-modal-prev,
+#reminder-modal-next {
+  width: 56px;
+  height: 56px;
+  font-size: 1.8rem;
+}
+
 .reminder-modal-buttons {
   display: flex;
   align-items: stretch;
