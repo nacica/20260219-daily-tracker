@@ -147,7 +147,7 @@ def search_pis(
     braindump（自由帳） trade（トレードメモ） michishirube（道しるべ） wishlist（やりたいこと）
     gratitude（ありがたいノート） udemy_tips flashcards（単語帳）。
     start_date / end_date: YYYY-MM-DD。省略時は直近 365 日。
-    board: トレードメモのボード（stocks, cfd-silver, sumco, breakout, crude-oil, natural-gas）。
+    board: トレードメモのボード（stocks, cfd-silver, breakout）。
     limit: 既定 20、最大 50。結果は一致数の多い順 → 新しい順。各件に type / id / date が付くので、
     全文は get_entry(type, id) で取得する。"""
     q = (query or "").strip()
@@ -203,7 +203,7 @@ def add_braindump_note(
     """PIS の自由帳に新しいメモを 1 件追加する（唯一の書き込みツール。更新・削除はできない）。
     ユーザーが「PIS に保存して」「メモしておいて」と明示したときだけ使う。それ以外で勝手に書き込まない。
     body: 本文（必須）。title: 省略時は AI が自動生成。labels: 任意（`from-claude` は自動で付く）。
-    board: トレードメモに入れたいときのボード（stocks, cfd-silver, sumco, breakout, crude-oil, natural-gas）。
+    board: トレードメモに入れたいときのボード（stocks, cfd-silver, breakout）。
     images: 画像のバイト列を base64 で持っている場合だけ渡す（最大 4 枚・1 枚 5MB。PNG/JPEG/GIF/WebP）。
     本文に {{image1}} のように書くとその位置に、書かなければ本文末尾に入る。
     会話に添付された画像は base64 を取り出せないことが多い。その場合は images を省略して保存し、

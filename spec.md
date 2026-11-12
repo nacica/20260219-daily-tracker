@@ -100,9 +100,9 @@
 - **並べ替え**: 同じ日のメモの順序を変更
 - **書式ツールバー**: 太字 / 赤文字 / 文字サイズ
 
-### 9. トレードメモ（`#/stocks` `#/cfd-silver` `#/sumco` `#/breakout` `#/crude-oil` `#/natural-gas`）
+### 9. トレードメモ（`#/stocks` `#/cfd-silver` `#/breakout`）
 
-- 自由帳と同じ仕様の専用ページ。株全般 / CFD銀 / sumcoデイトレ / 新高値ブレイク / 原油 / 天然ガス の 6 ボード
+- 自由帳と同じ仕様の専用ページ。株全般 / CFD銀 / 新高値ブレイク の 3 ボード（sumcoデイトレ・原油・天然ガスは 2026-11-12 に廃止し、メモは株全般へ移行）
 - データは自由帳と同じ保存先を共有し、`board` フィールドで絞り込む。自由帳本体は全メモを表示する
 
 ### 10. 道しるべ（今日意識すること）（`#/michishirube`）
@@ -212,7 +212,7 @@ claude.ai / Claude アプリのカスタムコネクタとして PIS に接続�
 | `/monthly` `/monthly/:yearMonth` | 月次レポート | monthly-report.js |
 | `/journal` `/journal/:date` | 日記（フリージャーナル） | journal.js |
 | `/braindump` | 自由帳 | braindump.js |
-| `/stocks` `/cfd-silver` `/sumco` `/breakout` `/crude-oil` `/natural-gas` | トレードメモ（ボード） | braindump.js（board 指定） |
+| `/stocks` `/cfd-silver` `/breakout` | トレードメモ（ボード） | braindump.js（board 指定） |
 | `/michishirube` | 道しるべ（付箋） | michishirube.js |
 | `/udemy-tips` | Udemy 制作 Tips | udemy-tips.js |
 | `/wishlist` | やりたいことリスト | wishlist.js |

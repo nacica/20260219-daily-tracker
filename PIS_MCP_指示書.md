@@ -141,7 +141,7 @@ Firestore（既存コレクション + 新規コレクション）
   - `query`（必須。スペース区切りで AND 検索）
   - `sources`（任意。`activity_log` `tasks` `analysis` `journal` `braindump` `trade` `michishirube` `wishlist` `gratitude` `udemy_tips` `flashcards` の配列。省略時は全部）
   - `start_date` / `end_date`（任意。省略時は直近 365 日）
-  - `board`（任意。トレードメモのボード指定: `stocks` `cfd-silver` `sumco` `breakout` `crude-oil` `natural-gas`）
+  - `board`（任意。トレードメモのボード指定: `stocks` `cfd-silver` `breakout`）
   - `limit`（既定 20、最大 50）
 - 実装: Firestore に全文検索はないため、期間で絞って取得し Python 側で照合する（単一ユーザーなので件数的に問題ない）
   - 正規化: Unicode NFKC、英字小文字化、全角半角統一、カタカナ / ひらがな同一視

@@ -10,11 +10,11 @@
  *     リダイレクトのみ提供する。
  */
 
-import { addRoute, navigate, updateNavActive } from "./router.js?v=20261107c";
-import { recordsApi } from "./api.js?v=20261107c";
-import { initSwipeNav } from "./swipe-nav.js?v=20261107c";
-import { initSidebarResize } from "./sidebar-resize.js?v=20261107c";
-import { initNavOrder } from "./nav-order.js?v=20261107c";
+import { addRoute, navigate, updateNavActive } from "./router.js?v=20261112a";
+import { recordsApi } from "./api.js?v=20261112a";
+import { initSwipeNav } from "./swipe-nav.js?v=20261112a";
+import { initSidebarResize } from "./sidebar-resize.js?v=20261112a";
+import { initNavOrder } from "./nav-order.js?v=20261112a";
 
 // ===== バックエンドのウォームアップ（コールドスタート対策） =====
 // Cloud Run は min-instances 0 で運用しているため、久しぶりのアクセスでは
@@ -34,22 +34,22 @@ import { initNavOrder } from "./nav-order.js?v=20261107c";
 
 // ===== 動的 import ヘルパー =====
 // 各コンポーネントは初回訪問時に初めてネットワーク取得（以降は SW キャッシュから即応答）
-const loadInputForm       = () => import("./components/input-form.js?v=20261107c");
-const loadAnalysisView    = () => import("./components/analysis-view.js?v=20261107c");
-const loadHistoryList     = () => import("./components/history-list.js?v=20261107c");
-const loadWeeklyReport    = () => import("./components/weekly-report.js?v=20261107c");
-const loadMonthlyReport   = () => import("./components/monthly-report.js?v=20261107c");
-const loadJournal         = () => import("./components/journal.js?v=20261107c");
-const loadBraindump       = () => import("./components/braindump.js?v=20261107c");
-const loadTaskStats       = () => import("./components/task-stats.js?v=20261107c");
-const loadFlashcardList   = () => import("./components/flashcard-list.js?v=20261107c");
-const loadFlashcardStudy  = () => import("./components/flashcard-study.js?v=20261107c");
-const loadWishlist        = () => import("./components/wishlist.js?v=20261107c");
-const loadGratitude       = () => import("./components/gratitude.js?v=20261107c");
-const loadUdemyTips       = () => import("./components/udemy-tips.js?v=20261107c");
-const loadMichishirube    = () => import("./components/michishirube.js?v=20261107c");
-const loadHomeLauncher    = () => import("./components/home-launcher.js?v=20261107c");
-const loadProfile         = () => import("./components/profile.js?v=20261107c");
+const loadInputForm       = () => import("./components/input-form.js?v=20261112a");
+const loadAnalysisView    = () => import("./components/analysis-view.js?v=20261112a");
+const loadHistoryList     = () => import("./components/history-list.js?v=20261112a");
+const loadWeeklyReport    = () => import("./components/weekly-report.js?v=20261112a");
+const loadMonthlyReport   = () => import("./components/monthly-report.js?v=20261112a");
+const loadJournal         = () => import("./components/journal.js?v=20261112a");
+const loadBraindump       = () => import("./components/braindump.js?v=20261112a");
+const loadTaskStats       = () => import("./components/task-stats.js?v=20261112a");
+const loadFlashcardList   = () => import("./components/flashcard-list.js?v=20261112a");
+const loadFlashcardStudy  = () => import("./components/flashcard-study.js?v=20261112a");
+const loadWishlist        = () => import("./components/wishlist.js?v=20261112a");
+const loadGratitude       = () => import("./components/gratitude.js?v=20261112a");
+const loadUdemyTips       = () => import("./components/udemy-tips.js?v=20261112a");
+const loadMichishirube    = () => import("./components/michishirube.js?v=20261112a");
+const loadHomeLauncher    = () => import("./components/home-launcher.js?v=20261112a");
+const loadProfile         = () => import("./components/profile.js?v=20261112a");
 
 // ===== ユーティリティ =====
 
@@ -77,10 +77,7 @@ const ROUTE_TITLES = {
   "/braindump": { title: "自由帳", breadcrumb: "頭の整理メモ" },
   "/stocks": { title: "株全般", breadcrumb: "トレードメモ" },
   "/cfd-silver": { title: "CFD銀", breadcrumb: "トレードメモ" },
-  "/sumco": { title: "sumcoデイトレ", breadcrumb: "トレードメモ" },
   "/breakout": { title: "新高値ブレイク", breadcrumb: "トレードメモ" },
-  "/crude-oil": { title: "原油", breadcrumb: "トレードメモ" },
-  "/natural-gas": { title: "天然ガス", breadcrumb: "トレードメモ" },
   "/task-stats": { title: "タスク実績", breadcrumb: "タスク実績" },
   "/flashcards": { title: "単語帳", breadcrumb: "単語帳カード" },
   "/wishlist": { title: "やりたいことリスト", breadcrumb: "Wishlist" },
@@ -469,14 +466,16 @@ addRoute("/journal/:date", async ({ date }) => (await loadJournal()).renderJourn
 addRoute("/braindump", async () => (await loadBraindump()).renderBraindump());
 addRoute("/stocks", async () => (await loadBraindump()).renderBraindump("stocks"));
 addRoute("/cfd-silver", async () => (await loadBraindump()).renderBraindump("cfd-silver"));
-addRoute("/sumco", async () => (await loadBraindump()).renderBraindump("sumco"));
 addRoute("/breakout", async () => (await loadBraindump()).renderBraindump("breakout"));
-addRoute("/crude-oil", async () => (await loadBraindump()).renderBraindump("crude-oil"));
-addRoute("/natural-gas", async () => (await loadBraindump()).renderBraindump("natural-gas"));
 // メモへの直リンク（MCP の add_braindump_note が返す「画像を追加するリンク」）
 addRoute("/braindump/entry/:id", async ({ id }) => (await loadBraindump()).renderBraindump(null, decodeURIComponent(id)));
-for (const board of ["stocks", "cfd-silver", "sumco", "breakout", "crude-oil", "natural-gas"]) {
+for (const board of ["stocks", "cfd-silver", "breakout"]) {
   addRoute(`/${board}/entry/:id`, async ({ id }) => (await loadBraindump()).renderBraindump(board, decodeURIComponent(id)));
+}
+// 廃止したボード（sumcoデイトレ・原油・天然ガス。メモは株全般へ移行済み）の旧 URL はホームへ戻す
+for (const board of ["sumco", "crude-oil", "natural-gas"]) {
+  addRoute(`/${board}`, () => { location.hash = "#/"; });
+  addRoute(`/${board}/entry/:id`, () => { location.hash = "#/"; });
 }
 addRoute("/task-stats", async () => (await loadTaskStats()).renderTaskStats());
 addRoute("/flashcards", async () => (await loadFlashcardList()).renderFlashcardList());

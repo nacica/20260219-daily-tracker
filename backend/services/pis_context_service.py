@@ -56,10 +56,7 @@ TYPE_LABELS = {
 BOARDS = {
     "stocks": "株全般",
     "cfd-silver": "CFD銀",
-    "sumco": "sumcoデイトレ",
     "breakout": "新高値ブレイク",
-    "crude-oil": "原油",
-    "natural-gas": "天然ガス",
 }
 
 

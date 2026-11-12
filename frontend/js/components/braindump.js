@@ -5,14 +5,14 @@
  * ラベル機能: メモごとに複数ラベル付与可、ラベルOR検索、専用管理モーダル。
  */
 
-import { braindumpApi } from "../api.js?v=20261107c";
-import { showToast } from "../app.js?v=20261107c";
+import { braindumpApi } from "../api.js?v=20261112a";
+import { showToast } from "../app.js?v=20261112a";
 import {
   attachFloatingToolbar,
   appendMarkdownToEditor,
   serializeEditorMarkdown,
   SIZE_SPAN_STRIP,
-} from "../floating-toolbar.js?v=20261107c";
+} from "../floating-toolbar.js?v=20261112a";
 
 // ===== ユーティリティ =====
 
@@ -118,10 +118,7 @@ function labelChipStyle(name) {
 const BOARDS = {
   "stocks":      { title: "株全般" },
   "cfd-silver":  { title: "CFD銀" },
-  "sumco":       { title: "sumcoデイトレ" },
   "breakout":    { title: "新高値ブレイク" },
-  "crude-oil":   { title: "原油" },
-  "natural-gas": { title: "天然ガス" },
 };
 
 let currentBoard = null; // null = ブレインダンプ本体
