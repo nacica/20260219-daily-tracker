@@ -10,10 +10,10 @@
  * デスクトップ: タスクページはカードのドラッグ&ドロップ（masonry）レイアウト。
  */
 
-import { recordsApi, categoriesApi, taskMetaApi, profileApi } from "../api.js?v=20261112b";
-import { lockButtonHTML, bindLockToggles, setLockState, lockLabel } from "../privacy-toggle.js?v=20261112b";
-import { showToast } from "../app.js?v=20261112b";
-import { showTaskCompleteAnimation } from "./task-stats.js?v=20261112b";
+import { recordsApi, categoriesApi, taskMetaApi, profileApi } from "../api.js?v=20261118a";
+import { lockButtonHTML, bindLockToggles, setLockState, lockLabel } from "../privacy-toggle.js?v=20261118a";
+import { showToast } from "../app.js?v=20261118a";
+import { showTaskCompleteAnimation } from "./task-stats.js?v=20261118a";
 
 /* ── カテゴリ管理 ── */
 
@@ -1804,7 +1804,7 @@ function attachFormEvents(date, isEdit, mode, initialTasks) {
   const grid = document.getElementById("input-grid");
   if (!grid || !completedList) return;
 
-  // タスク追加（各カテゴリカードの上下にある入力欄。カテゴリはカードで決まり、どちらから追加しても末尾に入る）
+  // タスク追加（各カテゴリカードの上下にある入力欄。カテゴリはカードで決まり、どちらから追加しても先頭に入る＝新しいものが上）
   function addTaskFromCard(card, btn) {
     const input = btn?.closest(".task-input-row")?.querySelector(".planned-input") || card?.querySelector(".planned-input");
     const list = card?.querySelector(".planned-list");
@@ -1812,7 +1812,7 @@ function attachFormEvents(date, isEdit, mode, initialTasks) {
     const text = input.value.trim();
     if (!text) return;
     const fullText = formatTaskWithCategory(text, card.dataset.category || "");
-    list.insertAdjacentHTML("beforeend", buildTaskItem(fullText, false));
+    list.insertAdjacentHTML("afterbegin", buildTaskItem(fullText, false));
     recordTaskCreated(fullText);
     input.value = "";
     input.focus();
