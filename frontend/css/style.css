@@ -5673,6 +5673,25 @@ div.journal-textarea.is-empty::before {
   align-items: center;
 }
 
+/* 本文下の 前 / ランダム / 次 ノート移動ボタン（読み終わり位置から次へ進む導線） */
+.bd-footer-nav {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+.bd-footer-nav[hidden] {
+  display: none;
+}
+.bd-footer-nav-btn {
+  flex: 1 1 0;
+  min-height: 40px;
+  white-space: nowrap;
+}
+.bd-footer-nav-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
 /* 写真追加ボタンは左寄せ（削除ボタンは右端のまま） */
 .braindump-photo-btn {
   margin-right: auto;

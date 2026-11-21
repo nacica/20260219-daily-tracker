@@ -5,14 +5,14 @@
  * ラベル機能: メモごとに複数ラベル付与可、ラベルOR検索、専用管理モーダル。
  */
 
-import { braindumpApi } from "../api.js?v=20261118a";
-import { showToast } from "../app.js?v=20261118a";
+import { braindumpApi } from "../api.js?v=20261121a";
+import { showToast } from "../app.js?v=20261121a";
 import {
   attachFloatingToolbar,
   appendMarkdownToEditor,
   serializeEditorMarkdown,
   SIZE_SPAN_STRIP,
-} from "../floating-toolbar.js?v=20261118a";
+} from "../floating-toolbar.js?v=20261121a";
 
 // ===== ユーティリティ =====
 
@@ -378,6 +378,12 @@ export async function renderBraindump(board = null, openEntryId = null) {
           <div class="braindump-textarea-wrap">
             <div class="braindump-textarea is-empty" id="bd-new-textarea" contenteditable="true" spellcheck="false" data-placeholder="思いついたことを自由に書き出してください..."></div>
             <div class="braindump-resize-bar" id="bd-resize-bar" aria-hidden="true" title="ドラッグして縦幅を調整"></div>
+          </div>
+          <!-- 読み終わり用: 前後 / ランダムのノート移動（既存ノート表示中のみ表示） -->
+          <div class="bd-footer-nav" id="bd-footer-nav" role="group" aria-label="ほかのノートへ移動" hidden>
+            <button type="button" class="btn btn-outline btn-sm bd-footer-nav-btn" id="bd-footer-prev-btn" title="一覧で上のノートへ">↑ 前のノート</button>
+            <button type="button" class="btn btn-outline btn-sm bd-footer-nav-btn" id="bd-footer-random-btn" title="過去のノートをランダムに開く">🎲 ランダム</button>
+            <button type="button" class="btn btn-outline btn-sm bd-footer-nav-btn" id="bd-footer-next-btn" title="一覧で下のノートへ">次のノート ↓</button>
           </div>
           <div class="braindump-form-actions">
             <input type="file" id="bd-photo-input" accept="image/*" multiple style="display: none;" />
@@ -1158,6 +1164,10 @@ function attachEvents() {
     btn.addEventListener("click", () => setMobileView(btn.dataset.view));
   });
   attachMobileFilterEvents();
+  // 本文下の 前 / ランダム / 次 ボタン（移動先は常に先頭から表示）
+  document.getElementById("bd-footer-prev-btn")?.addEventListener("click", () => navigateEntryBy(-1, null, { toTop: true }));
+  document.getElementById("bd-footer-next-btn")?.addEventListener("click", () => navigateEntryBy(1, null, { toTop: true }));
+  document.getElementById("bd-footer-random-btn")?.addEventListener("click", openRandomPastEntry);
   // 写真追加（スマホのアルバム / カメラ、PC のファイル選択）
   document.getElementById("bd-photo-btn")?.addEventListener("click", openPhotoPicker);
   document.getElementById("bd-photo-input")?.addEventListener("change", handlePhotoInputChange);
@@ -1333,7 +1343,7 @@ async function flushPendingAutoSave() {
  * fromId を渡すとそのカード基準（キーボード操作）、省略時は編集中ノート基準（ヘッダーボタン）。
  * 端に達したら何もしない。
  */
-async function navigateEntryBy(delta, fromId) {
+async function navigateEntryBy(delta, fromId, { toTop = false } = {}) {
   const ordered = getOrderedEntries();
   if (ordered.length === 0) return;
   const baseId = fromId || editingEntryId || newEntryId;
@@ -1344,8 +1354,55 @@ async function navigateEntryBy(delta, fromId) {
 
   await flushPendingAutoSave();
   loadEntryIntoEditor(next);
+  if (toTop) showEditorFromTop();
   // キーボード操作時のみ移動先カードへフォーカスを移し、連続 ↑↓ を可能にする
   if (fromId) focusEntryCard(next.id);
+}
+
+/** 移動先ノートを先頭から読めるよう、本文欄とページを一番上へ戻す */
+function showEditorFromTop() {
+  const editorEl = document.getElementById("bd-new-textarea");
+  if (editorEl) editorEl.scrollTop = 0;
+  const left = document.querySelector(".braindump-left");
+  if (left && left.getBoundingClientRect().top < 0) left.scrollIntoView({ block: "start" });
+}
+
+/** 表示中ボードの全期間から、今日の分と表示中ノートを除いた過去ノートをランダムに開く */
+async function openRandomPastEntry() {
+  const btn = document.getElementById("bd-footer-random-btn");
+  if (btn) btn.disabled = true;
+  try {
+    if (!allEntriesCache) allEntriesCache = await braindumpApi.list(null, null, currentBoard) || [];
+    const todayStr = today();
+    const pool = allEntriesCache.filter(e => e.date !== todayStr && e.id !== editingEntryId);
+    if (pool.length === 0) {
+      showToast("ランダムに開ける過去のノートがありません");
+      return;
+    }
+    const pick = pool[Math.floor(Math.random() * pool.length)];
+    await flushPendingAutoSave();
+    loadEntryIntoEditor(pick);
+    focusEntryCard(pick.id); // 一覧内の位置を見せる（ページ位置は直後に本文先頭へ戻す）
+    showEditorFromTop();
+  } catch {
+    showToast("ノートの取得に失敗しました", "error");
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+/** 本文下の移動ボタンの表示と ↑↓ の有効/無効を更新（entry=null で非表示） */
+function updateFooterNav(entry) {
+  const bar = document.getElementById("bd-footer-nav");
+  if (!bar) return;
+  bar.hidden = !entry;
+  if (!entry) return;
+  const ordered = getOrderedEntries();
+  const idx = ordered.findIndex(e => e.id === entry.id);
+  const prev = document.getElementById("bd-footer-prev-btn");
+  const next = document.getElementById("bd-footer-next-btn");
+  if (prev) prev.disabled = !(idx > 0);
+  if (next) next.disabled = !(idx >= 0 && idx < ordered.length - 1);
 }
 
 function focusEntryCard(id) {
@@ -1451,6 +1508,7 @@ function updateHeaderForEditing(entry) {
   // フォーム内の削除ボタンを表示
   const deleteBtn = document.getElementById("bd-delete-btn");
   if (deleteBtn) deleteBtn.style.display = "";
+  updateFooterNav(entry);
 }
 
 async function startNewMemo() {
@@ -1514,6 +1572,7 @@ function resetToNewMode() {
   // フォーム内の削除ボタンを非表示
   const deleteBtn = document.getElementById("bd-delete-btn");
   if (deleteBtn) deleteBtn.style.display = "none";
+  updateFooterNav(null);
 
   // 右カラムのアクティブ表示を解除
   document.querySelectorAll(".braindump-entry").forEach(el => el.classList.remove("active"));
