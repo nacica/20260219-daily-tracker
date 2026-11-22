@@ -10,56 +10,15 @@
  * デスクトップ: タスクページはカードのドラッグ&ドロップ（masonry）レイアウト。
  */
 
-import { recordsApi, categoriesApi, taskMetaApi, profileApi } from "../api.js?v=20261121a";
-import { lockButtonHTML, bindLockToggles, setLockState, lockLabel } from "../privacy-toggle.js?v=20261121a";
-import { showToast } from "../app.js?v=20261121a";
-import { showTaskCompleteAnimation } from "./task-stats.js?v=20261121a";
+import { recordsApi, taskMetaApi, profileApi } from "../api.js?v=20261122a";
+import { lockButtonHTML, bindLockToggles, setLockState, lockLabel } from "../privacy-toggle.js?v=20261122a";
+import { showToast } from "../app.js?v=20261122a";
+import { showTaskCompleteAnimation } from "./task-stats.js?v=20261122a";
 
-/* ── カテゴリ管理 ── */
-
-const CATEGORY_STORAGE_KEY = "task-categories";
-const DEFAULT_COLORS = ["#0088aa", "#00894d", "#c47800", "#9c27b0", "#c62828", "#0277bd", "#2e7d32", "#e65100"];
-
-function getCategories() {
-  try {
-    const saved = localStorage.getItem(CATEGORY_STORAGE_KEY);
-    return saved ? JSON.parse(saved) : [];
-  } catch { return []; }
-}
-
-function saveCategories(categories) {
-  localStorage.setItem(CATEGORY_STORAGE_KEY, JSON.stringify(categories));
-  // バックエンドにも同期（awaitしないがエラーログは出す）
-  categoriesApi.save(categories).catch((e) => console.warn("カテゴリ同期失敗:", e));
-}
-
-/** バックエンドからカテゴリを取得してlocalStorageとドロップダウンを同期 */
-async function syncCategoriesFromServer() {
-  try {
-    const res = await categoriesApi.get();
-    const remote = res.categories || [];
-    const local = getCategories();
-
-    if (remote.length > 0) {
-      // サーバー側にデータがある場合: ローカルとマージ（サーバー優先）
-      const merged = [...remote];
-      for (const lc of local) {
-        if (!merged.some((rc) => rc.name === lc.name)) {
-          merged.push(lc);
-        }
-      }
-      localStorage.setItem(CATEGORY_STORAGE_KEY, JSON.stringify(merged));
-      if (merged.length !== remote.length) {
-        await categoriesApi.save(merged);
-      }
-    } else if (local.length > 0) {
-      // サーバーが空でローカルにデータがある場合: ローカルをサーバーに送信
-      await categoriesApi.save(local);
-    }
-  } catch (e) {
-    console.warn("カテゴリ同期失敗:", e);
-  }
-}
+/* ── タスク文字列のカテゴリ接頭辞 ──
+ * カテゴリ分け機能は廃止済み。過去のタスクには「[カテゴリ] 本文」の接頭辞が残っているので、
+ * データは消さずに保持し、画面では本文だけを表示する（編集・完了切替でも接頭辞は維持）。
+ */
 
 function parseTaskCategory(taskStr) {
   const m = taskStr.match(/^\[(.+?)\]\s*/);
@@ -72,41 +31,16 @@ function formatTaskWithCategory(text, category) {
   return `[${category}] ${text}`;
 }
 
-function getCategoryColor(categoryName) {
-  const cats = getCategories();
-  const found = cats.find((c) => c.name === categoryName);
-  if (found) return found.color;
-  return DEFAULT_COLORS[0];
-}
-
-/* ── カラム数永続化 ── */
-
-const COLUMN_COUNT_KEY = "input-form-column-count";
+/* ── カラム数（タスクページはカード 2 枚なので 2 列固定） ── */
 
 function getColumnCount() {
-  const saved = localStorage.getItem(COLUMN_COUNT_KEY);
-  return saved ? parseInt(saved, 10) : 3;
-}
-
-function saveColumnCount(count) {
-  localStorage.setItem(COLUMN_COUNT_KEY, String(count));
-}
-
-function applyColumnCount(count) {
-  const grid = document.getElementById("input-grid");
-  if (!grid) return;
-  grid.setAttribute("data-columns", count);
-  // ボタンのアクティブ状態を更新
-  document.querySelectorAll(".col-toggle-btn").forEach((btn) => {
-    btn.classList.toggle("active", parseInt(btn.dataset.cols, 10) === count);
-  });
-  distributeMasonry();
+  return 2;
 }
 
 /* ── Masonry列配置の永続化 ── */
 
 function getMasonryLayoutKey(colCount) {
-  return "masonry-layout-" + colCount;
+  return "tasks-layout-v2-" + colCount;
 }
 
 function getSavedMasonryLayout(colCount) {
@@ -210,56 +144,21 @@ function flattenMasonry(grid) {
   cards.forEach((card) => grid.appendChild(card));
 }
 
-/* ── タスクページ: カテゴリ別カード ──
- * 予定タスクをカテゴリごとに独立したカードに分け、デスクトップの列切替（1〜4列）と
- * masonry 配置でそのまま並べる。カードの id はカテゴリ名から作るので、列配置の保存
- * （masonry-layout-N）もカテゴリ単位で効く。
- */
+/* ── タスクページ: 予定タスクカード（1 枚） ── */
 
-/** カテゴリ名 → カード要素 id（日本語名も安全に id 化する） */
-function catCardId(name) {
-  return "card-cat-" + (name ? encodeURIComponent(name) : "__none__");
-}
-
-/**
- * 未完了タスクをカテゴリごとにグループ化する。
- * 順序: 定義済みカテゴリ（カテゴリ管理の並び）→ 定義に無いがタスクに残っているカテゴリ → 未分類。
- * 定義済みカテゴリはタスクが 0 件でもカードを出す（レイアウトが安定し、追加欄として使えるため）。
- */
-function groupTasksByCategory(incompleteTasks) {
-  const groups = new Map();
-  for (const c of getCategories()) groups.set(c.name, []);
-  const extra = new Map();
-  const none = [];
-  for (const t of incompleteTasks) {
-    const { category } = parseTaskCategory(t);
-    if (!category) none.push(t);
-    else if (groups.has(category)) groups.get(category).push(t);
-    else {
-      if (!extra.has(category)) extra.set(category, []);
-      extra.get(category).push(t);
-    }
-  }
-  for (const [k, v] of extra) groups.set(k, v);
-  groups.set("", none);
-  return groups;
-}
-
-function buildCategoryCardHTML(name, tasks) {
-  // カテゴリ色は CSS 変数でカードに渡し、見出し文字・左バー・上端ラインの色に使う（未分類は既定の水色）
-  const colorStyle = name ? ` style="--cat-color:${getCategoryColor(name)}"` : "";
+function buildTaskCardHTML(tasks) {
   return `
-      <div class="card draggable-card category-card${tasks.length === 0 ? " is-empty" : ""}" id="${catCardId(name)}" data-category="${escapeHTML(name)}" draggable="false"${colorStyle}>
+      <div class="card draggable-card category-card${tasks.length === 0 ? " is-empty" : ""}" id="card-tasks" draggable="false">
         <div class="card-drag-handle" title="ドラッグで移動">⠿</div>
         <div class="card-title">
-          <span class="card-title-text">${name ? escapeHTML(name) : "未分類"}</span>
+          <span class="card-title-text">タスク</span>
           <span class="card-count category-task-count">${tasks.length}</span>
         </div>
         <div class="task-input-row task-input-row-top">
           <input type="text" class="planned-input" placeholder="タスクを追加" />
           <button class="btn btn-outline btn-sm btn-add-task">追加</button>
         </div>
-        <ul class="task-list planned-list" data-category="${escapeHTML(name)}">${tasks.map((t) => buildTaskItem(t, false)).join("")}</ul>
+        <ul class="task-list planned-list">${tasks.map((t) => buildTaskItem(t, false)).join("")}</ul>
         <div class="task-input-row">
           <input type="text" class="planned-input" placeholder="タスクを追加" />
           <button class="btn btn-outline btn-sm btn-add-task">追加</button>
@@ -267,36 +166,7 @@ function buildCategoryCardHTML(name, tasks) {
       </div>`;
 }
 
-function buildCategoryManageListHTML() {
-  return getCategories().map((c) => `
-              <li class="category-manage-item">
-                <span class="task-category-badge" style="background:${c.color}">${escapeHTML(c.name)}</span>
-                <button class="category-remove-btn" data-remove-category="${escapeHTML(c.name)}" title="削除">✕</button>
-              </li>`).join("");
-}
-
-function buildCategoryMgmtCardHTML() {
-  return `
-      <div class="card draggable-card category-mgmt-card" id="card-category-mgmt" draggable="false">
-        <div class="card-drag-handle" title="ドラッグで移動">⠿</div>
-        <div class="card-title"><span class="card-title-text">カテゴリ管理</span></div>
-        <ul class="category-manage-list" id="category-manage-list">${buildCategoryManageListHTML()}</ul>
-        <div class="task-input-row">
-          <input type="text" id="new-category-input" placeholder="新しいカテゴリ名" />
-          <button class="btn btn-outline btn-sm" id="btn-add-category">追加</button>
-        </div>
-      </div>`;
-}
-
-/** カテゴリ名に対応する予定タスクリスト（無ければ未分類リスト） */
-function getPlannedListFor(category) {
-  const lists = [...document.querySelectorAll(".planned-list")];
-  return lists.find((l) => (l.dataset.category || "") === (category || ""))
-    || lists.find((l) => (l.dataset.category || "") === "")
-    || null;
-}
-
-/** 各カテゴリカードの件数バッジと「空」状態を更新 */
+/** 件数バッジと「空」状態を更新 */
 function syncCategoryCounts() {
   document.querySelectorAll(".category-card").forEach((card) => {
     const n = card.querySelectorAll(".task-item").length;
@@ -304,25 +174,6 @@ function syncCategoryCounts() {
     if (el) el.textContent = n;
     card.classList.toggle("is-empty", n === 0);
   });
-}
-
-/**
- * タスク li のカテゴリを付け替える（data-* とバッジを更新）。
- * data-task / data-edit / data-remove は保存時の収集元なので 3 つとも揃える。
- */
-function setTaskCategory(li, category) {
-  const cb = li.querySelector('input[type="checkbox"]');
-  if (!cb) return;
-  const { text } = parseTaskCategory(cb.dataset.task);
-  const full = formatTaskWithCategory(text, category);
-  cb.dataset.task = full;
-  const eBtn = li.querySelector(".task-edit");
-  if (eBtn) eBtn.dataset.edit = full;
-  const rBtn = li.querySelector(".task-remove");
-  if (rBtn) rBtn.dataset.remove = full;
-  li.querySelector(".task-category-badge")?.remove();
-  const textSpan = li.querySelector(".task-text");
-  if (textSpan) textSpan.insertAdjacentHTML("beforebegin", buildCategoryBadge(category));
 }
 
 /* ── メインレンダリング ── */
@@ -353,18 +204,7 @@ function saveInputCache(date, snapshot) {
   } catch {}
 }
 
-/**
- * セッション内の categories 同期に短い TTL を設けて、
- * 同じセッションでタスクページを複数回開いた時の重複 API 呼び出しを避ける
- */
 const SESSION_SYNC_TTL_MS = 5 * 60 * 1000; // 5分
-let _lastCategoriesSyncAt = 0;
-
-async function syncCategoriesWithCache() {
-  if (Date.now() - _lastCategoriesSyncAt < SESSION_SYNC_TTL_MS) return;
-  await syncCategoriesFromServer();
-  _lastCategoriesSyncAt = Date.now();
-}
 
 /* ── タスクメタ情報（追加日時・完了日時） ──
  * タスク本体は「[カテゴリ] 本文」の文字列で日時を持たないため、カテゴリを除いた本文を
@@ -694,8 +534,8 @@ function focusFirstActivityInput() {
  *
  * 高速化戦略:
  *   1. localStorage キャッシュから即描画（スピナー回避）
- *   2. クリティカルパスの API を並列: record / categories（タスクページのみ） / 直近7日の list
- *   3. categories は 5 分 TTL のセッションキャッシュで二重取得を回避
+ *   2. クリティカルパスの API を並列: record / taskMeta・profile（タスクページのみ） / 直近7日の list
+ *   3. taskMeta などは 5 分 TTL のセッションキャッシュで二重取得を回避
  *
  * 直近7日の list は「予定タスクの引き継ぎ」に使う。行動ログページでも取得しておくのは、
  * その日のレコードを行動ログ側が先に作成した場合でも引き継ぎタスクを一緒に登録し、
@@ -727,7 +567,7 @@ async function _renderPage(date, mode) {
 
   const [recordResult, , prevResult] = await Promise.allSettled([
     recordsApi.get(date),
-    isLog ? Promise.resolve() : Promise.all([syncCategoriesWithCache(), syncTaskMetaWithCache(), syncProfileMeta()]),
+    isLog ? Promise.resolve() : Promise.all([syncTaskMetaWithCache(), syncProfileMeta()]),
     recordsApi.list(startStr, endStr),
   ]);
 
@@ -1119,12 +959,8 @@ function buildFormHTML(date, record, tasks, isEdit, isRestDay = false, restReaso
         </div>
       </div>`;
 
-  // ── タスクページ: カテゴリ別カード（＋未分類） / 完了タスク / カテゴリ管理 ──
-  if (!isLog) {
-    for (const [name, list] of groupTasksByCategory(incompleteTasks)) {
-      cards[catCardId(name)] = buildCategoryCardHTML(name, list);
-    }
-  }
+  // ── タスクページ: 予定タスク（1 枚） / 完了タスク ──
+  if (!isLog) cards["card-tasks"] = buildTaskCardHTML(incompleteTasks);
 
   if (!isLog) cards["card-completed"] = `
       <div class="card draggable-card completed-tasks-card" id="card-completed" draggable="false"
@@ -1139,10 +975,8 @@ function buildFormHTML(date, record, tasks, isEdit, isRestDay = false, restReaso
         </ul>
       </div>`;
 
-  if (!isLog) cards["card-category-mgmt"] = buildCategoryMgmtCardHTML();
-
-  // カードの初期順序は上で組み立てた順（カテゴリ → 未分類 → 完了 → カテゴリ管理）。
-  // デスクトップの列配置はユーザーのドラッグ結果を masonry-layout-N に保存して復元する。
+  // カードの初期順序は上で組み立てた順（タスク → 完了）。
+  // デスクトップの列配置はユーザーのドラッグ結果を tasks-layout-v2-N に保存して復元する。
   const cardsHTML = Object.values(cards).join("");
 
   // おやすみモード理由選択肢
@@ -1161,10 +995,6 @@ function buildFormHTML(date, record, tasks, isEdit, isRestDay = false, restReaso
         <h2 style="margin: 0; font-size: 1.2rem;">タスク管理</h2>
       </div>
       <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: var(--gap);">${dateLabel}</p>
-    </div>
-
-    <div class="col-toggle-bar" id="col-toggle-bar">
-      ${[1, 2, 3, 4].map((n) => `<button class="col-toggle-btn${n === getColumnCount() ? " active" : ""}" data-cols="${n}">${n}列</button>`).join("")}
     </div>
 
     <div class="input-grid tasks-grid" id="input-grid" data-columns="${getColumnCount()}">
@@ -1226,19 +1056,13 @@ function buildFormHTML(date, record, tasks, isEdit, isRestDay = false, restReaso
   `;
 }
 
-function buildCategoryBadge(category) {
-  if (!category) return "";
-  const color = getCategoryColor(category);
-  return `<span class="task-category-badge" style="background:${color}">${escapeHTML(category)}</span>`;
-}
-
 function buildTaskItem(taskText, isCompleted) {
-  const { category, text } = parseTaskCategory(taskText);
+  const { text } = parseTaskCategory(taskText);
   return `
     <li class="task-item${isCompleted ? " completed" : ""}">
       ${!isCompleted ? `<span class="task-drag-handle" title="ドラッグで並べ替え">⠿</span>` : ""}
       <input type="checkbox" ${isCompleted ? "checked" : ""} data-task="${escapeHTML(taskText)}" />
-      ${buildCategoryBadge(category)}<span class="task-text">${escapeHTML(text)}</span>
+      <span class="task-text">${escapeHTML(text)}</span>
       <button class="task-edit" data-edit="${escapeHTML(taskText)}" title="編集">✎</button>
       <button class="task-remove" data-remove="${escapeHTML(taskText)}" title="削除">✕</button>
       ${isCompleted ? buildTaskMetaHTML(taskText) : ""}
@@ -1316,16 +1140,7 @@ function syncCompletedCard() {
 /* ── イベント登録 ── */
 
 function attachColumnToggleEvents() {
-  const bar = document.getElementById("col-toggle-bar");
-  if (!bar) return;
-  bar.addEventListener("click", (e) => {
-    const btn = e.target.closest(".col-toggle-btn");
-    if (!btn) return;
-    const cols = parseInt(btn.dataset.cols, 10);
-    saveColumnCount(cols);
-    applyColumnCount(cols);
-  });
-  // 初回レンダリング時にmasonry適用
+  // 列切替は廃止（2 列固定）。初回レンダリング時に masonry を適用するだけ
   distributeMasonry();
 }
 
@@ -1804,14 +1619,14 @@ function attachFormEvents(date, isEdit, mode, initialTasks) {
   const grid = document.getElementById("input-grid");
   if (!grid || !completedList) return;
 
-  // タスク追加（各カテゴリカードの上下にある入力欄。カテゴリはカードで決まり、どちらから追加しても先頭に入る＝新しいものが上）
+  // タスク追加（カードの上下にある入力欄。どちらから追加しても先頭に入る＝新しいものが上）
   function addTaskFromCard(card, btn) {
     const input = btn?.closest(".task-input-row")?.querySelector(".planned-input") || card?.querySelector(".planned-input");
     const list = card?.querySelector(".planned-list");
     if (!input || !list) return;
     const text = input.value.trim();
     if (!text) return;
-    const fullText = formatTaskWithCategory(text, card.dataset.category || "");
+    const fullText = text;
     list.insertAdjacentHTML("afterbegin", buildTaskItem(fullText, false));
     recordTaskCreated(fullText);
     input.value = "";
@@ -1860,12 +1675,10 @@ function attachFormEvents(date, isEdit, mode, initialTasks) {
         showTaskCompleteAnimation(e.target);
       } else {
         recordTaskCompleted(e.target.dataset.task, false);
-        // 完了 → 予定へ戻す: 元のカテゴリカードへ（受け皿が無ければ未分類へ付け替え）
-        const { category } = parseTaskCategory(e.target.dataset.task);
-        const target = getPlannedListFor(category);
+        // 完了 → 予定へ戻す（タスク文字列はそのまま＝古いカテゴリ接頭辞も保持）
+        const target = document.querySelector(".planned-list");
         if (target) {
-          const targetCat = target.dataset.category || "";
-          const full = formatTaskWithCategory(parseTaskCategory(e.target.dataset.task).text, targetCat);
+          const full = e.target.dataset.task;
           li.remove();
           // 並べ替えハンドル付きの予定タスク行として作り直す
           target.insertAdjacentHTML("beforeend", buildTaskItem(full, false));
@@ -1879,72 +1692,10 @@ function attachFormEvents(date, isEdit, mode, initialTasks) {
     }
   });
 
-  // ── カテゴリ管理 ──
-  function renderCategoryManageList() {
-    const list = document.getElementById("category-manage-list");
-    if (list) list.innerHTML = buildCategoryManageListHTML();
-  }
-
-  /** 新しいカテゴリのカードをグリッドに差し込み、デスクトップでは列配置に組み込む */
-  function insertCategoryCard(name) {
-    if (document.getElementById(catCardId(name))) return;
-    const html = buildCategoryCardHTML(name, []);
-    const completedCard = document.getElementById("card-completed");
-    if (completedCard && completedCard.parentNode === grid) {
-      completedCard.insertAdjacentHTML("beforebegin", html); // モバイル（フラット表示）: 完了タスクの手前
-    } else {
-      grid.insertAdjacentHTML("beforeend", html); // デスクトップ: distributeMasonry が最短列へ配置する
-    }
-    const card = document.getElementById(catCardId(name));
-    bindTaskSort(card.querySelector(".planned-list"));
-    distributeMasonry();
-  }
-
-  const categoryManageList = document.getElementById("category-manage-list");
-  if (categoryManageList) {
-    categoryManageList.addEventListener("click", (e) => {
-      if (e.target.dataset.removeCategory !== undefined) {
-        const name = e.target.dataset.removeCategory;
-        const cats = getCategories().filter((c) => c.name !== name);
-        saveCategories(cats);
-        renderCategoryManageList();
-        // タスクが残っていなければカードも消す（残っていれば次回描画まではそのまま）
-        const card = document.getElementById(catCardId(name));
-        if (card && card.querySelectorAll(".task-item").length === 0) {
-          card.remove();
-          distributeMasonry();
-        }
-      }
-    });
-  }
-
-  const btnAddCategory = document.getElementById("btn-add-category");
-  const newCategoryInput = document.getElementById("new-category-input");
-  if (btnAddCategory && newCategoryInput) {
-    function addCategory() {
-      const name = newCategoryInput.value.trim();
-      if (!name) return;
-      const cats = getCategories();
-      if (cats.find((c) => c.name === name)) {
-        showToast("同じ名前のカテゴリが既にあります", "error");
-        return;
-      }
-      const color = DEFAULT_COLORS[cats.length % DEFAULT_COLORS.length];
-      cats.push({ name, color });
-      saveCategories(cats);
-      newCategoryInput.value = "";
-      renderCategoryManageList();
-      insertCategoryCard(name);
-      showToast(`カテゴリ「${name}」を追加しました`, "success");
-    }
-    btnAddCategory.addEventListener("click", addCategory);
-    // Enter での自動登録は廃止（追加ボタンクリックでのみ登録）
-  }
-
   // カードのドラッグ&ドロップ（デスクトップのみ）
   attachDragDropEvents();
 
-  // タスク並べ替え（デスクトップ＋モバイル）。デスクトップでは別カテゴリのカードへドラッグするとカテゴリを付け替える
+  // タスク並べ替え（デスクトップ＋モバイル）
   const bindTaskSort = attachTaskSortEvents(saveDataQuietly);
   document.querySelectorAll(".planned-list").forEach(bindTaskSort);
   return api;
@@ -1977,10 +1728,8 @@ function attachTaskSortEvents(saveDataQuietly) {
 
   /** ドロップ先リストへ移動。別カードなら data-* とバッジのカテゴリを付け替える */
   function dropInto(list, afterItem) {
-    const fromList = draggedItem.closest("ul");
     if (afterItem) list.insertBefore(draggedItem, afterItem);
     else list.appendChild(draggedItem);
-    if (fromList !== list) setTaskCategory(draggedItem, list.dataset.category || "");
     syncCategoryCounts();
     saveDataQuietly();
   }
