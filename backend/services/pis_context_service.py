@@ -225,6 +225,8 @@ def _udemy_doc(u: dict) -> Doc:
 
 def _flashcard_doc(c: dict) -> Doc:
     labels = ["覚えた"] if c.get("remembered") else ["まだ"]
+    if (c.get("category") or "").strip():
+        labels.append(c["category"].strip())
     return Doc("flashcards", c.get("id", ""), _date_of(c.get("created_at")), title=_first_line(c.get("front", "")),
                labels=labels, texts=[c.get("front", ""), c.get("back", "")], raw=c)
 

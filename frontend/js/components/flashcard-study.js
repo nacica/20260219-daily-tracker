@@ -4,15 +4,35 @@
  * 学習中のカード編集にも対応
  */
 
-import { flashcardsApi } from "../api.js?v=20261122a";
-import { showToast } from "../app.js?v=20261122a";
+import { flashcardsApi } from "../api.js?v=20261125a";
+import { showToast } from "../app.js?v=20261125a";
 import {
   attachFloatingToolbar,
   appendMarkdownToEditor,
   serializeEditorMarkdown,
-} from "../floating-toolbar.js?v=20261122a";
+} from "../floating-toolbar.js?v=20261125a";
 
 const ORDER_STORAGE_KEY = "flashcard-study-order";
+// 一覧画面（flashcard-list.js）と共有するカテゴリー選択
+const CATEGORY_STORAGE_KEY = "flashcard-category";
+const CAT_ALL = "__all__";
+const CAT_NONE = "__none__";
+
+function catOf(card) {
+  return (card.category || "").trim();
+}
+
+function getStudyCategory() {
+  return localStorage.getItem(CATEGORY_STORAGE_KEY) || CAT_ALL;
+}
+
+/** 選択中カテゴリーに属するカード（学習範囲） */
+function scopedCards() {
+  const cat = getStudyCategory();
+  if (cat === CAT_ALL) return allCards;
+  if (cat === CAT_NONE) return allCards.filter((c) => !catOf(c));
+  return allCards.filter((c) => catOf(c) === cat);
+}
 
 let allCards = [];
 let deck = [];       // 出題リスト
@@ -327,9 +347,38 @@ export async function renderFlashcardStudy() {
   renderModeSelect(main);
 }
 
+function buildStudyCategorySelect() {
+  const counts = new Map();
+  let none = 0;
+  allCards.forEach((c) => {
+    const k = catOf(c);
+    if (!k) { none++; return; }
+    counts.set(k, (counts.get(k) || 0) + 1);
+  });
+  const names = [...counts.keys()].sort((a, b) => a.localeCompare(b, "ja"));
+  if (names.length === 0) return "";
+  const cur = getStudyCategory();
+  const chip = (value, label, count) => `
+    <button class="fc-cat-chip ${cur === value ? "active" : ""}" data-cat="${escapeHtml(value)}">
+      ${escapeHtml(label)}<span class="fc-cat-count">${count}</span>
+    </button>`;
+  return `
+    <div class="fcs-order-select">
+      <div class="fcs-order-label">出題するカテゴリー</div>
+      <div class="fc-cat-bar fcs-cat-bar" id="fcs-cat-bar">
+        ${chip(CAT_ALL, "すべて", allCards.length)}
+        ${names.map((n) => chip(n, n, counts.get(n))).join("")}
+        ${none > 0 ? chip(CAT_NONE, "未分類", none) : ""}
+      </div>
+    </div>`;
+}
+
 function renderModeSelect(main) {
-  const totalCount = allCards.length;
-  const notYetCount = allCards.filter((c) => !c.remembered).length;
+  // 保存済みカテゴリーのカードが無くなっていたら「すべて」に戻す
+  if (scopedCards().length === 0) localStorage.setItem(CATEGORY_STORAGE_KEY, CAT_ALL);
+  const scope = scopedCards();
+  const totalCount = scope.length;
+  const notYetCount = scope.filter((c) => !c.remembered).length;
   const rememberedCount = totalCount - notYetCount;
   const savedOrder = getSavedOrder();
 
@@ -346,6 +395,8 @@ function renderModeSelect(main) {
         <span class="fc-stat not-yet">✗ 未記憶 ${notYetCount}</span>
         <span class="fc-stat remembered">✓ 覚えた ${rememberedCount}</span>
       </div>
+
+      ${buildStudyCategorySelect()}
 
       <!-- 順序選択 -->
       <div class="fcs-order-select">
@@ -375,6 +426,17 @@ function renderModeSelect(main) {
       <button class="btn btn-outline btn-sm" id="fcs-mode-back" style="margin-top: 20px;">← 一覧に戻る</button>
     </div>`;
 
+  // カテゴリー選択（枚数表示を更新するため画面を描き直す）
+  const catBar = document.getElementById("fcs-cat-bar");
+  if (catBar) {
+    catBar.addEventListener("click", (e) => {
+      const chip = e.target.closest(".fc-cat-chip");
+      if (!chip) return;
+      localStorage.setItem(CATEGORY_STORAGE_KEY, chip.dataset.cat);
+      renderModeSelect(main);
+    });
+  }
+
   // 順序ボタンのイベント
   let currentOrder = savedOrder;
   main.querySelectorAll(".fcs-order-btn").forEach((btn) => {
@@ -390,11 +452,11 @@ function renderModeSelect(main) {
   const notYetBtn = document.getElementById("fcs-mode-notyet");
   if (notYetBtn) {
     notYetBtn.addEventListener("click", () => {
-      startStudy(main, allCards.filter((c) => !c.remembered), currentOrder);
+      startStudy(main, scopedCards().filter((c) => !c.remembered), currentOrder);
     });
   }
   document.getElementById("fcs-mode-all").addEventListener("click", () => {
-    startStudy(main, allCards, currentOrder);
+    startStudy(main, scopedCards(), currentOrder);
   });
   document.getElementById("fcs-mode-back").addEventListener("click", () => {
     window.location.hash = "/flashcards";
@@ -420,7 +482,7 @@ function renderStudyUI(main) {
         <button class="btn btn-outline btn-sm fcs-back-btn" id="fcs-back">← 一覧に戻る</button>
         <div class="fcs-top-right">
           <button class="btn btn-outline btn-sm fcs-prev-btn" id="fcs-prev" ${currentIndex === 0 ? 'disabled' : ''}>← 前へ</button>
-          <span class="fcs-progress">#${card._num}　${progress} / ${total}</span>
+          <span class="fcs-progress">${catOf(card) ? `<span class="fcs-card-cat">📁 ${escapeHtml(catOf(card))}</span>` : ""}#${card._num}　${progress} / ${total}</span>
         </div>
       </div>
 
@@ -644,7 +706,7 @@ function showComplete() {
       </div>
       <div class="fcs-complete-actions">
         ${total - remembered > 0 ? `<button class="btn btn-primary" id="fcs-retry-notyet">まだのカードだけ再学習（${total - remembered} 枚）</button>` : ""}
-        <button class="btn btn-outline" id="fcs-retry">全カードでもう一度</button>
+        <button class="btn btn-outline" id="fcs-retry">${getStudyCategory() === CAT_ALL ? "全カード" : "このカテゴリー全部"}でもう一度</button>
         <button class="btn btn-outline" id="fcs-to-list">一覧に戻る</button>
       </div>
     </div>`;
@@ -654,11 +716,11 @@ function showComplete() {
   const retryNotYet = document.getElementById("fcs-retry-notyet");
   if (retryNotYet) {
     retryNotYet.addEventListener("click", () => {
-      startStudy(main, allCards.filter((c) => !c.remembered), savedOrder);
+      startStudy(main, scopedCards().filter((c) => !c.remembered), savedOrder);
     });
   }
   document.getElementById("fcs-retry").addEventListener("click", () => {
-    startStudy(main, allCards, savedOrder);
+    startStudy(main, scopedCards(), savedOrder);
   });
   document.getElementById("fcs-to-list").addEventListener("click", () => {
     window.location.hash = "/flashcards";

@@ -61,6 +61,7 @@ async def create_flashcard(body: FlashcardCreate):
         "id": card_id,
         "front": body.front,
         "back": body.back,
+        "category": body.category.strip(),
         "remembered": False,
         "created_at": ts,
         "updated_at": ts,
@@ -95,6 +96,8 @@ async def update_flashcard(card_id: str, body: FlashcardUpdate):
         update_data["back"] = body.back
     if body.is_private is not None:
         update_data["is_private"] = body.is_private
+    if body.category is not None:
+        update_data["category"] = body.category.strip()
 
     result = firestore_service.update_flashcard(card_id, update_data)
     if not result:

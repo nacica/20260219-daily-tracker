@@ -5,14 +5,14 @@
  * カードの追加・編集・削除 + 学習画面への遷移
  */
 
-import { flashcardsApi } from "../api.js?v=20261122a";
-import { lockButtonHTML, bindLockToggles, setLockState, lockLabel } from "../privacy-toggle.js?v=20261122a";
-import { showToast } from "../app.js?v=20261122a";
+import { flashcardsApi } from "../api.js?v=20261125a";
+import { lockButtonHTML, bindLockToggles, setLockState, lockLabel } from "../privacy-toggle.js?v=20261125a";
+import { showToast } from "../app.js?v=20261125a";
 import {
   attachFloatingToolbar,
   appendMarkdownToEditor,
   serializeEditorMarkdown,
-} from "../floating-toolbar.js?v=20261122a";
+} from "../floating-toolbar.js?v=20261125a";
 
 // モジュールロード時に読み込み確認ログを出す（キャッシュ診断用）
 const FLASHCARD_LIST_VERSION = "20260424b";
@@ -351,10 +351,102 @@ async function handleBulkPaste(e) {
 
 const PAGE_SIZE = 15;
 
-let cards = [];
+let allCards = [];   // API から取得した全カード
+let cards = [];      // 現在のカテゴリー絞り込み + 並び替え後の表示用リスト
 let selectedId = null;
 let keyHandler = null;
 let currentPage = 1;
+
+// ========== カテゴリー ==========
+// 学習画面（flashcard-study.js）と同じ localStorage キーを共有する
+const CATEGORY_STORAGE_KEY = "flashcard-category";
+const CAT_ALL = "__all__";
+const CAT_NONE = "__none__";
+let currentCategory = localStorage.getItem(CATEGORY_STORAGE_KEY) || CAT_ALL;
+
+function catOf(card) {
+  return (card.category || "").trim();
+}
+
+/** 既存カテゴリー名（50音順）と件数 */
+function getCategoryStats(list) {
+  const counts = new Map();
+  let none = 0;
+  list.forEach((c) => {
+    const k = catOf(c);
+    if (!k) { none++; return; }
+    counts.set(k, (counts.get(k) || 0) + 1);
+  });
+  const names = [...counts.keys()].sort((a, b) => a.localeCompare(b, "ja"));
+  return { names, counts, none };
+}
+
+function setCategoryFilter(cat) {
+  currentCategory = cat;
+  localStorage.setItem(CATEGORY_STORAGE_KEY, cat);
+}
+
+/** allCards → cards（絞り込み + 「すべて」ではカテゴリー順にグループ化） */
+function applyCategoryFilter() {
+  const { names } = getCategoryStats(allCards);
+  // 保存済みのカテゴリーが消えていたら「すべて」に戻す
+  if (currentCategory !== CAT_ALL && currentCategory !== CAT_NONE && !names.includes(currentCategory)) {
+    setCategoryFilter(CAT_ALL);
+  }
+  if (currentCategory === CAT_NONE && !allCards.some((c) => !catOf(c))) {
+    setCategoryFilter(CAT_ALL);
+  }
+
+  if (currentCategory === CAT_ALL) {
+    // カテゴリー順（未分類は最後）、同カテゴリー内は API の新しい順を維持
+    const order = new Map(names.map((n, i) => [n, i]));
+    cards = allCards
+      .map((c, i) => ({ c, i }))
+      .sort((a, b) => {
+        const ka = catOf(a.c), kb = catOf(b.c);
+        const oa = ka ? order.get(ka) : names.length;
+        const ob = kb ? order.get(kb) : names.length;
+        return oa - ob || a.i - b.i;
+      })
+      .map((x) => x.c);
+  } else if (currentCategory === CAT_NONE) {
+    cards = allCards.filter((c) => !catOf(c));
+  } else {
+    cards = allCards.filter((c) => catOf(c) === currentCategory);
+  }
+}
+
+function buildCategoryBar() {
+  const { names, counts, none } = getCategoryStats(allCards);
+  if (names.length === 0) return ""; // カテゴリー未使用ならバー自体を出さない
+  const chip = (value, label, count) => `
+    <button class="fc-cat-chip ${currentCategory === value ? "active" : ""}" data-cat="${escapeHtml(value)}">
+      ${escapeHtml(label)}<span class="fc-cat-count">${count}</span>
+    </button>`;
+  return `
+    <div class="fc-cat-bar" id="fc-cat-bar">
+      ${chip(CAT_ALL, "すべて", allCards.length)}
+      ${names.map((n) => chip(n, n, counts.get(n))).join("")}
+      ${none > 0 ? chip(CAT_NONE, "未分類", none) : ""}
+    </div>`;
+}
+
+function buildCategoryDatalist() {
+  const { names } = getCategoryStats(allCards);
+  return `<datalist id="fc-cat-datalist">${names.map((n) => `<option value="${escapeHtml(n)}"></option>`).join("")}</datalist>`;
+}
+
+/** 新規追加フォームのカテゴリー初期値（特定カテゴリーで絞り込み中ならそれ） */
+function defaultNewCategory() {
+  return currentCategory === CAT_ALL || currentCategory === CAT_NONE ? "" : currentCategory;
+}
+
+/** 追加したカードが今の絞り込みで見えない場合は、そのカテゴリーへ切り替える */
+function followCategoryAfterCreate(category) {
+  if (currentCategory === CAT_ALL) return;
+  const target = category ? category : CAT_NONE;
+  if (target !== currentCategory) setCategoryFilter(target);
+}
 
 // ページ遷移時にオーバーレイとキーハンドラを除去
 window.addEventListener("hashchange", () => {
@@ -384,18 +476,32 @@ export async function renderFlashcardList() {
   const oldOverlay = document.getElementById("fc-mobile-overlay");
   if (oldOverlay) oldOverlay.remove();
 
-  cards = [];
+  allCards = [];
   try {
-    cards = await flashcardsApi.list();
+    allCards = await flashcardsApi.list();
   } catch (e) {
     showToast(`読み込みに失敗: ${e.message}`, "error");
   }
 
   // 作成順に番号を振る（APIは降順なので逆順に番号付け）
-  cards.forEach((c, i) => { c._num = cards.length - i; });
+  allCards.forEach((c, i) => { c._num = allCards.length - i; });
 
-  const totalCount = cards.length;
-  const rememberedCount = cards.filter((c) => c.remembered).length;
+  renderListView();
+}
+
+/** 取得済みの allCards から画面を組み立てる（カテゴリー切替時は再取得しない） */
+function renderListView() {
+  const main = document.querySelector("main");
+
+  if (keyHandler) {
+    document.removeEventListener("keydown", keyHandler);
+    keyHandler = null;
+  }
+
+  applyCategoryFilter();
+
+  const totalCount = allCards.length;
+  const rememberedCount = allCards.filter((c) => c.remembered).length;
 
   // ページ数を正規化（カード削除後などで超過しないように）
   const totalPages = Math.max(1, Math.ceil(cards.length / PAGE_SIZE));
@@ -434,6 +540,9 @@ export async function renderFlashcardList() {
         <div class="fc-editor" id="fc-new-front" contenteditable="true" data-placeholder="覚えたい言葉や問題を入力... (画像は Ctrl+V で貼り付け)"></div>
         <label class="fc-label">裏面（答え・意味）</label>
         <div class="fc-editor" id="fc-new-back" contenteditable="true" data-placeholder="答えや意味を入力... (画像は Ctrl+V で貼り付け)"></div>
+        <label class="fc-label">カテゴリー（任意）</label>
+        <input type="text" class="fc-cat-input" id="fc-new-category" list="fc-cat-datalist" maxlength="50"
+          placeholder="例: 英単語 / 健康（新しい名前を入れると自動で作成）" value="${escapeHtml(defaultNewCategory())}" />
         <div class="fc-form-btns">
           <button class="btn btn-primary btn-sm" id="fc-save-new">保存</button>
           <button class="btn btn-outline btn-sm" id="fc-cancel-new">キャンセル</button>
@@ -446,6 +555,9 @@ export async function renderFlashcardList() {
         <div class="fc-bulk-help">
           <code>===</code> で表面と裏面を区切り、<code>---</code> でカード同士を区切ります。改行はそのまま反映されます。
         </div>
+        <label class="fc-label">カテゴリー（任意・登録する全カードに適用）</label>
+        <input type="text" class="fc-cat-input" id="fc-bulk-category" list="fc-cat-datalist" maxlength="50"
+          placeholder="例: 英単語" value="${escapeHtml(defaultNewCategory())}" />
         <textarea class="fc-textarea" id="fc-bulk-input" rows="14"></textarea>
         <div class="fc-bulk-preview" id="fc-bulk-preview"></div>
         <div class="fc-form-btns">
@@ -455,6 +567,9 @@ export async function renderFlashcardList() {
         </div>
         <div class="fc-bulk-status" id="fc-bulk-status" style="display:none; margin-top:16px; padding:14px; background:#111; color:#eee; border:2px solid #ffcc00; border-radius:8px; font-family:monospace; font-size:13px; white-space:pre-wrap; max-height:320px; overflow-y:auto; box-shadow:0 0 12px rgba(255,204,0,0.4);"></div>
       </div>
+
+      ${buildCategoryDatalist()}
+      ${buildCategoryBar()}
 
       <!-- 2ペインレイアウト -->
       ${cards.length === 0
@@ -471,7 +586,7 @@ export async function renderFlashcardList() {
               </div>
               ${buildPagination(currentPage, totalPages, "top")}
               <div class="fc-pane-list" id="fc-pane-list">
-                ${getPageCards(currentPage).map((c) => buildListRow(c)).join("")}
+                ${buildPageRows(currentPage)}
               </div>
               ${buildPagination(currentPage, totalPages, "bottom")}
             </div>
@@ -518,6 +633,26 @@ function getPageCards(page) {
   return cards.slice(start, start + PAGE_SIZE);
 }
 
+/** ページ内の行 HTML。「すべて」表示ではカテゴリーが変わる位置に見出しを挟む */
+function buildPageRows(page) {
+  const pageCards = getPageCards(page);
+  const grouped = currentCategory === CAT_ALL && getCategoryStats(allCards).names.length > 0;
+  if (!grouped) return pageCards.map((c) => buildListRow(c)).join("");
+  const { counts, none } = getCategoryStats(allCards);
+  let prev = null;
+  return pageCards.map((c) => {
+    const k = catOf(c);
+    let header = "";
+    if (k !== prev) {
+      const label = k || "未分類";
+      const n = k ? counts.get(k) : none;
+      header = `<div class="fc-group-header">📁 ${escapeHtml(label)}<span class="fc-cat-count">${n}</span></div>`;
+      prev = k;
+    }
+    return header + buildListRow(c);
+  }).join("");
+}
+
 function buildPagination(page, totalPages, position) {
   if (totalPages <= 1) return "";
   return `
@@ -544,7 +679,7 @@ function rerenderList(direction) {
   const listEl = document.getElementById("fc-pane-list");
   if (!listEl) return;
 
-  const newHtml = getPageCards(currentPage).map((c) => buildListRow(c)).join("");
+  const newHtml = buildPageRows(currentPage);
 
   if (direction) {
     // スライド+フェードアニメーション
@@ -618,6 +753,7 @@ function buildDetailView(card) {
     <div class="fc-detail-header">
       <span class="fc-detail-num">#${card._num}</span>
       <span class="fc-item-status ${statusClass}">${statusLabel}</span>
+      <span class="fc-detail-cat ${catOf(card) ? "" : "none"}">📁 ${escapeHtml(catOf(card) || "未分類")}</span>
       <span class="fc-detail-date">${formatDateTime(card.created_at)}</span>
     </div>
     <div class="fc-detail-section">
@@ -641,6 +777,9 @@ function buildDetailView(card) {
       <div class="fc-editor fc-edit-front" contenteditable="true" data-initial="${encodeURIComponent(card.front)}"></div>
       <label class="fc-label">裏面</label>
       <div class="fc-editor fc-edit-back" contenteditable="true" data-initial="${encodeURIComponent(card.back)}"></div>
+      <label class="fc-label">カテゴリー</label>
+      <input type="text" class="fc-cat-input fc-edit-category" list="fc-cat-datalist" maxlength="50"
+        placeholder="空欄で未分類" value="${escapeHtml(catOf(card))}" />
       <div class="fc-form-btns">
         <button class="btn btn-primary btn-sm fc-detail-save-edit" data-id="${card.id}">保存</button>
         <button class="btn btn-outline btn-sm fc-detail-cancel-edit" data-id="${card.id}">キャンセル</button>
@@ -826,12 +965,14 @@ function attachDetailEvents(container) {
       const id = saveBtn.dataset.id;
       const front = editorToMarkdown(root.querySelector(".fc-edit-front"));
       const back = editorToMarkdown(root.querySelector(".fc-edit-back"));
+      const category = (root.querySelector(".fc-edit-category")?.value || "").trim();
       if (!front || !back) {
         showToast("表面と裏面の両方を入力してください", "error");
         return;
       }
       try {
-        await flashcardsApi.update(id, { front, back });
+        await flashcardsApi.update(id, { front, back, category });
+        followCategoryAfterCreate(category);
         showToast("カードを更新しました", "success");
         renderFlashcardList();
       } catch (e) {
@@ -952,12 +1093,14 @@ function attachEvents() {
   document.getElementById("fc-save-new").addEventListener("click", async () => {
     const front = editorToMarkdown(document.getElementById("fc-new-front"));
     const back = editorToMarkdown(document.getElementById("fc-new-back"));
+    const category = document.getElementById("fc-new-category").value.trim();
     if (!front || !back) {
       showToast("表面と裏面の両方を入力してください", "error");
       return;
     }
     try {
-      await flashcardsApi.create(front, back);
+      await flashcardsApi.create(front, back, category);
+      followCategoryAfterCreate(category);
       showToast("カードを追加しました", "success");
       renderFlashcardList();
     } catch (e) {
@@ -1027,7 +1170,8 @@ function attachEvents() {
       log(`=== 一括登録 開始 (version=${FLASHCARD_LIST_VERSION}) ===`, "#0ff");
 
       const text = document.getElementById("fc-bulk-input").value;
-      log(`入力長: ${text.length} 文字`);
+      const bulkCategory = document.getElementById("fc-bulk-category").value.trim();
+      log(`入力長: ${text.length} 文字 / カテゴリー: ${bulkCategory || "(未分類)"}`);
 
       const { cards: parsed, skipped } = parseBulkInput(text);
       log(`パース結果: 有効=${parsed.length} 件, スキップ=${skipped.length} 件`);
@@ -1049,7 +1193,7 @@ function attachEvents() {
         const label = `#${i + 1}/${parsed.length} "${card.front.slice(0, 20)}"`;
         log(`→ POST ${label}`);
         try {
-          const res = await flashcardsApi.create(card.front, card.back);
+          const res = await flashcardsApi.create(card.front, card.back, bulkCategory);
           successCount++;
           saveBtn.textContent = `登録中... (${successCount}/${parsed.length})`;
           log(`  ✓ 成功 id=${res?.id || "?"}`, "#0f0");
@@ -1074,6 +1218,7 @@ function attachEvents() {
       } else {
         showToast(`${successCount} 枚のカードを登録しました`, "success");
       }
+      followCategoryAfterCreate(bulkCategory);
       // 成功時のみリスト再描画（ステータスログは renderFlashcardList で消える）
       setTimeout(() => renderFlashcardList(), 800);
     } catch (fatal) {
@@ -1085,6 +1230,19 @@ function attachEvents() {
       saveBtn.textContent = originalText;
     }
   });
+
+  // カテゴリーチップ（絞り込み切替。再取得せずに描画し直す）
+  const catBar = document.getElementById("fc-cat-bar");
+  if (catBar) {
+    catBar.addEventListener("click", (e) => {
+      const chip = e.target.closest(".fc-cat-chip");
+      if (!chip || chip.dataset.cat === currentCategory) return;
+      setCategoryFilter(chip.dataset.cat);
+      selectedId = null;
+      currentPage = 1;
+      renderListView();
+    });
+  }
 
   // 左ペインのクリックイベント
   const listEl = document.getElementById("fc-pane-list");

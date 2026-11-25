@@ -362,10 +362,10 @@ export const udemyTipsApi = {
 
 export const flashcardsApi = {
   /** カード作成 */
-  create: (front, back) =>
+  create: (front, back, category = "") =>
     apiFetch("/flashcards", {
       method: "POST",
-      body: { front, back },
+      body: { front, back, category },
     }),
 
   /** 全カード取得（作成日降順） */

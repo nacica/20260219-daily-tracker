@@ -10,10 +10,10 @@
  * デスクトップ: タスクページはカードのドラッグ&ドロップ（masonry）レイアウト。
  */
 
-import { recordsApi, taskMetaApi, profileApi } from "../api.js?v=20261122a";
-import { lockButtonHTML, bindLockToggles, setLockState, lockLabel } from "../privacy-toggle.js?v=20261122a";
-import { showToast } from "../app.js?v=20261122a";
-import { showTaskCompleteAnimation } from "./task-stats.js?v=20261122a";
+import { recordsApi, taskMetaApi, profileApi } from "../api.js?v=20261125a";
+import { lockButtonHTML, bindLockToggles, setLockState, lockLabel } from "../privacy-toggle.js?v=20261125a";
+import { showToast } from "../app.js?v=20261125a";
+import { showTaskCompleteAnimation } from "./task-stats.js?v=20261125a";
 
 /* ── タスク文字列のカテゴリ接頭辞 ──
  * カテゴリ分け機能は廃止済み。過去のタスクには「[カテゴリ] 本文」の接頭辞が残っているので、

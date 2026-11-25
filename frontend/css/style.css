@@ -9453,3 +9453,96 @@ body.nav-sorting * {
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
+
+/* ===== 単語帳: カテゴリー ===== */
+.fc-cat-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 4px 0 14px;
+}
+
+.fcs-cat-bar {
+  justify-content: center;
+  margin: 0;
+}
+
+.fc-cat-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: 0.85rem;
+  border: 1px solid var(--border-color, var(--border));
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.fc-cat-chip:hover {
+  border-color: var(--neon-green);
+}
+
+.fc-cat-chip.active {
+  background: rgba(0, 255, 148, 0.12);
+  border-color: var(--neon-green);
+  color: var(--neon-green);
+  font-weight: 600;
+}
+
+.fc-cat-count {
+  font-size: 0.72rem;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--bg-secondary);
+  color: var(--text-muted);
+}
+
+.fc-cat-chip.active .fc-cat-count {
+  background: rgba(0, 255, 148, 0.18);
+  color: var(--neon-green);
+}
+
+.fc-group-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px 6px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--neon-green);
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-secondary);
+}
+
+.fc-cat-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  margin-bottom: 10px;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs, 6px);
+}
+
+.fc-detail-cat {
+  font-size: 0.78rem;
+  padding: 2px 8px;
+  border-radius: 999px;
+  color: var(--neon-green);
+  background: rgba(0, 255, 148, 0.08);
+}
+
+.fc-detail-cat.none {
+  color: var(--text-muted);
+  background: var(--bg-secondary);
+}
+
+.fcs-card-cat {
+  margin-right: 8px;
+  color: var(--neon-green);
+}

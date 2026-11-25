@@ -7,14 +7,14 @@
  * 下書きは確定版を上書きしない。「下書きを採用」で確定版に流し込んでから手直しする。
  */
 
-import { profileApi } from "../api.js?v=20261122a";
-import { showToast } from "../app.js?v=20261122a";
+import { profileApi } from "../api.js?v=20261125a";
+import { showToast } from "../app.js?v=20261125a";
 import {
   attachFloatingToolbar,
   appendMarkdownToEditor,
   serializeEditorMarkdown,
-} from "../floating-toolbar.js?v=20261122a";
-import { renderStickyMd, addMdRefreshHook } from "./michishirube.js?v=20261122a";
+} from "../floating-toolbar.js?v=20261125a";
+import { renderStickyMd, addMdRefreshHook } from "./michishirube.js?v=20261125a";
 
 const state = {
   content: "",

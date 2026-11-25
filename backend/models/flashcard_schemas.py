@@ -13,6 +13,7 @@ class FlashcardCreate(BaseModel):
     """カード作成リクエスト"""
     front: str = Field(..., min_length=1, max_length=5000, description="表面（問題・単語）")
     back: str = Field(..., min_length=1, max_length=5000, description="裏面（答え・意味）")
+    category: str = Field("", max_length=50, description="カテゴリー（空文字 = 未分類）")
 
 
 class FlashcardUpdate(BaseModel):
@@ -20,6 +21,7 @@ class FlashcardUpdate(BaseModel):
     front: Optional[str] = Field(None, min_length=1, max_length=5000)
     back: Optional[str] = Field(None, min_length=1, max_length=5000)
     is_private: Optional[bool] = Field(None, description="true: Claude（MCP）に渡さない")
+    category: Optional[str] = Field(None, max_length=50, description="カテゴリー（空文字で未分類に戻す）")
 
 
 class FlashcardMark(BaseModel):
@@ -36,5 +38,6 @@ class FlashcardEntry(BaseModel):
     back: str
     remembered: bool = False
     is_private: bool = False
+    category: str = ""
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
